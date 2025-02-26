@@ -8,6 +8,43 @@
 #include "neopixel.h"
 
 #define GPIO_WS2812B_PIN GPIO_NUM_38
+#define NUM_LEDS 17
+#define ANIMATION_DELAY_MS 50
+
+static tNeopixelContext *neopixel_ctx = NULL;
+
+void running_light_animation(void) {
+    static int position = 0;
+    tNeopixel pixels[NUM_LEDS];
+    
+    for (int i = 0; i < NUM_LEDS; i++) {
+        pixels[i].index = i;
+        pixels[i].rgb = NP_RGB(0, 0, 0);
+    }
+    
+    for (int i = 0; i < 3; i++) {
+        int pos = (position + i) % NUM_LEDS;
+        uint8_t intensity = 255 >> i; 
+        pixels[pos].rgb = NP_RGB(0, 0, intensity / 8);
+    }
+    
+    neopixel_SetPixel(neopixel_ctx, pixels, NUM_LEDS);
+    position = (position + 1) % NUM_LEDS;
+}
+
+void led_control_task(void *pvParameters) {
+    neopixel_ctx = neopixel_Init(NUM_LEDS, GPIO_WS2812B_PIN);
+    if (neopixel_ctx == NULL) {
+        printf("Failed to initialize NeoPixel\n");
+        vTaskDelete(NULL);
+        return;
+    }
+    
+    while (1) {
+        running_light_animation();
+        vTaskDelay(pdMS_TO_TICKS(ANIMATION_DELAY_MS));
+    }
+}
 
 void init_gpio(void)
 {
@@ -61,5 +98,7 @@ void init_gpio(void)
 void app_main(void)
 {
     init_gpio();
+    xTaskCreatePinnedToCore(led_control_task, "LED_Control", 4096, NULL, 5, NULL, 1);
+    
     printf("Free heap: %d bytes\n", (int)esp_get_free_heap_size());
 }
