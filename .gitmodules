@@ -1,0 +1,3 @@
+[submodule "components/neopixel"]
+	path = components/neopixel
+	url = https://github.com/zorxx/neopixel
