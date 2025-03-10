@@ -26,22 +26,9 @@ static const char *TAG = "MAIN";
 static TaskHandle_t button_task_handle = NULL;
 static QueueHandle_t intrQueue = NULL;
 
-static void button_task(void *arg);
 static void init_gpio(void);
-
-static void IRAM_ATTR gpio_button_isr_handler(void* args) {
-    int arg = (int) args;
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    
-    xQueueSendFromISR(intrQueue, &arg, &xHigherPriorityTaskWoken);
-    if (xHigherPriorityTaskWoken == pdTRUE) {
-        portYIELD_FROM_ISR();
-    }
-}
-
-static void init_variables() {
-    intrQueue = xQueueCreate(4, sizeof(int));
-}
+static void init_variables(void);
+static void run_hid_bridge(void);
 
 void app_main(void) {
     ESP_LOGI(TAG, "Starting USB HID to BLE HID bridge");
@@ -55,13 +42,21 @@ void app_main(void) {
 
     init_variables();
     init_gpio();
+
     led_control_init(NUM_LEDS, GPIO_WS2812B_PIN);
-    xTaskCreate(button_task, "button_task", 8192 * 4, NULL, 2, &button_task_handle);
+    led_update_pattern(usb_hid_host_device_connected(), ble_hid_device_connected());
+    
+    vTaskDelay(pdMS_TO_TICKS(100));
+    run_hid_bridge();
 
     while (1) {
         led_update_pattern(usb_hid_host_device_connected(), ble_hid_device_connected());
         vTaskDelay(pdMS_TO_TICKS(100));
     }
+}
+
+static void init_variables() {
+    intrQueue = xQueueCreate(4, sizeof(int));
 }
 
 static void run_hid_bridge() {
@@ -78,16 +73,6 @@ static void run_hid_bridge() {
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to start HID bridge: %s", esp_err_to_name(ret));
         return;
-    }
-}
-
-static void button_task(void *arg) {
-    int value;
-    while (1) {
-        if (xQueueReceive(intrQueue, &value, portMAX_DELAY) == pdTRUE) {
-            ESP_LOGI(TAG, "Button pressed, starting HID bridge");
-            run_hid_bridge();
-        }
     }
 }
 
@@ -131,18 +116,6 @@ static void init_gpio(void) {
         .intr_type = GPIO_INTR_DISABLE
     };
     gpio_config(&input_pullup_conf);
-
-    gpio_config_t button_conf = {
-        .pin_bit_mask = (1ULL<<GPIO_BUTTON_SW4),
-        .mode = GPIO_MODE_INPUT,
-        .pull_up_en = GPIO_PULLUP_ENABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_NEGEDGE 
-    };
-    gpio_config(&button_conf);
-
-    gpio_install_isr_service(0);
-    gpio_isr_handler_add(GPIO_BUTTON_SW4, gpio_button_isr_handler, (void*) 1);
 
     // CHARGE_EN: LOW = EN
     gpio_set_level(GPIO_NUM_36, 1);
