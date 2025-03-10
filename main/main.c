@@ -23,7 +23,6 @@ static const char *TAG = "MAIN";
 #define GPIO_BUTTON_SW4 GPIO_NUM_13
 #define NUM_LEDS 17
 
-static TaskHandle_t button_task_handle = NULL;
 static QueueHandle_t intrQueue = NULL;
 
 static void init_gpio(void);

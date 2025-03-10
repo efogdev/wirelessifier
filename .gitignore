@@ -2,3 +2,5 @@
 managed_components
 *.old
 build
+.idea
+cmake-build-debug

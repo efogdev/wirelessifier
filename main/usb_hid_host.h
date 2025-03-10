@@ -12,6 +12,11 @@
 
 #pragma once
 
+// Utility macro for getting minimum of two values
+#ifndef MIN
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
+
 #include <stdbool.h>
 #include <stdint.h>
 #include "esp_err.h"
@@ -22,50 +27,47 @@
 extern "C" {
 #endif
 
-// Custom HID report types for our application
+// HID report field types
 typedef enum {
-    USB_HID_REPORT_TYPE_KEYBOARD,
-    USB_HID_REPORT_TYPE_MOUSE,
-    USB_HID_REPORT_TYPE_UNKNOWN
-} usb_hid_report_type_t;
+    USB_HID_FIELD_TYPE_INPUT = 0,
+    USB_HID_FIELD_TYPE_OUTPUT = 1,
+    USB_HID_FIELD_TYPE_FEATURE = 2
+} usb_hid_field_type_t;
 
-// Keyboard report structure
+// HID report field attributes
 typedef struct {
-    uint8_t modifier;
-    uint8_t reserved;
-    uint8_t keys[6];
-} usb_hid_keyboard_report_t;
+    uint16_t usage_page;
+    uint16_t usage;
+    uint8_t report_size;    // Size in bits
+    uint8_t report_count;   // Number of data fields
+    uint32_t logical_min;
+    uint32_t logical_max;
+    bool constant;          // Constant vs Data
+    bool variable;          // Variable vs Array
+    bool relative;          // Relative vs Absolute
+} usb_hid_field_attr_t;
 
-// Mouse report structure
+// HID report field data
 typedef struct {
-    uint8_t buttons;
-    int8_t x;
-    int8_t y;
-    int8_t wheel;
-} usb_hid_mouse_report_t;
+    usb_hid_field_attr_t attr;
+    uint32_t *values;       // Array of values for this field
+} usb_hid_field_t;
 
-// Generic HID report structure
+// HID report structure
 typedef struct {
-    usb_hid_report_type_t type;
-    union {
-        usb_hid_keyboard_report_t keyboard;
-        usb_hid_mouse_report_t mouse;
-        uint8_t raw[64];
-    };
-    uint16_t raw_len;
+    uint8_t report_id;
+    usb_hid_field_type_t type;
+    uint8_t num_fields;
+    usb_hid_field_t *fields;
+    uint8_t raw[64];       // Raw report data
+    uint16_t raw_len;      // Length of raw data
 } usb_hid_report_t;
 
 // Callback function type for HID reports
 typedef void (*usb_hid_report_callback_t)(usb_hid_report_t *report);
 
 /**
- * @brief Initialize the USB HID Host
- * 
- * This function initializes the USB HID Host by:
- * 1. Creating an event group for USB host events
- * 2. Creating the USB Host Library Daemon Task
- * 3. Creating the HID Host Client Task
- * 
+ * @brief Initialize the USB HID Host* 
  * @param report_queue Queue to receive HID reports
  * @return esp_err_t ESP_OK on success, error code otherwise
  */
@@ -73,13 +75,6 @@ esp_err_t usb_hid_host_init(QueueHandle_t report_queue);
 
 /**
  * @brief Deinitialize the USB HID Host
- * 
- * This function deinitializes the USB HID Host by:
- * 1. Deleting the HID Host Client Task
- * 2. Deleting the USB Host Library Daemon Task
- * 3. Deleting the event group
- * 4. Resetting all state variables
- * 
  * @return esp_err_t ESP_OK on success, error code otherwise
  */
 esp_err_t usb_hid_host_deinit(void);

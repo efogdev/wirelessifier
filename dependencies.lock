@@ -17,8 +17,16 @@ dependencies:
     source:
       type: idf
     version: 5.4.0
+  zorxx/neopixel:
+    component_hash: eb2457ac2b7fca04be1834cf3af7a901f72969918a30ce68a1c1b0c160306201
+    dependencies: []
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.0.10
 direct_dependencies:
 - espressif/usb_host_hid
-manifest_hash: 900653e7920628c803653fb1b61cd275a06b8b34c39941062ecca89b329e80a0
+- zorxx/neopixel
+manifest_hash: b8fdbfde6087159b83d52cf7c6baa70855d676cd33273a90c0c750414979cbdf
 target: esp32s3
 version: 2.0.0
