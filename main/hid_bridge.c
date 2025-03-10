@@ -178,12 +178,24 @@ esp_err_t hid_bridge_process_report(usb_hid_report_t *report)
     switch (report->type) {
         case USB_HID_REPORT_TYPE_KEYBOARD:
             ESP_LOGD(TAG, "Forwarding keyboard report");
-            ret = ble_hid_device_send_keyboard_report(&report->keyboard);
+            // Convert USB keyboard report to BLE keyboard report
+            keyboard_report_t ble_kb_report = {
+                .modifier = report->keyboard.modifier,
+                .keycode = report->keyboard.keys[0] // Take first key pressed
+            };
+            ret = ble_hid_device_send_keyboard_report(&ble_kb_report);
             break;
 
         case USB_HID_REPORT_TYPE_MOUSE:
             ESP_LOGD(TAG, "Forwarding mouse report");
-            ret = ble_hid_device_send_mouse_report(&report->mouse);
+            // Convert USB mouse report to BLE mouse report
+            mouse_report_t ble_mouse_report = {
+                .buttons = report->mouse.buttons,
+                .x = report->mouse.x,
+                .y = report->mouse.y,
+                .wheel = report->mouse.wheel
+            };
+            ret = ble_hid_device_send_mouse_report(&ble_mouse_report);
             break;
 
         case USB_HID_REPORT_TYPE_UNKNOWN:
