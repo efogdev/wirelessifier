@@ -11,6 +11,19 @@
 extern "C" {
 #endif
 
+// Status LED colors
+#define STATUS_COLOR_OFF    0x000000
+#define STATUS_COLOR_RED    0xFF0000
+#define STATUS_COLOR_GREEN  0x00FF00
+#define STATUS_COLOR_BLUE   0x0000FF
+#define STATUS_COLOR_PURPLE 0xFF00FF
+#define STATUS_COLOR_WHITE  0xFFFFFF
+
+// Status LED modes
+#define STATUS_MODE_OFF     0
+#define STATUS_MODE_ON      1
+#define STATUS_MODE_BLINK   2
+
 // LED pattern definitions
 #define LED_PATTERN_IDLE 0
 #define LED_PATTERN_USB_CONNECTED 1
@@ -28,6 +41,9 @@ void led_control_init(int num_leds, int gpio_pin);
 
 // Update LED pattern based on connection status
 void led_update_pattern(bool usb_connected, bool ble_connected);
+
+// Update status LED (LED 0)
+void led_update_status(uint32_t color, uint8_t mode);
 
 #ifdef __cplusplus
 }
