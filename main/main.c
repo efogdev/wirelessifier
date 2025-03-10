@@ -77,7 +77,7 @@ static void run_hid_bridge() {
 }
 
 static void init_gpio(void) {
-    gpio_config_t io_conf = {
+    gpio_config_t output_pullup_conf = {
         .pin_bit_mask = (
             (1ULL<<GPIO_NUM_36) |
             (1ULL<<GPIO_NUM_35) |
@@ -90,7 +90,7 @@ static void init_gpio(void) {
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .intr_type = GPIO_INTR_DISABLE
     };
-    gpio_config(&io_conf);
+    gpio_config(&output_pullup_conf);
 
     gpio_config_t input_nopull_conf = {
         .pin_bit_mask = (
@@ -116,15 +116,6 @@ static void init_gpio(void) {
         .intr_type = GPIO_INTR_DISABLE
     };
     gpio_config(&input_pullup_conf);
-
-    // CHARGE_EN: LOW = EN
-    gpio_set_level(GPIO_NUM_36, 1);
-
-    // USB_MUX_OE: LOW = EN
-    gpio_set_level(GPIO_NUM_34, 1);
-
-    // USB_MUX_SEL: 1 = PC, 0 = MC
-    gpio_set_level(GPIO_NUM_33, 0);
 
     // PWR_LED: red, via 5.1kOhm
     // PWM to optimize battery life
