@@ -4,17 +4,15 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
-#include "freertos/semphr.h"
-#include "esp_system.h"
 #include "esp_log.h"
 #include "esp_err.h"
 #include "nvs_flash.h"
 #include "driver/gpio.h"
 #include "driver/ledc.h"
-#include "usb_hid_host.h"
+#include "usb/usb_hid_host.h"
 #include "ble_hid_device.h"
 #include "hid_bridge.h"
-#include "rgb_utils.h"
+#include "rgb/rgb_utils.h"
 
 static const char *TAG = "MAIN";
 

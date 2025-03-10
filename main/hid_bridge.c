@@ -4,7 +4,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
-#include "usb_hid_host.h"
+#include "usb/usb_hid_host.h"
 #include "ble_hid_device.h"
 
 static const char *TAG = "HID_BRIDGE";
