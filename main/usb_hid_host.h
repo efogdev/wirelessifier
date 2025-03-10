@@ -1,3 +1,15 @@
+/**
+ * @file usb_hid_host.h
+ * @brief USB HID Host interface
+ * 
+ * This header file defines the interface for the USB HID Host functionality.
+ * It provides functions to initialize and deinitialize the USB HID Host,
+ * check device connection status, and defines the structures for HID reports.
+ * 
+ * The implementation follows the architecture described in the USB Host Library documentation,
+ * with a Host Library Daemon Task and a Client Task for handling USB events.
+ */
+
 #pragma once
 
 #include <stdbool.h>
@@ -47,24 +59,37 @@ typedef struct {
 typedef void (*usb_hid_report_callback_t)(usb_hid_report_t *report);
 
 /**
- * @brief Initialize USB HID host
+ * @brief Initialize the USB HID Host
+ * 
+ * This function initializes the USB HID Host by:
+ * 1. Creating an event group for USB host events
+ * 2. Creating the USB Host Library Daemon Task
+ * 3. Creating the HID Host Client Task
  * 
  * @param report_queue Queue to receive HID reports
- * @return esp_err_t ESP_OK on success
+ * @return esp_err_t ESP_OK on success, error code otherwise
  */
 esp_err_t usb_hid_host_init(QueueHandle_t report_queue);
 
 /**
- * @brief Deinitialize USB HID host
+ * @brief Deinitialize the USB HID Host
  * 
- * @return esp_err_t ESP_OK on success
+ * This function deinitializes the USB HID Host by:
+ * 1. Deleting the HID Host Client Task
+ * 2. Deleting the USB Host Library Daemon Task
+ * 3. Deleting the event group
+ * 4. Resetting all state variables
+ * 
+ * @return esp_err_t ESP_OK on success, error code otherwise
  */
 esp_err_t usb_hid_host_deinit(void);
 
 /**
  * @brief Check if a USB HID device is connected
  * 
- * @return true if connected, false otherwise
+ * This function returns the current connection status of USB HID devices.
+ * 
+ * @return true if a USB HID device is connected, false otherwise
  */
 bool usb_hid_host_device_connected(void);
 
