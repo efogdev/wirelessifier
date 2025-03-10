@@ -8,6 +8,10 @@
 #include "esp_gap_ble_api.h"
 #include "esp_gatts_api.h"
 #include "esp_gatt_defs.h"
+#include "esp_bt_defs.h"
+#include "esp_bt_main.h"
+#include "esp_bt_device.h"
+#include "esp_gatt_common_api.h"
 #include "esp_hidd.h"
 #include "esp_hid_common.h"
 #include "freertos/FreeRTOS.h"
@@ -155,24 +159,17 @@ extern void esp_hidd_gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if
 esp_err_t ble_hid_device_init(void)
 {
     if (s_ble_hid_device_initialized) {
-        ESP_LOGW(TAG, "BLE HID device already initialized");
         return ESP_OK;
     }
 
-    // Initialize NVS
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ret = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK(ret);
+    ESP_LOGW(TAG, "%d: - RAM left %d", (int) __LINE__, (int) esp_get_free_heap_size());
 
     // Release the memory for classic BT since we only use BLE
     ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
 
     // Initialize BT controller with BLE mode
     esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
-    ret = esp_bt_controller_init(&bt_cfg);
+    esp_err_t ret = esp_bt_controller_init(&bt_cfg);
     if (ret) {
         ESP_LOGE(TAG, "Initialize BT controller failed: %s", esp_err_to_name(ret));
         return ret;
@@ -197,7 +194,7 @@ esp_err_t ble_hid_device_init(void)
     }
 
     // Set device name
-    ret = esp_bt_dev_set_device_name(hid_config.device_name);
+    ret = esp_ble_gap_set_device_name(hid_config.device_name);
     if (ret) {
         ESP_LOGE(TAG, "Set device name failed: %s", esp_err_to_name(ret));
         return ret;
@@ -235,6 +232,23 @@ esp_err_t ble_hid_device_init(void)
     esp_ble_gap_set_security_param(ESP_BLE_SM_MAX_KEY_SIZE, &key_size, sizeof(uint8_t));
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_INIT_KEY, &init_key, sizeof(uint8_t));
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_RSP_KEY, &rsp_key, sizeof(uint8_t));
+
+    // ret = esp_ble_gatts_app_register(0);
+    // if (ret) {
+    //     ESP_LOGE(TAG, "gatts app register error, error code = %x", ret);
+    //     return ret;
+    // }
+
+    // ret = esp_ble_gatts_app_register(1);
+    // if (ret) {
+    //     ESP_LOGE(TAG, "gatts app register error, error code = %x", ret);
+    //     return ret;
+    // }
+
+    esp_err_t local_mtu_ret = esp_ble_gatt_set_local_mtu(500);
+    if (local_mtu_ret) {
+        ESP_LOGE(TAG, "set local MTU failed, error code = %x", local_mtu_ret);
+    }
 
     s_ble_hid_device_initialized = true;
     ESP_LOGI(TAG, "BLE HID device initialized");

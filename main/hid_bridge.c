@@ -115,11 +115,11 @@ esp_err_t hid_bridge_start(void)
     BaseType_t task_created = xTaskCreatePinnedToCore(
         hid_bridge_task,
         "hid_bridge",
-        4096,
+        8192,
         NULL,
         5,
         &s_hid_bridge_task_handle,
-        0
+        1
     );
     if (task_created != pdTRUE) {
         ESP_LOGE(TAG, "Failed to create HID bridge task");
@@ -204,17 +204,13 @@ static void hid_bridge_task(void *arg)
 
     usb_hid_report_t report;
     while (1) {
-        // Wait for HID report from USB HID host
         if (xQueueReceive(s_hid_report_queue, &report, portMAX_DELAY) == pdTRUE) {
-            // Check if USB HID device is connected
             if (usb_hid_host_device_connected()) {
-                // Process report
                 hid_bridge_process_report(&report);
             }
         }
     }
 
-    // This point should never be reached
     ESP_LOGE(TAG, "HID bridge task exiting");
     vTaskDelete(NULL);
 }

@@ -40,7 +40,7 @@ void led_control_init(int num_leds, int gpio_pin)
         return;
     }
     
-    xTaskCreate(led_control_task, "LED_Control", 2048, NULL, configMAX_PRIORITIES - 1, &s_led_task_handle);
+    xTaskCreate(led_control_task, "led_control", 2048, NULL, configMAX_PRIORITIES - 1, &s_led_task_handle);
 }
 
 void led_update_pattern(bool usb_connected, bool ble_connected)
