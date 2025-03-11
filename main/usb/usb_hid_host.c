@@ -15,6 +15,16 @@
 #include "usb/hid_host.h"
 #include "usb_hid_host.h"
 
+// HID Usage Pages
+#define HID_USAGE_PAGE_GENERIC_DESKTOP  0x01
+#define HID_USAGE_PAGE_KEYBOARD         0x07
+#define HID_USAGE_PAGE_BUTTON          0x09
+
+// HID Generic Desktop Page Usages
+#define HID_USAGE_X                    0x30
+#define HID_USAGE_Y                    0x31
+#define HID_USAGE_WHEEL               0x38
+
 static const char *TAG = "usb_hid_host";
 
 static QueueHandle_t g_report_queue = NULL;
