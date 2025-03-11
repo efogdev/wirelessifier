@@ -1,20 +1,14 @@
 #include "ble_hid_device.h"
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "esp_system.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "esp_bt.h"
 #include "esp_hidd_prf_api.h"
 #include "esp_bt_defs.h"
 #include "esp_gap_ble_api.h"
-#include "esp_gatts_api.h"
-#include "esp_gatt_defs.h"
 #include "esp_bt_main.h"
-#include "esp_bt_device.h"
 #include "hid_dev.h"
 
 static const char *TAG = "BLE_HID";
@@ -22,7 +16,7 @@ static const char *TAG = "BLE_HID";
 static uint16_t s_conn_id = 0;
 static bool s_connected = false;
 
-#define HIDD_DEVICE_NAME            "Adept HID"
+#define HIDD_DEVICE_NAME            "USB-to-BLE HID bridge"
 static uint8_t hidd_service_uuid128[] = {
     /* LSB <--------------------------------------------------------------------------------> MSB */
     //first uuid, 16bit, [12],[13] is the value

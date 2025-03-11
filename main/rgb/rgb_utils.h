@@ -24,11 +24,28 @@ extern "C" {
 #define STATUS_MODE_ON      1
 #define STATUS_MODE_BLINK   2
 
+// Animation types
+typedef enum {
+    ANIM_TYPE_BREATHING,
+    ANIM_TYPE_RUNNING_LIGHT,
+    ANIM_TYPE_RUNNING_LIGHT_BOUNCE,
+    ANIM_TYPE_ALTERNATING
+} led_animation_type_t;
+
+// LED pattern structure
+typedef struct {
+    uint32_t colors[2];           // Primary and secondary colors (for alternating patterns)
+    led_animation_type_t type;    // Animation type
+    uint8_t trail_length;         // Length of the trail for running light (1-255)
+    uint8_t speed;                // Animation speed (1-255, higher is faster)
+    bool direction_up;            // Direction for running light animations (true = up, false = down)
+} led_pattern_t;
+
 // LED pattern definitions
 #define LED_PATTERN_IDLE 0
 #define LED_PATTERN_USB_CONNECTED 1
-#define LED_PATTERN_BLE_ADVERTISING 2
-#define LED_PATTERN_BLE_CONNECTED 3
+#define LED_PATTERN_BLE_CONNECTED 2
+#define LED_PATTERN_BOTH_CONNECTED 3
 
 // Global brightness setting (0-100%)
 extern uint8_t g_rgb_brightness;

@@ -17,14 +17,12 @@
 
 static const char *TAG = "usb_hid_host";
 
-// Global variables
 static QueueHandle_t g_report_queue = NULL;
 static QueueHandle_t g_event_queue = NULL;
 static bool g_device_connected = false;
 static TaskHandle_t g_usb_events_task_handle = NULL;
 static TaskHandle_t g_event_task_handle = NULL;
 
-// Event queue structure
 typedef struct {
     enum {
         APP_EVENT_HID_DEVICE,
@@ -44,25 +42,12 @@ typedef struct {
     };
 } hid_event_queue_t;
 
-// Forward declarations
 static void usb_lib_task(void *arg);
 static void hid_host_event_task(void *arg);
-
-static void hid_host_device_callback(hid_host_device_handle_t hid_device_handle,
-                                     hid_host_driver_event_t event,
-                                     void *arg);
-
-static void hid_host_interface_callback(hid_host_device_handle_t hid_device_handle,
-                                        hid_host_interface_event_t event,
-                                        void *arg);
-
-static void process_device_event(hid_host_device_handle_t hid_device_handle,
-                               const hid_host_driver_event_t event,
-                               void *arg);
-
-static void process_interface_event(hid_host_device_handle_t hid_device_handle,
-                                  const hid_host_interface_event_t event,
-                                  void *arg);
+static void hid_host_device_callback(hid_host_device_handle_t hid_device_handle, hid_host_driver_event_t event, void *arg);
+static void hid_host_interface_callback(hid_host_device_handle_t hid_device_handle, hid_host_interface_event_t event, void *arg);
+static void process_device_event(hid_host_device_handle_t hid_device_handle, hid_host_driver_event_t event, void *arg);
+static void process_interface_event(hid_host_device_handle_t hid_device_handle, hid_host_interface_event_t event, void *arg);
 
 esp_err_t usb_hid_host_init(QueueHandle_t report_queue) {
     ESP_LOGI(TAG, "Initializing USB HID Host");
@@ -73,15 +58,12 @@ esp_err_t usb_hid_host_init(QueueHandle_t report_queue) {
 
     g_report_queue = report_queue;
     g_device_connected = false;
-    
-    // Create event queue
     g_event_queue = xQueueCreate(10, sizeof(hid_event_queue_t));
     if (g_event_queue == NULL) {
         ESP_LOGE(TAG, "Failed to create event queue");
         return ESP_ERR_NO_MEM;
     }
 
-    // Initialize USB Host Library
     const usb_host_config_t host_config = {
         .skip_phy_setup = false,
         .intr_flags = ESP_INTR_FLAG_LEVEL1,
@@ -89,27 +71,13 @@ esp_err_t usb_hid_host_init(QueueHandle_t report_queue) {
 
     ESP_ERROR_CHECK(usb_host_install(&host_config));
 
-    // Create event handling task
-    BaseType_t task_created = xTaskCreatePinnedToCore(hid_host_event_task,
-                                                     "hid_events",
-                                                     4096,
-                                                     NULL,
-                                                     3,
-                                                     &g_event_task_handle,
-                                                     0);
+    BaseType_t task_created = xTaskCreatePinnedToCore(hid_host_event_task, "hid_events", 4096, NULL, 3, &g_event_task_handle, 0);
     if (task_created != pdTRUE) {
         vQueueDelete(g_event_queue);
         return ESP_ERR_NO_MEM;
     }
 
-    // Create USB Events Task
-    task_created = xTaskCreatePinnedToCore(usb_lib_task,
-                                                      "usb_events",
-                                                      4096,
-                                                      NULL,
-                                                      2,
-                                                      &g_usb_events_task_handle,
-                                                      0);
+    task_created = xTaskCreatePinnedToCore(usb_lib_task, "usb_events", 4096, NULL, 2, &g_usb_events_task_handle, 0);
     if (task_created != pdTRUE) {
         vTaskDelete(g_event_task_handle);
         vQueueDelete(g_event_queue);
@@ -117,7 +85,6 @@ esp_err_t usb_hid_host_init(QueueHandle_t report_queue) {
         return ESP_ERR_NO_MEM;
     }
 
-    // Initialize HID Host Driver
     const hid_host_driver_config_t hid_host_config = {
         .create_background_task = true,
         .task_priority = 4,
@@ -146,7 +113,6 @@ esp_err_t usb_hid_host_deinit(void) {
         return ret;
     }
 
-    // Delete tasks
     if (g_event_task_handle != NULL) {
         vTaskDelete(g_event_task_handle);
         g_event_task_handle = NULL;
@@ -161,7 +127,6 @@ esp_err_t usb_hid_host_deinit(void) {
         ESP_LOGE(TAG, "Failed to uninstall USB host: %d", ret);
     }
 
-    // Delete queues
     if (g_event_queue != NULL) {
         vQueueDelete(g_event_queue);
         g_event_queue = NULL;
@@ -178,7 +143,7 @@ bool usb_hid_host_device_connected(void) {
 }
 
 static void process_report(const uint8_t *data, size_t length, uint8_t report_id) {
-    if (!data || length == 0 || !g_report_queue) {
+    if (length == 0 || !g_report_queue) {
         return;
     }
 
@@ -194,9 +159,7 @@ static void process_report(const uint8_t *data, size_t length, uint8_t report_id
     xQueueSend(g_report_queue, &report, 0);
 }
 
-static void hid_host_interface_callback(hid_host_device_handle_t hid_device_handle,
-                                      const hid_host_interface_event_t event,
-                                      void *arg) {
+static void hid_host_interface_callback(hid_host_device_handle_t hid_device_handle, const hid_host_interface_event_t event, void *arg) {
     if (!g_event_queue) {
         return;
     }
@@ -219,9 +182,7 @@ static const char *hid_proto_name_str[] = {
     "MOUSE"
 };
 
-static void hid_host_device_callback(hid_host_device_handle_t hid_device_handle,
-                                   const hid_host_driver_event_t event,
-                                   void *arg) {
+static void hid_host_device_callback(hid_host_device_handle_t hid_device_handle, const hid_host_driver_event_t event, void *arg) {
     if (!g_event_queue) {
         return;
     }
@@ -238,14 +199,12 @@ static void hid_host_device_callback(hid_host_device_handle_t hid_device_handle,
     xQueueSend(g_event_queue, &evt, 0);
 }
 
-static void process_device_event(hid_host_device_handle_t hid_device_handle,
-                               const hid_host_driver_event_t event,
-                               void *arg) {
+static void process_device_event(hid_host_device_handle_t hid_device_handle, const hid_host_driver_event_t event, void *arg) {
     hid_host_dev_params_t dev_params;
     ESP_ERROR_CHECK(hid_host_device_get_params(hid_device_handle, &dev_params));
 
     if (event == HID_HOST_DRIVER_EVENT_CONNECTED) {
-        ESP_LOGI(TAG, "HID Device Connected, proto = %s", hid_proto_name_str[dev_params.proto]);
+        ESP_LOGI(TAG, "HID Device Connected, proto = %s, subclass = %d", hid_proto_name_str[dev_params.proto], dev_params.sub_class);
 
         const hid_host_device_config_t dev_config = {
             .callback = hid_host_interface_callback,
@@ -264,12 +223,15 @@ static void process_device_event(hid_host_device_handle_t hid_device_handle,
 
         ESP_ERROR_CHECK(hid_host_device_start(hid_device_handle));
         g_device_connected = true;
+    } else {
+        ESP_LOGI(TAG, "Unknown device event, subclass = %d, proto = %s, iface = %d",
+            dev_params.sub_class, hid_proto_name_str[dev_params.proto], dev_params.iface_num);
     }
 }
 
-static void process_interface_event(hid_host_device_handle_t hid_device_handle,
-                                  const hid_host_interface_event_t event,
-                                  void *arg) {
+static void process_interface_event(hid_host_device_handle_t hid_device_handle, const hid_host_interface_event_t event, void *arg) {
+    ESP_LOGI(TAG, "Interface event received: %d", event);
+
     uint8_t data[64] = {0};
     size_t data_length = 0;
     hid_host_dev_params_t dev_params;
@@ -278,12 +240,12 @@ static void process_interface_event(hid_host_device_handle_t hid_device_handle,
 
     switch (event) {
         case HID_HOST_INTERFACE_EVENT_INPUT_REPORT:
-            ESP_LOGD(TAG, "Received input report from interface 0x%x", dev_params.iface_num);
+            ESP_LOGI(TAG, "Received input report from interface 0x%x", dev_params.iface_num);
             ESP_ERROR_CHECK(hid_host_device_get_raw_input_report_data(hid_device_handle,
                 data,
                 sizeof(data),
                 &data_length));
-            ESP_LOGD(TAG, "Raw input report data: length=%d", data_length);
+            ESP_LOGI(TAG, "Raw input report data: length=%d", data_length);
 
             process_report(data, data_length, 0);
             break;
@@ -311,17 +273,11 @@ static void hid_host_event_task(void *arg) {
         if (xQueueReceive(g_event_queue, &evt, portMAX_DELAY)) {
             switch (evt.event_group) {
                 case APP_EVENT_HID_DEVICE:
-                    process_device_event(evt.device_event.handle,
-                                      evt.device_event.event,
-                                      evt.device_event.arg);
+                    process_device_event(evt.device_event.handle, evt.device_event.event, evt.device_event.arg);
                     break;
-
                 case APP_EVENT_INTERFACE:
-                    process_interface_event(evt.interface_event.handle,
-                                         evt.interface_event.event,
-                                         evt.interface_event.arg);
+                    process_interface_event(evt.interface_event.handle, evt.interface_event.event, evt.interface_event.arg);
                     break;
-
                 default:
                     ESP_LOGW(TAG, "Unknown event group: %d", evt.event_group);
                     break;

@@ -166,7 +166,7 @@ static esp_err_t process_keyboard_report(usb_hid_report_t *report) {
         }
     }
     
-    ESP_LOGD(TAG, "Forwarding keyboard report: mod=0x%02x key=0x%02x",
+    ESP_LOGI(TAG, "Forwarding keyboard report: mod=0x%02x key=0x%02x",
              ble_kb_report.modifier, ble_kb_report.keycode);
     return ble_hid_device_send_keyboard_report(&ble_kb_report);
 }
@@ -200,7 +200,7 @@ static esp_err_t process_mouse_report(usb_hid_report_t *report) {
         }
     }
 
-    ESP_LOGD(TAG, "Forwarding mouse report: btn=0x%02x x=%d y=%d wheel=%d",
+    ESP_LOGI(TAG, "Forwarding mouse report: btn=0x%02x x=%d y=%d wheel=%d",
              ble_mouse_report.buttons, ble_mouse_report.x,
              ble_mouse_report.y, ble_mouse_report.wheel);
     return ble_hid_device_send_mouse_report(&ble_mouse_report);
