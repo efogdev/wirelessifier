@@ -249,6 +249,6 @@ esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report)
     buffer[2] = report->y;
     buffer[3] = report->wheel;
 
-    esp_hidd_send_mouse_value(s_conn_id, buffer[0], buffer[1], buffer[2]);
+    esp_hidd_send_mouse_value(s_conn_id, buffer[0], buffer[1], buffer[2], buffer[3]);
     return ESP_OK;
 }

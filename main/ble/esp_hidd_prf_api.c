@@ -118,14 +118,14 @@ void esp_hidd_send_keyboard_value(uint16_t conn_id, key_mask_t special_key_mask,
     return;
 }
 
-void esp_hidd_send_mouse_value(uint16_t conn_id, uint8_t mouse_button, int8_t mickeys_x, int8_t mickeys_y)
+void esp_hidd_send_mouse_value(uint16_t conn_id, uint8_t mouse_button, int8_t mickeys_x, int8_t mickeys_y, int8_t wheel)
 {
     uint8_t buffer[HID_MOUSE_IN_RPT_LEN];
 
     buffer[0] = mouse_button;   // Buttons
     buffer[1] = mickeys_x;           // X
     buffer[2] = mickeys_y;           // Y
-    buffer[3] = 0;           // Wheel
+    buffer[3] = wheel;           // Wheel
     buffer[4] = 0;           // AC Pan
 
     hid_dev_send_report(hidd_le_env.gatt_if, conn_id,

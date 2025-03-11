@@ -23,6 +23,7 @@ static QueueHandle_t g_event_queue = NULL;
 static bool g_device_connected = false;
 static TaskHandle_t g_usb_events_task_handle = NULL;
 static TaskHandle_t g_event_task_handle = NULL;
+static SemaphoreHandle_t g_report_maps_mutex = NULL;
 
 #define MAX_REPORT_FIELDS 32
 #define MAX_COLLECTION_DEPTH 8
@@ -81,6 +82,11 @@ esp_err_t usb_hid_host_init(QueueHandle_t report_queue) {
     }
 
     g_report_queue = report_queue;
+    g_report_maps_mutex = xSemaphoreCreateMutex();
+    if (g_report_maps_mutex == NULL) {
+        ESP_LOGE(TAG, "Failed to create report maps mutex");
+        return ESP_ERR_NO_MEM;
+    }
     g_device_connected = false;
     g_event_queue = xQueueCreate(128, sizeof(hid_event_queue_t));
     if (g_event_queue == NULL) {
@@ -155,6 +161,10 @@ esp_err_t usb_hid_host_deinit(void) {
         vQueueDelete(g_event_queue);
         g_event_queue = NULL;
     }
+    if (g_report_maps_mutex != NULL) {
+        vSemaphoreDelete(g_report_maps_mutex);
+        g_report_maps_mutex = NULL;
+    }
     g_report_queue = NULL;
     g_device_connected = false;
     
@@ -169,6 +179,11 @@ bool usb_hid_host_device_connected(void) {
 static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t interface_num) {
     if (interface_num >= USB_HOST_MAX_INTERFACES) {
         ESP_LOGE(TAG, "Interface number %d exceeds maximum", interface_num);
+        return;
+    }
+
+    if (xSemaphoreTake(g_report_maps_mutex, pdMS_TO_TICKS(1000)) != pdTRUE) {
+        ESP_LOGE(TAG, "Failed to take report maps mutex");
         return;
     }
 
@@ -267,21 +282,39 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
 
     ESP_LOGI(TAG, "Parsed report descriptor for interface %d: %d fields, %d total bits", 
              interface_num, report_map->num_fields, report_map->total_bits);
+             
+    xSemaphoreGive(g_report_maps_mutex);
 }
 
 static uint32_t extract_field_value(const uint8_t *data, uint16_t bit_offset, uint16_t bit_size) {
+    if (!data || bit_size == 0 || bit_size > 32) {
+        return 0;
+    }
+
     uint32_t value = 0;
     uint16_t byte_offset = bit_offset / 8;
     uint8_t bit_shift = bit_offset % 8;
     uint16_t bits_remaining = bit_size;
-    uint8_t current_byte;
+    
+    // Handle single bit case separately for efficiency
+    if (bit_size == 1) {
+        uint8_t byte_value;
+        memcpy(&byte_value, &data[byte_offset], sizeof(uint8_t));
+        return (byte_value >> bit_shift) & 0x01;
+    }
 
+    // Process multiple bytes
     while (bits_remaining > 0) {
-        current_byte = data[byte_offset];
+        uint8_t current_byte;
+        memcpy(&current_byte, &data[byte_offset], sizeof(uint8_t));
+        
         uint8_t bits_to_read = MIN(8 - bit_shift, bits_remaining);
         uint8_t mask = ((1 << bits_to_read) - 1);
-        uint8_t byte_value = (current_byte >> bit_shift) & mask;
-        value |= byte_value << (bit_size - bits_remaining);
+        uint32_t byte_value = (current_byte >> bit_shift) & mask;
+        
+        // Shift into the correct position in the result
+        uint8_t shift_amount = bit_size - bits_remaining;
+        value |= (byte_value << shift_amount);
         
         bits_remaining -= bits_to_read;
         byte_offset++;
@@ -292,13 +325,18 @@ static uint32_t extract_field_value(const uint8_t *data, uint16_t bit_offset, ui
 }
 
 static void process_report(hid_host_device_handle_t hid_device_handle, const uint8_t *data, size_t length, uint8_t report_id, uint8_t interface_num) {
-    if (!data || length == 0 || !g_report_queue) {
-        ESP_LOGE(TAG, "Invalid input parameters");
+    if (!data || length == 0 || length > 64 || !g_report_queue) {
+        ESP_LOGE(TAG, "Invalid input parameters: data=%p, length=%zu", data, length);
         return;
     }
 
     if (interface_num >= USB_HOST_MAX_INTERFACES) {
         ESP_LOGE(TAG, "Interface number %d exceeds maximum", interface_num);
+        return;
+    }
+
+    if (xSemaphoreTake(g_report_maps_mutex, pdMS_TO_TICKS(1000)) != pdTRUE) {
+        ESP_LOGE(TAG, "Failed to take report maps mutex");
         return;
     }
 
@@ -317,21 +355,6 @@ static void process_report(hid_host_device_handle_t hid_device_handle, const uin
     for (uint8_t i = 0; i < report_map->num_fields; i++) {
         const report_field_info_t *field_info = &report_map->fields[i];
         uint32_t value = extract_field_value(data, field_info->bit_offset, field_info->bit_size);
-
-        // For mouse wheel (Generic Desktop page, Wheel usage), convert to signed value
-        if (field_info->attr.usage_page == 0x0001 && field_info->attr.usage == 0x0038) {
-            // Convert to signed value based on logical min/max
-            if (field_info->attr.logical_min < 0) {
-                // If logical min is negative, treat as signed
-                int32_t signed_value = (int32_t)value;
-                if (signed_value > field_info->attr.logical_max) {
-                    signed_value = field_info->attr.logical_max;
-                } else if (signed_value < field_info->attr.logical_min) {
-                    signed_value = field_info->attr.logical_min;
-                }
-                value = (uint32_t)signed_value;
-            }
-        }
         
         field_values[i] = value;
         fields[i] = (usb_hid_field_t) {
@@ -339,8 +362,8 @@ static void process_report(hid_host_device_handle_t hid_device_handle, const uin
             .values = &field_values[i]
         };
 
-        ESP_LOGI(TAG, "Field %d: usage_page=0x%04x, usage=0x%04x, value=%" PRIu32,
-                i, field_info->attr.usage_page, field_info->attr.usage, field_values[i]);
+        // ESP_LOGI(TAG, "Field %d: usage_page=0x%04x, usage=0x%04x, value=%" PRIu32,
+        //         i, field_info->attr.usage_page, field_info->attr.usage, field_values[i]);
     }
 
     report.fields = fields;
@@ -350,6 +373,8 @@ static void process_report(hid_host_device_handle_t hid_device_handle, const uin
     if (queue_result != pdTRUE) {
         ESP_LOGE(TAG, "Failed to send report to queue");
     }
+
+    xSemaphoreGive(g_report_maps_mutex);
 }
 
 static void hid_host_interface_callback(hid_host_device_handle_t hid_device_handle, const hid_host_interface_event_t event, void *arg) {

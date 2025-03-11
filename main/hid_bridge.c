@@ -170,14 +170,22 @@ static esp_err_t process_mouse_report(usb_hid_report_t *report) {
                     ble_mouse_report.y = (int8_t)(field->values[0]);
                 break;
                 case HID_USAGE_WHEEL: // Scroll wheel
-                    ble_mouse_report.wheel = (int8_t)(field->values[0]);
+                    if (field->values[0] == 255) {
+                        ble_mouse_report.wheel = 1;  // Up
+                    } else if (field->values[0] == 1) {
+                        ble_mouse_report.wheel = -1; // Down
+                    }
                 break;
             }
         }
         // Button Page (0x09)
         else if (field->attr.usage_page == HID_USAGE_PAGE_BUTTON) {
-            // The first byte contains all button states
-            ble_mouse_report.buttons = (uint8_t)(field->values[0]);
+            if (field->values && field->attr.usage >= 1 && field->attr.usage <= 8) {
+                // Set the corresponding bit in buttons byte based on button number (1-8)
+                if (field->values[0]) {
+                    ble_mouse_report.buttons |= (1 << (field->attr.usage - 1));
+                }
+            }
         }
     }
 
