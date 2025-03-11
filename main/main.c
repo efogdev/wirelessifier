@@ -89,18 +89,6 @@ static void init_gpio(void) {
     };
     gpio_config(&output_pullup_conf);
 
-    gpio_config_t input_nopull_conf = {
-        .pin_bit_mask = (
-            (1ULL<<GPIO_NUM_19) |
-            (1ULL<<GPIO_NUM_20)
-        ),
-        .mode = GPIO_MODE_INPUT,
-        .pull_up_en = GPIO_PULLDOWN_DISABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE
-    };
-    gpio_config(&input_nopull_conf);
-
     gpio_config_t input_pullup_conf = {
         .pin_bit_mask = (
             (1ULL<<GPIO_NUM_14) |

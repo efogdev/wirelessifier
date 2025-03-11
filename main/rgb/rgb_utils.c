@@ -11,7 +11,7 @@
 #include <math.h>
 
 static const char *TAG = "RGB_UTILS";
-#define FPS 240
+#define FPS 120
 uint8_t g_rgb_brightness = 10;
 
 // Pattern definitions
