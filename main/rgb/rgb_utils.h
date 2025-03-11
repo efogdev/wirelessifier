@@ -28,8 +28,7 @@ extern "C" {
 typedef enum {
     ANIM_TYPE_BREATHING,
     ANIM_TYPE_RUNNING_LIGHT,
-    ANIM_TYPE_RUNNING_LIGHT_BOUNCE,
-    ANIM_TYPE_ALTERNATING
+    ANIM_TYPE_RUNNING_LIGHT_BOUNCE
 } led_animation_type_t;
 
 // LED pattern structure

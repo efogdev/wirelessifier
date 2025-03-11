@@ -12,7 +12,7 @@
 
 static const char *TAG = "RGB_UTILS";
 #define FPS 240
-uint8_t g_rgb_brightness = 50;
+uint8_t g_rgb_brightness = 10;
 
 // Pattern definitions
 static const led_pattern_t led_patterns[] = {
@@ -21,7 +21,7 @@ static const led_pattern_t led_patterns[] = {
         .colors = {NP_RGB(255, 0, 0), 0},
         .type = ANIM_TYPE_BREATHING,
         .trail_length = 1,
-        .speed = 40,  // Moderate speed for breathing
+        .speed = 40, 
         .direction_up = true
     },
     // USB_CONNECTED
@@ -29,15 +29,15 @@ static const led_pattern_t led_patterns[] = {
         .colors = {NP_RGB(0, 0, 255), 0},
         .type = ANIM_TYPE_RUNNING_LIGHT_BOUNCE,
         .trail_length = 2,
-        .speed = 50,  // Quarter speed for bounce effect
+        .speed = 50, 
         .direction_up = true
     },
     // BLE_CONNECTED 
     {
         .colors = {NP_RGB(255, 0, 255), 0},
         .type = ANIM_TYPE_RUNNING_LIGHT,
-        .trail_length = 3,
-        .speed = 35,  // Quarter speed for running light
+        .trail_length = 2,
+        .speed = 35, 
         .direction_up = false
     },
     // BOTH_CONNECTED
@@ -45,7 +45,7 @@ static const led_pattern_t led_patterns[] = {
         .colors = {NP_RGB(0, 255, 0)},
         .type = ANIM_TYPE_RUNNING_LIGHT_BOUNCE,
         .trail_length = 3,
-        .speed = 50,  // Half speed for bounce effect
+        .speed = 50, 
         .direction_up = true
     }
 };
@@ -167,7 +167,7 @@ static void update_status_led(tNeopixel* pixels)
     }
 }
 
-static void apply_pattern(tNeopixel* pixels, const led_pattern_t* pattern)
+static inline void apply_pattern(tNeopixel* pixels, const led_pattern_t* pattern)
 {
     int column_length = (s_num_leds - 1) / 2;
     uint32_t current_color = s_use_secondary_color ? pattern->colors[1] : pattern->colors[0];
@@ -177,41 +177,37 @@ static void apply_pattern(tNeopixel* pixels, const led_pattern_t* pattern)
 
     switch (pattern->type) {
         case ANIM_TYPE_RUNNING_LIGHT_BOUNCE: {
-            float bounce_progress = progress * 2;
-            if (bounce_progress > 1.0f) {
-                bounce_progress = 2.0f - bounce_progress; // Reverse direction
-            }
-            int position = (int)(bounce_progress * (column_length - 1));
-            
-            // Apply easing to position
-            float eased_progress = 0.5f - 0.5f * cosf(bounce_progress * M_PI);
-            position = (int)(eased_progress * (column_length - 1));
-
-            // First column with smooth trail
-            for (int i = 1; i < 1 + column_length; i++) {
-                float distance = fabsf(i - (1 + position));
-                if (distance < pattern->trail_length) {
-                    float intensity = cosf(distance / pattern->trail_length * M_PI_2);
-                    intensity *= intensity; // Square for smoother falloff
-                    uint32_t color = current_color;
-                    uint8_t r = ((color >> 16) & 0xFF) * intensity;
-                    uint8_t g = ((color >> 8) & 0xFF) * intensity;
-                    uint8_t b = (color & 0xFF) * intensity;
-                    pixels[i].rgb = rgb_color(r, g, b);
-                }
+            // Calculate position with bounce
+            float bounce_progress;
+            if (progress < 0.5f) {
+                bounce_progress = progress * 2.0f; // Going down
+            } else {
+                bounce_progress = 2.0f - (progress * 2.0f); // Going up
             }
             
-            // Second column with smooth trail
-            for (int i = 1 + column_length; i < s_num_leds; i++) {
-                float distance = fabsf(i - (s_num_leds - 1 - position));
-                if (distance < pattern->trail_length) {
-                    float intensity = cosf(distance / pattern->trail_length * M_PI_2);
-                    intensity *= intensity; // Square for smoother falloff
-                    uint32_t color = current_color;
-                    uint8_t r = ((color >> 16) & 0xFF) * intensity;
-                    uint8_t g = ((color >> 8) & 0xFF) * intensity;
-                    uint8_t b = (color & 0xFF) * intensity;
-                    pixels[i].rgb = rgb_color(r, g, b);
+            // Calculate center position (0 to column_length-1)
+            float center_pos = bounce_progress * (column_length - 1);
+            
+            // Apply to both columns with trail, second column inverted
+            for (int col = 0; col < 2; col++) {
+                int col_offset = 1 + (col * column_length);
+                
+                for (int i = 0; i < column_length; i++) {
+                    // For second column, invert the position calculation
+                    float pos = col == 0 ? i - center_pos : 
+                        (column_length - 1 - i) - center_pos;
+                    float distance = fabsf(pos);
+                    if (distance <= pattern->trail_length) {
+                        float intensity = 1.0f - (distance / pattern->trail_length);
+                        uint8_t r = ((current_color >> 16) & 0xFF);
+                        uint8_t g = ((current_color >> 8) & 0xFF);
+                        uint8_t b = (current_color & 0xFF);
+                        pixels[col_offset + i].rgb = rgb_color(
+                            (r * (int)(intensity * 100)) / 100,
+                            (g * (int)(intensity * 100)) / 100,
+                            (b * (int)(intensity * 100)) / 100
+                        );
+                    }
                 }
             }
             break;
@@ -239,55 +235,43 @@ static void apply_pattern(tNeopixel* pixels, const led_pattern_t* pattern)
             break;
         }
 
-        case ANIM_TYPE_RUNNING_LIGHT:
-        case ANIM_TYPE_ALTERNATING: {
-            // Apply easing to progress
-            float eased_progress = 0.5f - 0.5f * cosf(progress * M_PI * 2);
-            int position = (int)(eased_progress * column_length);
+        case ANIM_TYPE_RUNNING_LIGHT: {
+            // Calculate base position for each column (0 to column_length)
+            float base_pos = progress * column_length;
             
-            // First column with smooth trail
-            for (int i = 1; i < 1 + column_length; i++) {
-                int base_pos = pattern->direction_up ? 
-                    1 + (position % column_length) :
-                    1 + ((column_length - 1 - position + column_length) % column_length);
-                float distance = fabsf(i - base_pos);
-                if (distance > column_length/2) {
-                    distance = column_length - distance;
+            // Apply to both columns, second column inverted
+            for (int col = 0; col < 2; col++) {
+                int col_offset = 1 + (col * column_length);
+                float base_i = pattern->direction_up ? 
+                    (column_length - base_pos) : base_pos;
+                
+                for (int i = 0; i < column_length; i++) {
+                    float pos;
+                    if (col == 0) {
+                        pos = i - base_i;
+                    } else {
+                        // For second column, invert position but maintain wrapping
+                        pos = (column_length - 1 - i) - base_i;
+                    }
+                    
+                    // Calculate wrapped distance for continuous effect
+                    float distance = fabsf(pos);
+                    if (distance > column_length/2) {
+                        distance = column_length - distance;
+                    }
+                    
+                    if (distance <= pattern->trail_length) {
+                        float intensity = 1.0f - (distance / pattern->trail_length);
+                        uint8_t r = ((current_color >> 16) & 0xFF);
+                        uint8_t g = ((current_color >> 8) & 0xFF);
+                        uint8_t b = (current_color & 0xFF);
+                        pixels[col_offset + i].rgb = rgb_color(
+                            (r * (int)(intensity * 100)) / 100,
+                            (g * (int)(intensity * 100)) / 100,
+                            (b * (int)(intensity * 100)) / 100
+                        );
+                    }
                 }
-                if (distance < pattern->trail_length) {
-                    float intensity = cosf(distance / pattern->trail_length * M_PI_2);
-                    intensity *= intensity;
-                    uint32_t color = current_color;
-                    uint8_t r = ((color >> 16) & 0xFF) * intensity;
-                    uint8_t g = ((color >> 8) & 0xFF) * intensity;
-                    uint8_t b = (color & 0xFF) * intensity;
-                    pixels[i].rgb = rgb_color(r, g, b);
-                }
-            }
-            
-            // Second column with smooth trail
-            for (int i = 1 + column_length; i < s_num_leds; i++) {
-                int base_pos = !pattern->direction_up ? 
-                    1 + column_length + (position % column_length) :
-                    1 + column_length + ((column_length - 1 - position + column_length) % column_length);
-                float distance = fabsf(i - base_pos);
-                if (distance > column_length/2) {
-                    distance = column_length - distance;
-                }
-                if (distance < pattern->trail_length) {
-                    float intensity = cosf(distance / pattern->trail_length * M_PI_2);
-                    intensity *= intensity;
-                    uint32_t color = current_color;
-                    uint8_t r = ((color >> 16) & 0xFF) * intensity;
-                    uint8_t g = ((color >> 8) & 0xFF) * intensity;
-                    uint8_t b = (color & 0xFF) * intensity;
-                    pixels[i].rgb = rgb_color(r, g, b);
-                }
-            }
-            
-            // Update alternating color at the end of cycle
-            if (pattern->type == ANIM_TYPE_ALTERNATING && progress < 0.1f) {
-                s_use_secondary_color = !s_use_secondary_color;
             }
             break;
         }
