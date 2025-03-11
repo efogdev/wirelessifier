@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
+#include <inttypes.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -22,6 +23,28 @@ static QueueHandle_t g_event_queue = NULL;
 static bool g_device_connected = false;
 static TaskHandle_t g_usb_events_task_handle = NULL;
 static TaskHandle_t g_event_task_handle = NULL;
+
+#define MAX_REPORT_FIELDS 32
+#define MAX_COLLECTION_DEPTH 8
+
+typedef struct {
+    usb_hid_field_attr_t attr;
+    uint16_t bit_offset;
+    uint16_t bit_size;
+} report_field_info_t;
+
+typedef struct {
+    report_field_info_t fields[MAX_REPORT_FIELDS];
+    uint8_t num_fields;
+    uint16_t total_bits;
+    uint8_t report_id;
+} report_map_t;
+
+static report_map_t g_input_report_map = {0};
+static uint16_t g_usage_stack[MAX_REPORT_FIELDS];
+static uint8_t g_usage_stack_pos = 0;
+static uint16_t g_collection_stack[MAX_COLLECTION_DEPTH];
+static uint8_t g_collection_depth = 0;
 
 typedef struct {
     enum {
@@ -142,92 +165,167 @@ bool usb_hid_host_device_connected(void) {
     return g_device_connected;
 }
 
+static void parse_report_descriptor(const uint8_t *desc, size_t length) {
+    uint16_t current_usage_page = 0;
+    uint8_t report_size = 0;
+    uint8_t report_count = 0;
+    int32_t logical_min = 0;
+    int32_t logical_max = 0;
+    uint16_t current_usage = 0;
+    g_input_report_map.num_fields = 0;
+    g_input_report_map.total_bits = 0;
+    g_usage_stack_pos = 0;
+    g_collection_depth = 0;
+
+    for (size_t i = 0; i < length;) {
+        uint8_t item = desc[i++];
+        uint8_t item_size = item & 0x3;
+        uint8_t item_type = (item >> 2) & 0x3;
+        uint8_t item_tag = (item >> 4) & 0xF;
+        
+        uint32_t data = 0;
+        if (item_size > 0) {
+            for (uint8_t j = 0; j < item_size && i < length; j++) {
+                data |= desc[i++] << (j * 8);
+            }
+        }
+
+        switch (item_type) {
+            case 0: // Main
+                switch (item_tag) {
+                    case 8: // Input
+                        if (g_input_report_map.num_fields < MAX_REPORT_FIELDS) {
+                            for (uint8_t j = 0; j < report_count; j++) {
+                                report_field_info_t *field = &g_input_report_map.fields[g_input_report_map.num_fields];
+                                field->attr.usage_page = current_usage_page;
+                                // Use the stacked usage if available, otherwise use current_usage
+                                if (g_usage_stack_pos > j) {
+                                    field->attr.usage = g_usage_stack[j];
+                                } else if (g_usage_stack_pos > 0) {
+                                    field->attr.usage = g_usage_stack[g_usage_stack_pos - 1];
+                                } else {
+                                    field->attr.usage = current_usage;
+                                }
+                                field->attr.report_size = report_size;
+                                field->attr.report_count = 1;
+                                field->attr.logical_min = logical_min;
+                                field->attr.logical_max = logical_max;
+                                field->attr.constant = (data & 0x01) != 0;
+                                field->attr.variable = (data & 0x02) != 0;
+                                field->attr.relative = (data & 0x04) != 0;
+                                field->bit_offset = g_input_report_map.total_bits;
+                                field->bit_size = report_size;
+                                g_input_report_map.total_bits += report_size;
+                                g_input_report_map.num_fields++;
+                            }
+                            g_usage_stack_pos = 0; // Clear usage stack after creating fields
+                        }
+                        break;
+                }
+                break;
+
+            case 1: // Global
+                switch (item_tag) {
+                    case 0: // Usage Page
+                        current_usage_page = data;
+                        break;
+                    case 1: // Logical Minimum
+                        logical_min = (int32_t)data;
+                        break;
+                    case 2: // Logical Maximum
+                        logical_max = (int32_t)data;
+                        break;
+                    case 7: // Report Size
+                        report_size = data;
+                        break;
+                    case 9: // Report Count
+                        report_count = data;
+                        break;
+                }
+                break;
+
+            case 2: // Local
+                switch (item_tag) {
+                    case 0: // Usage
+                        if (g_usage_stack_pos < MAX_REPORT_FIELDS) {
+                            g_usage_stack[g_usage_stack_pos++] = data;
+                        }
+                        current_usage = data;
+                        break;
+                }
+                break;
+        }
+    }
+
+    ESP_LOGI(TAG, "Parsed report descriptor: %d fields, %d total bits", 
+             g_input_report_map.num_fields, g_input_report_map.total_bits);
+    ESP_LOGI(TAG, "Report descriptor dump:");
+    for (size_t i = 0; i < length; i++) {
+        printf("%02x ", desc[i]);
+        if ((i + 1) % 16 == 0) printf("\n");
+    }
+    printf("\n");
+}
+
+static uint32_t extract_field_value(const uint8_t *data, uint16_t bit_offset, uint16_t bit_size) {
+    uint32_t value = 0;
+    uint16_t byte_offset = bit_offset / 8;
+    uint8_t bit_shift = bit_offset % 8;
+    uint16_t bits_remaining = bit_size;
+    uint8_t current_byte;
+
+    while (bits_remaining > 0) {
+        current_byte = data[byte_offset];
+        uint8_t bits_to_read = MIN(8 - bit_shift, bits_remaining);
+        uint8_t mask = ((1 << bits_to_read) - 1);
+        uint8_t byte_value = (current_byte >> bit_shift) & mask;
+        value |= byte_value << (bit_size - bits_remaining);
+        
+        bits_remaining -= bits_to_read;
+        byte_offset++;
+        bit_shift = 0;
+    }
+
+    return value;
+}
+
 static void process_report(hid_host_device_handle_t hid_device_handle, const uint8_t *data, size_t length, uint8_t report_id) {
-    ESP_LOGI("HID", "Processing report - Handle: %p, Length: %d, Report ID: %d", hid_device_handle, length, report_id);
+    // ESP_LOGI(TAG, "Processing report - Handle: %p, Length: %d, Report ID: %d", hid_device_handle, length, report_id);
 
     if (!data || length == 0 || !g_report_queue) {
-        ESP_LOGE("HID", "Invalid input parameters");
+        ESP_LOGE(TAG, "Invalid input parameters");
         return;
     }
 
     usb_hid_report_t report = {
         .report_id = report_id,
         .type = USB_HID_FIELD_TYPE_INPUT,
-        .num_fields = 0,
+        .num_fields = g_input_report_map.num_fields,
         .raw_len = MIN(length, sizeof(report.raw))
     };
 
-    static usb_hid_field_t fields[4]; // Buttons, X, Y, Wheel
-    report.fields = fields;
-
-    ESP_LOGI("HID", "Raw report data:");
-    for (size_t i = 0; i < length; i++) {
-        ESP_LOGI("HID", "Byte %d: 0x%02X", i, data[i]);
-    }
-
-    // Buttons field (byte 0)
-    report.fields[report.num_fields] = (usb_hid_field_t) {
-        .attr = {
-            .usage_page = HID_USAGE_PAGE_BUTTONS,
-            .usage = 1,
-            .report_count = 1,
-            .report_size = 8
-        },
-        .values = (uint32_t[]){data[0]}
-    };
-    ESP_LOGI("HID", "Added buttons field: 0x%02X", data[0]);
-    report.num_fields++;
-
-    // X movement (byte 1)
-    report.fields[report.num_fields] = (usb_hid_field_t) {
-        .attr = {
-            .usage_page = HID_USAGE_PAGE_GENERIC_DESKTOP,
-            .usage = HID_USAGE_X,
-            .report_count = 1,
-            .report_size = 8
-        },
-        .values = (uint32_t[]){data[1]}
-    };
-    ESP_LOGI("HID", "Added X movement: %d", (int8_t)data[1]);
-    report.num_fields++;
-
-    // Y movement (byte 2)
-    report.fields[report.num_fields] = (usb_hid_field_t) {
-        .attr = {
-            .usage_page = HID_USAGE_PAGE_GENERIC_DESKTOP,
-            .usage = HID_USAGE_Y,
-            .report_count = 1,
-            .report_size = 8
-        },
-        .values = (uint32_t[]){data[2]}
-    };
-    ESP_LOGI("HID", "Added Y movement: %d", (int8_t)data[2]);
-    report.num_fields++;
-
-    // Wheel movement (byte 5)
-    if (length >= 6) {
-        report.fields[report.num_fields] = (usb_hid_field_t) {
-            .attr = {
-                .usage_page = HID_USAGE_PAGE_GENERIC_DESKTOP,
-                .usage = HID_USAGE_WHEEL,
-                .report_count = 1,
-                .report_size = 8
-            },
-            .values = (uint32_t[]){data[5]}
+    static uint32_t field_values[MAX_REPORT_FIELDS];
+    static usb_hid_field_t fields[MAX_REPORT_FIELDS];
+    
+    for (uint8_t i = 0; i < g_input_report_map.num_fields; i++) {
+        const report_field_info_t *field_info = &g_input_report_map.fields[i];
+        field_values[i] = extract_field_value(data, field_info->bit_offset, field_info->bit_size);
+        
+        fields[i] = (usb_hid_field_t) {
+            .attr = field_info->attr,
+            .values = &field_values[i]
         };
-        ESP_LOGI("HID", "Added wheel movement: %d", (int8_t)data[5]);
-        report.num_fields++;
+
+        // ESP_LOGI(TAG, "Field %d: usage_page=0x%04x, usage=0x%04x, value=%" PRIu32, 
+        //         i, field_info->attr.usage_page, field_info->attr.usage, field_values[i]);
     }
 
-    // Copy raw data
+    report.fields = fields;
     memcpy(report.raw, data, report.raw_len);
 
-    // Send to queue with timeout
     BaseType_t queue_result = xQueueSend(g_report_queue, &report, pdMS_TO_TICKS(100));
     if (queue_result != pdTRUE) {
-        ESP_LOGE("HID", "Failed to send report to queue");
-    } else {
-        ESP_LOGD("HID", "Report successfully queued with %d fields", report.num_fields);
+        ESP_LOGE(TAG, "Failed to send report to queue");
     }
 }
 
@@ -289,6 +387,14 @@ static void process_device_event(hid_host_device_handle_t hid_device_handle, con
             ESP_ERROR_CHECK(hid_class_request_set_idle(hid_device_handle, 0, 0));
         }
 
+        // Get and parse report descriptor
+        size_t desc_len;
+        const uint8_t *desc = hid_host_get_report_descriptor(hid_device_handle, &desc_len);
+        if (desc != NULL && HID_PROTOCOL_KEYBOARD != dev_params.proto && HID_PROTOCOL_NONE != dev_params.proto) {
+            ESP_LOGI(TAG, "Got report descriptor, length = %zu", desc_len);
+            parse_report_descriptor(desc, desc_len);
+        }
+
         ESP_ERROR_CHECK(hid_host_device_start(hid_device_handle));
         g_device_connected = true;
     } else {
@@ -303,12 +409,12 @@ static void process_interface_event(hid_host_device_handle_t hid_device_handle, 
     hid_host_dev_params_t dev_params;
 
     ESP_ERROR_CHECK(hid_host_device_get_params(hid_device_handle, &dev_params));
-    ESP_LOGD(TAG, "Interface 0x%x: HID event received", dev_params.iface_num);
+    // ESP_LOGD(TAG, "Interface 0x%x: HID event received", dev_params.iface_num);
 
     switch (event) {
         case HID_HOST_INTERFACE_EVENT_INPUT_REPORT:
             ESP_ERROR_CHECK(hid_host_device_get_raw_input_report_data(hid_device_handle, data, sizeof(data), &data_length));
-            ESP_LOGD(TAG, "Raw input report data: length=%d", data_length);
+            // ESP_LOGD(TAG, "Raw input report data: length=%d", data_length);
             process_report(hid_device_handle, data, data_length, 0);
             break;
 

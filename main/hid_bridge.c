@@ -190,7 +190,7 @@ static esp_err_t process_mouse_report(usb_hid_report_t *report) {
 
 esp_err_t hid_bridge_process_report(usb_hid_report_t *report)
 {
-    ESP_LOGD(TAG, "Processing HID report (%d fields)", report->num_fields);
+    // ESP_LOGD(TAG, "Processing HID report (%d fields)", report->num_fields);
 
     if (!s_hid_bridge_initialized) {
         ESP_LOGE(TAG, "HID bridge not initialized");
@@ -231,13 +231,7 @@ esp_err_t hid_bridge_process_report(usb_hid_report_t *report)
         } else if (field->attr.usage_page == HID_USAGE_PAGE_KEYBOARD) {
             is_keyboard = true;
         } else if (field->attr.usage_page == HID_USAGE_PAGE_BUTTONS) {
-            // Look at the button value to determine if it's a mouse or keyboard
-            // Mouse typically uses lower button values (1-5)
-            if (field->attr.usage <= 5) {
-                is_mouse = true;
-            } else {
-                is_keyboard = true;
-            }
+            is_keyboard = true;
         }
     }
 
