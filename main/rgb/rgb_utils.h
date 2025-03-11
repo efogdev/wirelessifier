@@ -37,7 +37,7 @@ typedef struct {
     uint32_t colors[2];           // Primary and secondary colors (for alternating patterns)
     led_animation_type_t type;    // Animation type
     uint8_t trail_length;         // Length of the trail for running light (1-255)
-    uint8_t speed;                // Animation speed (1-255, higher is faster)
+    uint8_t speed;                // Animation speed (1-100, where 100 is max speed)
     bool direction_up;            // Direction for running light animations (true = up, false = down)
 } led_pattern_t;
 
