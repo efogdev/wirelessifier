@@ -15,16 +15,6 @@
 #include "usb/hid_host.h"
 #include "usb_hid_host.h"
 
-// HID Usage Pages
-#define HID_USAGE_PAGE_GENERIC_DESKTOP  0x01
-#define HID_USAGE_PAGE_KEYBOARD         0x07
-#define HID_USAGE_PAGE_BUTTON          0x09
-
-// HID Generic Desktop Page Usages
-#define HID_USAGE_X                    0x30
-#define HID_USAGE_Y                    0x31
-#define HID_USAGE_WHEEL               0x38
-
 static const char *TAG = "usb_hid_host";
 
 static QueueHandle_t g_report_queue = NULL;
@@ -152,8 +142,11 @@ bool usb_hid_host_device_connected(void) {
     return g_device_connected;
 }
 
-static void process_report(const uint8_t *data, size_t length, uint8_t report_id) {
-    if (length == 0 || !g_report_queue) {
+static void process_report(hid_host_device_handle_t hid_device_handle, const uint8_t *data, size_t length, uint8_t report_id) {
+    ESP_LOGI("HID", "Processing report - Handle: %p, Length: %d, Report ID: %d", hid_device_handle, length, report_id);
+
+    if (!data || length == 0 || !g_report_queue) {
+        ESP_LOGE("HID", "Invalid input parameters");
         return;
     }
 
@@ -164,99 +157,78 @@ static void process_report(const uint8_t *data, size_t length, uint8_t report_id
         .raw_len = MIN(length, sizeof(report.raw))
     };
 
-    // Allocate space for fields - we'll need at most length fields
-    static usb_hid_field_t fields[32];  // Static to avoid stack overflow
+    static usb_hid_field_t fields[4]; // Buttons, X, Y, Wheel
     report.fields = fields;
-    
-    // For keyboard reports
-    if (length >= 8) {  // Standard boot protocol keyboard report
-        // Modifier keys field
+
+    ESP_LOGI("HID", "Raw report data:");
+    for (size_t i = 0; i < length; i++) {
+        ESP_LOGI("HID", "Byte %d: 0x%02X", i, data[i]);
+    }
+
+    // Buttons field (byte 0)
+    report.fields[report.num_fields] = (usb_hid_field_t) {
+        .attr = {
+            .usage_page = HID_USAGE_PAGE_BUTTONS,
+            .usage = 1,
+            .report_count = 1,
+            .report_size = 8
+        },
+        .values = (uint32_t[]){data[0]}
+    };
+    ESP_LOGI("HID", "Added buttons field: 0x%02X", data[0]);
+    report.num_fields++;
+
+    // X movement (byte 1)
+    report.fields[report.num_fields] = (usb_hid_field_t) {
+        .attr = {
+            .usage_page = HID_USAGE_PAGE_GENERIC_DESKTOP,
+            .usage = HID_USAGE_X,
+            .report_count = 1,
+            .report_size = 8
+        },
+        .values = (uint32_t[]){data[1]}
+    };
+    ESP_LOGI("HID", "Added X movement: %d", (int8_t)data[1]);
+    report.num_fields++;
+
+    // Y movement (byte 2)
+    report.fields[report.num_fields] = (usb_hid_field_t) {
+        .attr = {
+            .usage_page = HID_USAGE_PAGE_GENERIC_DESKTOP,
+            .usage = HID_USAGE_Y,
+            .report_count = 1,
+            .report_size = 8
+        },
+        .values = (uint32_t[]){data[2]}
+    };
+    ESP_LOGI("HID", "Added Y movement: %d", (int8_t)data[2]);
+    report.num_fields++;
+
+    // Wheel movement (byte 5)
+    if (length >= 6) {
         report.fields[report.num_fields] = (usb_hid_field_t) {
             .attr = {
-                .usage_page = HID_USAGE_PAGE_KEYBOARD,
-                .usage = 0,  // Modifier keys don't have specific usage
+                .usage_page = HID_USAGE_PAGE_GENERIC_DESKTOP,
+                .usage = HID_USAGE_WHEEL,
                 .report_count = 1,
                 .report_size = 8
             },
-            .values = (uint32_t[]){data[0]}  // Modifier byte
+            .values = (uint32_t[]){data[5]}
         };
+        ESP_LOGI("HID", "Added wheel movement: %d", (int8_t)data[5]);
         report.num_fields++;
-
-        // Regular keys field (ignoring reserved byte)
-        if (data[2] != 0) {  // If there's a key pressed
-            report.fields[report.num_fields] = (usb_hid_field_t) {
-                .attr = {
-                    .usage_page = HID_USAGE_PAGE_KEYBOARD,
-                    .usage = data[2],  // Key usage
-                    .report_count = 1,
-                    .report_size = 8
-                },
-                .values = (uint32_t[]){data[2]}  // First key
-            };
-            report.num_fields++;
-        }
-    }
-    // For mouse reports
-    else if (length >= 4) {  // Standard boot protocol mouse report
-        // Buttons field
-        if (data[0] != 0) {  // If any button is pressed
-            report.fields[report.num_fields] = (usb_hid_field_t) {
-                .attr = {
-                    .usage_page = HID_USAGE_PAGE_BUTTON,
-                    .usage = 0,  // Button state
-                    .report_count = 1,
-                    .report_size = 8
-                },
-                .values = (uint32_t[]){data[0]}  // Button byte
-            };
-            report.num_fields++;
-        }
-
-        // X movement field
-        if (data[1] != 0) {  // If there's X movement
-            report.fields[report.num_fields] = (usb_hid_field_t) {
-                .attr = {
-                    .usage_page = HID_USAGE_PAGE_GENERIC_DESKTOP,
-                    .usage = HID_USAGE_X,
-                    .report_count = 1,
-                    .report_size = 8
-                },
-                .values = (uint32_t[]){(int8_t)data[1]}  // X movement (signed)
-            };
-            report.num_fields++;
-        }
-
-        // Y movement field
-        if (data[2] != 0) {  // If there's Y movement
-            report.fields[report.num_fields] = (usb_hid_field_t) {
-                .attr = {
-                    .usage_page = HID_USAGE_PAGE_GENERIC_DESKTOP,
-                    .usage = HID_USAGE_Y,
-                    .report_count = 1,
-                    .report_size = 8
-                },
-                .values = (uint32_t[]){(int8_t)data[2]}  // Y movement (signed)
-            };
-            report.num_fields++;
-        }
-
-        // Wheel movement field
-        if (length >= 4 && data[3] != 0) {  // If there's wheel movement
-            report.fields[report.num_fields] = (usb_hid_field_t) {
-                .attr = {
-                    .usage_page = HID_USAGE_PAGE_GENERIC_DESKTOP,
-                    .usage = HID_USAGE_WHEEL,
-                    .report_count = 1,
-                    .report_size = 8
-                },
-                .values = (uint32_t[]){(int8_t)data[3]}  // Wheel movement (signed)
-            };
-            report.num_fields++;
-        }
     }
 
+    // Copy raw data
     memcpy(report.raw, data, report.raw_len);
-    xQueueSend(g_report_queue, &report, 0);
+
+    // Send to queue with timeout
+    BaseType_t queue_result = xQueueSend(g_report_queue, &report, pdMS_TO_TICKS(100));
+    if (queue_result != pdTRUE) {
+        ESP_LOGE("HID", "Failed to send report to queue");
+    } else {
+        ESP_LOGD("HID", "Report successfully queued with %d fields", report.num_fields);
+    }
 }
 
 static void hid_host_interface_callback(hid_host_device_handle_t hid_device_handle, const hid_host_interface_event_t event, void *arg) {
@@ -312,13 +284,9 @@ static void process_device_event(hid_host_device_handle_t hid_device_handle, con
         };
 
         ESP_ERROR_CHECK(hid_host_device_open(hid_device_handle, &dev_config));
-        if (HID_SUBCLASS_BOOT_INTERFACE == dev_params.sub_class) {
-            ESP_ERROR_CHECK(hid_class_request_set_protocol(hid_device_handle, HID_REPORT_PROTOCOL_BOOT));
-        } else {
-            ESP_ERROR_CHECK(hid_class_request_set_protocol(hid_device_handle, HID_REPORT_PROTOCOL_REPORT));
-            if (HID_PROTOCOL_KEYBOARD == dev_params.proto) {
-                ESP_ERROR_CHECK(hid_class_request_set_idle(hid_device_handle, 0, 0));
-            }
+        ESP_ERROR_CHECK(hid_class_request_set_protocol(hid_device_handle, HID_REPORT_PROTOCOL_REPORT));
+        if (HID_PROTOCOL_KEYBOARD == dev_params.proto) {
+            ESP_ERROR_CHECK(hid_class_request_set_idle(hid_device_handle, 0, 0));
         }
 
         ESP_ERROR_CHECK(hid_host_device_start(hid_device_handle));
@@ -335,13 +303,13 @@ static void process_interface_event(hid_host_device_handle_t hid_device_handle, 
     hid_host_dev_params_t dev_params;
 
     ESP_ERROR_CHECK(hid_host_device_get_params(hid_device_handle, &dev_params));
-    ESP_LOGI(TAG, "Interface 0x%x: HID event received", dev_params.iface_num);
+    ESP_LOGD(TAG, "Interface 0x%x: HID event received", dev_params.iface_num);
 
     switch (event) {
         case HID_HOST_INTERFACE_EVENT_INPUT_REPORT:
             ESP_ERROR_CHECK(hid_host_device_get_raw_input_report_data(hid_device_handle, data, sizeof(data), &data_length));
             ESP_LOGD(TAG, "Raw input report data: length=%d", data_length);
-            process_report(data, data_length, 0);
+            process_report(hid_device_handle, data, data_length, 0);
             break;
 
         case HID_HOST_INTERFACE_EVENT_DISCONNECTED:

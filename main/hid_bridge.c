@@ -127,18 +127,6 @@ esp_err_t hid_bridge_stop(void)
     return ESP_OK;
 }
 
-// HID Usage Pages
-#define HID_USAGE_PAGE_GENERIC_DESKTOP  0x01
-#define HID_USAGE_PAGE_KEYBOARD         0x07
-#define HID_USAGE_PAGE_BUTTON          0x09
-
-// HID Usages
-#define HID_USAGE_KEYBOARD             0x06
-#define HID_USAGE_MOUSE               0x02
-#define HID_USAGE_X                   0x30
-#define HID_USAGE_Y                   0x31
-#define HID_USAGE_WHEEL               0x38
-
 static esp_err_t process_keyboard_report(usb_hid_report_t *report) {
     keyboard_report_t ble_kb_report = {0};
     
@@ -166,41 +154,43 @@ static esp_err_t process_keyboard_report(usb_hid_report_t *report) {
 static esp_err_t process_mouse_report(usb_hid_report_t *report) {
     mouse_report_t ble_mouse_report = {0};
 
+    // Process all fields
     for (int i = 0; i < report->num_fields; i++) {
         usb_hid_field_t *field = &report->fields[i];
 
-        if (field->attr.usage_page == HID_USAGE_PAGE_BUTTON) {
-            // Handle mouse buttons
-            if (field->values && field->attr.report_count > 0) {
-                ble_mouse_report.buttons = field->values[0];
+        if (!field->values) continue;
+
+        // Generic Desktop Page (0x01)
+        if (field->attr.usage_page == HID_USAGE_PAGE_GENERIC_DESKTOP) {
+            switch (field->attr.usage) {
+                case HID_USAGE_X: // X movement
+                    ble_mouse_report.x = (int8_t)(field->values[0]);
+                break;
+                case HID_USAGE_Y: // Y movement
+                    ble_mouse_report.y = (int8_t)(field->values[0]);
+                break;
+                case HID_USAGE_WHEEL: // Scroll wheel
+                    ble_mouse_report.wheel = (int8_t)(field->values[0]);
+                break;
             }
-        } else if (field->attr.usage_page == HID_USAGE_PAGE_GENERIC_DESKTOP) {
-            // Handle mouse movement and wheel
-            if (field->values && field->attr.report_count > 0) {
-                switch (field->attr.usage) {
-                    case HID_USAGE_X:
-                        ble_mouse_report.x = field->values[0];
-                        break;
-                    case HID_USAGE_Y:
-                        ble_mouse_report.y = field->values[0];
-                        break;
-                    case HID_USAGE_WHEEL:
-                        ble_mouse_report.wheel = field->values[0];
-                        break;
-                }
-            }
+        }
+        // Button Page (0x09)
+        else if (field->attr.usage_page == HID_USAGE_PAGE_BUTTON) {
+            // The first byte contains all button states
+            ble_mouse_report.buttons = (uint8_t)(field->values[0]);
         }
     }
 
-    ESP_LOGI(TAG, "Forwarding mouse report: btn=0x%02x x=%d y=%d wheel=%d",
-             ble_mouse_report.buttons, ble_mouse_report.x,
-             ble_mouse_report.y, ble_mouse_report.wheel);
+    // ESP_LOGI(TAG, "Mouse report: btn=0x%02x x=%d y=%d wheel=%d",
+    //          ble_mouse_report.buttons, ble_mouse_report.x,
+    //          ble_mouse_report.y, ble_mouse_report.wheel);
+
     return ble_hid_device_send_mouse_report(&ble_mouse_report);
 }
 
 esp_err_t hid_bridge_process_report(usb_hid_report_t *report)
 {
-    ESP_LOGI(TAG, "Processing HID report (%d fields)", report->num_fields);
+    ESP_LOGD(TAG, "Processing HID report (%d fields)", report->num_fields);
 
     if (!s_hid_bridge_initialized) {
         ESP_LOGE(TAG, "HID bridge not initialized");
@@ -219,30 +209,42 @@ esp_err_t hid_bridge_process_report(usb_hid_report_t *report)
     }
 
     esp_err_t ret = ESP_OK;
-    if (report->num_fields > 0) {
-        const usb_hid_field_t *first_field = &report->fields[0];
+    bool is_mouse = false;
+    bool is_keyboard = false;
+
+    // Scan all fields to determine report type
+    for (int i = 0; i < report->num_fields; i++) {
+        const usb_hid_field_t *field = &report->fields[i];
         
-        if (first_field->attr.usage_page == HID_USAGE_PAGE_GENERIC_DESKTOP) {
-            switch (first_field->attr.usage) {
-                case HID_USAGE_KEYBOARD:
-                    ret = process_keyboard_report(report);
-                    break;
-                    
+        if (field->attr.usage_page == HID_USAGE_PAGE_GENERIC_DESKTOP) {
+            switch (field->attr.usage) {
                 case HID_USAGE_MOUSE:
-                    ret = process_mouse_report(report);
+                case HID_USAGE_X:
+                case HID_USAGE_Y:
+                case HID_USAGE_WHEEL:
+                    is_mouse = true;
                     break;
-                    
-                default:
-                    ESP_LOGW(TAG, "Unhandled generic desktop usage: 0x%04x", 
-                            first_field->attr.usage);
+                case HID_USAGE_KEYBOARD:
+                    is_keyboard = true;
                     break;
             }
-        } else if (first_field->attr.usage_page == HID_USAGE_PAGE_KEYBOARD) {
-            ret = process_keyboard_report(report);
-        } else {
-            ESP_LOGW(TAG, "Unhandled usage page: 0x%04x", 
-                    first_field->attr.usage_page);
+        } else if (field->attr.usage_page == HID_USAGE_PAGE_KEYBOARD) {
+            is_keyboard = true;
+        } else if (field->attr.usage_page == HID_USAGE_PAGE_BUTTONS) {
+            // Look at the button value to determine if it's a mouse or keyboard
+            // Mouse typically uses lower button values (1-5)
+            if (field->attr.usage <= 5) {
+                is_mouse = true;
+            } else {
+                is_keyboard = true;
+            }
         }
+    }
+
+    if (is_mouse) {
+        ret = process_mouse_report(report);
+    } else if (is_keyboard) {
+        ret = process_keyboard_report(report);
     }
 
     return ret;

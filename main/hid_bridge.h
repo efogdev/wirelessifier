@@ -7,6 +7,14 @@
 extern "C" {
 #endif
 
+#define HID_USAGE_PAGE_GENERIC_DESKTOP  0x01
+#define HID_USAGE_PAGE_BUTTON          0x09
+
+#define HID_USAGE_X                   0x30
+#define HID_USAGE_Y                   0x31
+#define HID_USAGE_WHEEL               0x38
+#define HID_USAGE_MOUSE               0x02
+
 /**
  * @brief Initialize HID bridge
  * 
