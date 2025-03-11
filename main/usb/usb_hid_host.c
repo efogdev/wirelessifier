@@ -82,7 +82,7 @@ esp_err_t usb_hid_host_init(QueueHandle_t report_queue) {
 
     g_report_queue = report_queue;
     g_device_connected = false;
-    g_event_queue = xQueueCreate(10, sizeof(hid_event_queue_t));
+    g_event_queue = xQueueCreate(128, sizeof(hid_event_queue_t));
     if (g_event_queue == NULL) {
         ESP_LOGE(TAG, "Failed to create event queue");
         return ESP_ERR_NO_MEM;
@@ -292,8 +292,6 @@ static uint32_t extract_field_value(const uint8_t *data, uint16_t bit_offset, ui
 }
 
 static void process_report(hid_host_device_handle_t hid_device_handle, const uint8_t *data, size_t length, uint8_t report_id, uint8_t interface_num) {
-    // ESP_LOGI(TAG, "Processing report - Handle: %p, Length: %d, Report ID: %d", hid_device_handle, length, report_id);
-
     if (!data || length == 0 || !g_report_queue) {
         ESP_LOGE(TAG, "Invalid input parameters");
         return;
@@ -315,17 +313,34 @@ static void process_report(hid_host_device_handle_t hid_device_handle, const uin
     static uint32_t field_values[MAX_REPORT_FIELDS];
     static usb_hid_field_t fields[MAX_REPORT_FIELDS];
     
+    // Process each field from the report descriptor
     for (uint8_t i = 0; i < report_map->num_fields; i++) {
         const report_field_info_t *field_info = &report_map->fields[i];
-        field_values[i] = extract_field_value(data, field_info->bit_offset, field_info->bit_size);
+        uint32_t value = extract_field_value(data, field_info->bit_offset, field_info->bit_size);
+
+        // For mouse wheel (Generic Desktop page, Wheel usage), convert to signed value
+        if (field_info->attr.usage_page == 0x0001 && field_info->attr.usage == 0x0038) {
+            // Convert to signed value based on logical min/max
+            if (field_info->attr.logical_min < 0) {
+                // If logical min is negative, treat as signed
+                int32_t signed_value = (int32_t)value;
+                if (signed_value > field_info->attr.logical_max) {
+                    signed_value = field_info->attr.logical_max;
+                } else if (signed_value < field_info->attr.logical_min) {
+                    signed_value = field_info->attr.logical_min;
+                }
+                value = (uint32_t)signed_value;
+            }
+        }
         
+        field_values[i] = value;
         fields[i] = (usb_hid_field_t) {
             .attr = field_info->attr,
             .values = &field_values[i]
         };
 
-        // ESP_LOGI(TAG, "Field %d: usage_page=0x%04x, usage=0x%04x, value=%" PRIu32, 
-        //         i, field_info->attr.usage_page, field_info->attr.usage, field_values[i]);
+        ESP_LOGI(TAG, "Field %d: usage_page=0x%04x, usage=0x%04x, value=%" PRIu32,
+                i, field_info->attr.usage_page, field_info->attr.usage, field_values[i]);
     }
 
     report.fields = fields;
