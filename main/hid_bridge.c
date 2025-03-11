@@ -228,9 +228,7 @@ esp_err_t hid_bridge_process_report(usb_hid_report_t *report)
                     is_keyboard = true;
                     break;
             }
-        } else if (field->attr.usage_page == HID_USAGE_PAGE_KEYBOARD) {
-            is_keyboard = true;
-        } else if (field->attr.usage_page == HID_USAGE_PAGE_BUTTONS) {
+        } else if (field->attr.usage_page == HID_USAGE_PAGE_BUTTONS || field->attr.usage_page == HID_USAGE_PAGE_KEYBOARD) {
             is_keyboard = true;
         }
     }

@@ -27,6 +27,7 @@
 extern "C" {
 #endif
 
+#define USB_HOST_MAX_INTERFACES     6
 #define USB_HID_MAX_RAW_REPORT_SIZE 64
 
 // HID Report Items from HID 1.11 Section 6.2.2
