@@ -200,7 +200,7 @@ static esp_err_t process_mouse_report(usb_hid_report_t *report) {
 
 esp_err_t hid_bridge_process_report(usb_hid_report_t *report)
 {
-    ESP_LOGI(TAG, "Processing report (%d fields): %p", report->num_fields, report->raw);
+    ESP_LOGI(TAG, "Processing HID report (%d fields)", report->num_fields);
 
     if (!s_hid_bridge_initialized) {
         ESP_LOGE(TAG, "HID bridge not initialized");
@@ -213,7 +213,7 @@ esp_err_t hid_bridge_process_report(usb_hid_report_t *report)
     }
 
     if (!ble_hid_device_connected()) {
-        ESP_LOGD(TAG, "BLE HID device not connected, starting advertising");
+        ESP_LOGI(TAG, "BLE HID device not connected, starting advertising");
         ble_hid_device_start_advertising();
         return ESP_OK;
     }

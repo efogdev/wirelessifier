@@ -330,23 +330,17 @@ static void process_device_event(hid_host_device_handle_t hid_device_handle, con
 }
 
 static void process_interface_event(hid_host_device_handle_t hid_device_handle, const hid_host_interface_event_t event, void *arg) {
-    ESP_LOGI(TAG, "Interface event received: %d", event);
-
     uint8_t data[64] = {0};
     size_t data_length = 0;
     hid_host_dev_params_t dev_params;
 
     ESP_ERROR_CHECK(hid_host_device_get_params(hid_device_handle, &dev_params));
+    ESP_LOGI(TAG, "Interface 0x%x: HID event received", dev_params.iface_num);
 
     switch (event) {
         case HID_HOST_INTERFACE_EVENT_INPUT_REPORT:
-            ESP_LOGI(TAG, "Received input report from interface 0x%x", dev_params.iface_num);
-            ESP_ERROR_CHECK(hid_host_device_get_raw_input_report_data(hid_device_handle,
-                data,
-                sizeof(data),
-                &data_length));
-            ESP_LOGI(TAG, "Raw input report data: length=%d", data_length);
-
+            ESP_ERROR_CHECK(hid_host_device_get_raw_input_report_data(hid_device_handle, data, sizeof(data), &data_length));
+            ESP_LOGD(TAG, "Raw input report data: length=%d", data_length);
             process_report(data, data_length, 0);
             break;
 
