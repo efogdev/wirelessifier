@@ -151,9 +151,99 @@ static void process_report(const uint8_t *data, size_t length, uint8_t report_id
         .report_id = report_id,
         .type = USB_HID_FIELD_TYPE_INPUT,
         .num_fields = 0,
-        .fields = NULL,
         .raw_len = MIN(length, sizeof(report.raw))
     };
+
+    // Allocate space for fields - we'll need at most length fields
+    static usb_hid_field_t fields[32];  // Static to avoid stack overflow
+    report.fields = fields;
+    
+    // For keyboard reports
+    if (length >= 8) {  // Standard boot protocol keyboard report
+        // Modifier keys field
+        report.fields[report.num_fields] = (usb_hid_field_t) {
+            .attr = {
+                .usage_page = HID_USAGE_PAGE_KEYBOARD,
+                .usage = 0,  // Modifier keys don't have specific usage
+                .report_count = 1,
+                .report_size = 8
+            },
+            .values = (uint32_t[]){data[0]}  // Modifier byte
+        };
+        report.num_fields++;
+
+        // Regular keys field (ignoring reserved byte)
+        if (data[2] != 0) {  // If there's a key pressed
+            report.fields[report.num_fields] = (usb_hid_field_t) {
+                .attr = {
+                    .usage_page = HID_USAGE_PAGE_KEYBOARD,
+                    .usage = data[2],  // Key usage
+                    .report_count = 1,
+                    .report_size = 8
+                },
+                .values = (uint32_t[]){data[2]}  // First key
+            };
+            report.num_fields++;
+        }
+    }
+    // For mouse reports
+    else if (length >= 4) {  // Standard boot protocol mouse report
+        // Buttons field
+        if (data[0] != 0) {  // If any button is pressed
+            report.fields[report.num_fields] = (usb_hid_field_t) {
+                .attr = {
+                    .usage_page = HID_USAGE_PAGE_BUTTON,
+                    .usage = 0,  // Button state
+                    .report_count = 1,
+                    .report_size = 8
+                },
+                .values = (uint32_t[]){data[0]}  // Button byte
+            };
+            report.num_fields++;
+        }
+
+        // X movement field
+        if (data[1] != 0) {  // If there's X movement
+            report.fields[report.num_fields] = (usb_hid_field_t) {
+                .attr = {
+                    .usage_page = HID_USAGE_PAGE_GENERIC_DESKTOP,
+                    .usage = HID_USAGE_X,
+                    .report_count = 1,
+                    .report_size = 8
+                },
+                .values = (uint32_t[]){(int8_t)data[1]}  // X movement (signed)
+            };
+            report.num_fields++;
+        }
+
+        // Y movement field
+        if (data[2] != 0) {  // If there's Y movement
+            report.fields[report.num_fields] = (usb_hid_field_t) {
+                .attr = {
+                    .usage_page = HID_USAGE_PAGE_GENERIC_DESKTOP,
+                    .usage = HID_USAGE_Y,
+                    .report_count = 1,
+                    .report_size = 8
+                },
+                .values = (uint32_t[]){(int8_t)data[2]}  // Y movement (signed)
+            };
+            report.num_fields++;
+        }
+
+        // Wheel movement field
+        if (length >= 4 && data[3] != 0) {  // If there's wheel movement
+            report.fields[report.num_fields] = (usb_hid_field_t) {
+                .attr = {
+                    .usage_page = HID_USAGE_PAGE_GENERIC_DESKTOP,
+                    .usage = HID_USAGE_WHEEL,
+                    .report_count = 1,
+                    .report_size = 8
+                },
+                .values = (uint32_t[]){(int8_t)data[3]}  // Wheel movement (signed)
+            };
+            report.num_fields++;
+        }
+    }
 
     memcpy(report.raw, data, report.raw_len);
     xQueueSend(g_report_queue, &report, 0);

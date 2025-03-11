@@ -94,15 +94,7 @@ esp_err_t hid_bridge_start(void)
         return ESP_OK;
     }
 
-    BaseType_t task_created = xTaskCreatePinnedToCore(
-        hid_bridge_task,
-        "hid_bridge",
-        8192,
-        NULL,
-        5,
-        &s_hid_bridge_task_handle,
-        1
-    );
+    BaseType_t task_created = xTaskCreatePinnedToCore(hid_bridge_task, "hid_bridge", 8192, NULL, 5, &s_hid_bridge_task_handle, 1);
     if (task_created != pdTRUE) {
         ESP_LOGE(TAG, "Failed to create HID bridge task");
         return ESP_ERR_NO_MEM;
@@ -208,6 +200,8 @@ static esp_err_t process_mouse_report(usb_hid_report_t *report) {
 
 esp_err_t hid_bridge_process_report(usb_hid_report_t *report)
 {
+    ESP_LOGI(TAG, "Processing report (%d fields): %p", report->num_fields, report->raw);
+
     if (!s_hid_bridge_initialized) {
         ESP_LOGE(TAG, "HID bridge not initialized");
         return ESP_ERR_INVALID_STATE;
@@ -260,9 +254,7 @@ static void hid_bridge_task(void *arg)
     usb_hid_report_t report;
     while (1) {
         if (xQueueReceive(s_hid_report_queue, &report, portMAX_DELAY) == pdTRUE) {
-            if (usb_hid_host_device_connected()) {
-                hid_bridge_process_report(&report);
-            }
+            hid_bridge_process_report(&report);
         }
     }
 }
