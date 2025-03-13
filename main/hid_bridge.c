@@ -171,9 +171,9 @@ static esp_err_t process_mouse_report(usb_hid_report_t *report) {
                 break;
                 case HID_USAGE_WHEEL: // Scroll wheel
                     if (field->values[0] == 255) {
-                        ble_mouse_report.wheel = 1;  // Up
+                        ble_mouse_report.wheel = -1;  // Up
                     } else if (field->values[0] == 1) {
-                        ble_mouse_report.wheel = -1; // Down
+                        ble_mouse_report.wheel = 1; // Down
                     }
                 break;
             }

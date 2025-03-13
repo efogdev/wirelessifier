@@ -244,12 +244,6 @@ esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report)
         return ESP_ERR_INVALID_STATE;
     }
 
-    uint8_t buffer[4];
-    buffer[0] = report->buttons;
-    buffer[1] = report->x;
-    buffer[2] = report->y;
-    buffer[3] = report->wheel;
-
-    esp_hidd_send_mouse_value(s_conn_id, buffer[0], buffer[1], buffer[2], buffer[3]);
+    esp_hidd_send_mouse_value(s_conn_id, report->buttons, report->x, report->y, report->wheel);
     return ESP_OK;
 }

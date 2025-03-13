@@ -18,7 +18,7 @@
 #define HID_LED_OUT_RPT_LEN         1
 
 // HID mouse input report length
-#define HID_MOUSE_IN_RPT_LEN        5
+#define HID_MOUSE_IN_RPT_LEN        6
 
 // HID consumer control input report length
 #define HID_CC_IN_RPT_LEN           2
@@ -118,15 +118,16 @@ void esp_hidd_send_keyboard_value(uint16_t conn_id, key_mask_t special_key_mask,
     return;
 }
 
-void esp_hidd_send_mouse_value(uint16_t conn_id, uint8_t mouse_button, int8_t mickeys_x, int8_t mickeys_y, int8_t wheel)
+void esp_hidd_send_mouse_value(uint16_t conn_id, uint8_t mouse_button, uint16_t mickeys_x, uint16_t mickeys_y, int8_t wheel)
 {
     uint8_t buffer[HID_MOUSE_IN_RPT_LEN];
 
-    buffer[0] = mouse_button;   // Buttons
-    buffer[1] = mickeys_x;           // X
-    buffer[2] = mickeys_y;           // Y
-    buffer[3] = wheel;           // Wheel
-    buffer[4] = 0;           // AC Pan
+    buffer[0] = mouse_button;        // Buttons
+    buffer[1] = mickeys_x & 0xFF;    // X low byte
+    buffer[2] = mickeys_x >> 8;      // X high byte
+    buffer[3] = mickeys_y & 0xFF;    // Y low byte
+    buffer[4] = mickeys_y >> 8;      // Y high byte
+    buffer[5] = wheel;               // Wheel
 
     hid_dev_send_report(hidd_le_env.gatt_if, conn_id,
                         HID_RPT_ID_MOUSE_IN, HID_REPORT_TYPE_INPUT, HID_MOUSE_IN_RPT_LEN, buffer);

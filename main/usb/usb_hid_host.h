@@ -27,6 +27,39 @@
 extern "C" {
 #endif
 
+// Map of usage page values to their names
+static const char* const usage_page_names[] = {
+    [0x01] = "Generic Desktop",
+    [0x02] = "Simulation",
+    [0x03] = "VR",
+    [0x04] = "Sport",
+    [0x05] = "Game",
+    [0x07] = "Key Codes",
+    [0x08] = "LEDs",
+    [0x09] = "Buttons",
+    [0x0C] = "Consumer"
+};
+
+// Map of usage values to their names (Generic Desktop page)
+static const char* const usage_names[] = {
+    [0x01] = "Pointer",
+    [0x02] = "Mouse",
+    [0x04] = "Joystick",
+    [0x05] = "Gamepad",
+    [0x06] = "Keyboard",
+    [0x07] = "Keypad",
+    [0x30] = "X",
+    [0x31] = "Y",
+    [0x32] = "Z",
+    [0x33] = "Rx",
+    [0x34] = "Ry",
+    [0x35] = "Rz",
+    [0x36] = "Slider",
+    [0x37] = "Dial",
+    [0x38] = "Wheel",
+    [0x39] = "Hat Switch"
+};
+
 #define USB_HOST_MAX_INTERFACES     6
 #define USB_HID_MAX_RAW_REPORT_SIZE 64
 
@@ -90,8 +123,8 @@ typedef struct {
     uint16_t usage;
     uint8_t report_size;    // Size in bits
     uint8_t report_count;   // Number of data fields
-    uint32_t logical_min;
-    uint32_t logical_max;
+    int logical_min;
+    int logical_max;
     bool constant;          // Constant vs Data
     bool variable;          // Variable vs Array
     bool relative;          // Relative vs Absolute
@@ -100,7 +133,7 @@ typedef struct {
 // HID report field data
 typedef struct {
     usb_hid_field_attr_t attr;
-    uint32_t *values;       // Array of values for this field
+    int *values;       // Array of values for this field
 } usb_hid_field_t;
 
 // HID report structure

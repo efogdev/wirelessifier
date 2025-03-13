@@ -207,8 +207,8 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
     uint16_t current_usage_page = 0;
     uint8_t report_size = 0;
     uint8_t report_count = 0;
-    int32_t logical_min = 0;
-    int32_t logical_max = 0;
+    int logical_min = 0;
+    int logical_max = 0;
     uint16_t current_usage = 0;
     
     report_map->num_fields = 0;
@@ -269,10 +269,26 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
                         current_usage_page = data;
                         break;
                     case 1: // Logical Minimum
-                        logical_min = (int32_t)data;
+                        if (item_size == 1 && (data & 0x80)) {
+                            // Sign extend 8-bit value
+                            logical_min = (int8_t)data;
+                        } else if (item_size == 2 && (data & 0x8000)) {
+                            // Sign extend 16-bit value
+                            logical_min = (int16_t)data;
+                        } else {
+                            logical_min = (int)data;
+                        }
                         break;
                     case 2: // Logical Maximum
-                        logical_max = (int32_t)data;
+                        if (item_size == 1 && (data & 0x80)) {
+                            // Sign extend 8-bit value
+                            logical_max = (int8_t)data;
+                        } else if (item_size == 2 && (data & 0x8000)) {
+                            // Sign extend 16-bit value 
+                            logical_max = (int16_t)data;
+                        } else {
+                            logical_max = (int)data;
+                        }
                         break;
                     case 7: // Report Size
                         report_size = data;
@@ -296,18 +312,46 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
         }
     }
 
-    ESP_LOGI(TAG, "Parsed report descriptor for interface %d: %d fields, %d total bits", 
-             interface_num, report_map->num_fields, report_map->total_bits);
+    // Log comprehensive field information
+    // ESP_LOGI(TAG, "=== Report Descriptor Analysis for Interface %d ===", interface_num);
+    // ESP_LOGI(TAG, "Total Fields: %d", report_map->num_fields);
+    // ESP_LOGI(TAG, "Total Bits: %d", report_map->total_bits);
+    // ESP_LOGI(TAG, "Report ID: %d", report_map->report_id);
+    // ESP_LOGI(TAG, "\n");
+    // ESP_LOGI(TAG, "Field Details:");
+    //
+    // for (int i = 0; i < report_map->num_fields; i++) {
+    //     ESP_LOGI(TAG, "\n");
+    //     ESP_LOGI(TAG, "Field %d:", i + 1);
+    //
+    //     report_field_info_t *field = &report_map->fields[i];
+    //
+    //     const char* usage_page_name = field->attr.usage_page < sizeof(usage_page_names)/sizeof(usage_page_names[0]) &&
+    //         usage_page_names[field->attr.usage_page] ? usage_page_names[field->attr.usage_page] : "Unknown";
+    //     ESP_LOGI(TAG, "  Usage Page: 0x%04X (%s)", field->attr.usage_page, usage_page_name);
+    //
+    //     const char* usage_name = field->attr.usage < sizeof(usage_names)/sizeof(usage_names[0]) &&
+    //         usage_names[field->attr.usage] ? usage_names[field->attr.usage] : "Unknown";
+    //     ESP_LOGI(TAG, "  Usage: 0x%04X (%s)", field->attr.usage, usage_name);
+    //
+    //     ESP_LOGI(TAG, "  Report Size: %d bits", (int) field->attr.report_size);
+    //     ESP_LOGI(TAG, "  Logical Min: %d", field->attr.logical_min);
+    //     ESP_LOGI(TAG, "  Logical Max: %d", field->attr.logical_max);
+    //     ESP_LOGI(TAG, "  Bit Position:");
+    //     ESP_LOGI(TAG, "    - Offset: %d", (int) field->bit_offset);
+    //     ESP_LOGI(TAG, "    - Size: %d", (int) field->bit_size);
+    // }
+    // ESP_LOGI(TAG, "\n=== End of Report Descriptor Analysis ===\n");
              
     pthread_rwlock_unlock(&g_report_maps_lock);
 }
 
-static uint32_t extract_field_value(const uint8_t *data, uint16_t bit_offset, uint16_t bit_size) {
+static int extract_field_value(const uint8_t *data, uint16_t bit_offset, uint16_t bit_size) {
     if (!data || bit_size == 0 || bit_size > 32) {
         return 0;
     }
 
-    uint32_t value = 0;
+    int value = 0;
     uint16_t byte_offset = bit_offset / 8;
     uint8_t bit_shift = bit_offset % 8;
     uint16_t bits_remaining = bit_size;
@@ -326,7 +370,7 @@ static uint32_t extract_field_value(const uint8_t *data, uint16_t bit_offset, ui
         
         uint8_t bits_to_read = MIN(8 - bit_shift, bits_remaining);
         uint8_t mask = ((1 << bits_to_read) - 1);
-        uint32_t byte_value = (current_byte >> bit_shift) & mask;
+        int byte_value = (current_byte >> bit_shift) & mask;
         
         // Shift into the correct position in the result
         uint8_t shift_amount = bit_size - bits_remaining;
@@ -335,6 +379,11 @@ static uint32_t extract_field_value(const uint8_t *data, uint16_t bit_offset, ui
         bits_remaining -= bits_to_read;
         byte_offset++;
         bit_shift = 0;
+    }
+
+    // Sign extend if the value is negative (MSB is 1)
+    if (bit_size < 32 && (value & (1 << (bit_size - 1)))) {
+        value |= ~((1 << bit_size) - 1);
     }
 
     return value;
@@ -365,7 +414,7 @@ static void process_report(hid_host_device_handle_t hid_device_handle, const uin
 
     // Static allocation for better performance
     static usb_hid_report_t report;
-    static uint32_t field_values[MAX_REPORT_FIELDS];
+    static int field_values[MAX_REPORT_FIELDS];
     static usb_hid_field_t fields[MAX_REPORT_FIELDS];
 
     if (pthread_rwlock_rdlock(&g_report_maps_lock) != 0) {
@@ -389,7 +438,7 @@ static void process_report(hid_host_device_handle_t hid_device_handle, const uin
         fields[i].attr = field_info->attr;
         fields[i].values = &field_values[i];
 
-        // ESP_LOGI(TAG, "Field %d: usage_page=0x%04x, usage=0x%04x, value=%" PRIu32,
+        // ESP_LOGI(TAG, "Field %d: usage_page=0x%04x, usage=0x%04x, value=%d",
         //         i, field_info->attr.usage_page, field_info->attr.usage, field_values[i]);
     }
 

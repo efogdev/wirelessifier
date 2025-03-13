@@ -11,10 +11,10 @@ typedef struct {
 
 // Mouse report structure
 typedef struct {
-    uint8_t buttons;   // Button state
-    int8_t x;         // X movement
-    int8_t y;         // Y movement
-    int8_t wheel;     // Wheel movement
+    uint8_t buttons;    // Button state
+    uint16_t x;        // X movement
+    uint16_t y;        // Y movement
+    int8_t wheel;      // Wheel movement
 } mouse_report_t;
 
 /**
