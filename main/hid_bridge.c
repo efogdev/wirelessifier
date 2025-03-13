@@ -192,9 +192,6 @@ static esp_err_t process_mouse_report(usb_hid_report_t *report) {
         }
     }
 
-    // ESP_LOGI(TAG, "Mouse report: btn=0x%02x x=%d y=%d wheel=%d",
-    //          ble_mouse_report.buttons, ble_mouse_report.x,
-    //          ble_mouse_report.y, ble_mouse_report.wheel);
 
     return ble_hid_device_send_mouse_report(&ble_mouse_report);
 }

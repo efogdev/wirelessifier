@@ -110,7 +110,6 @@ void esp_hidd_send_keyboard_value(uint16_t conn_id, key_mask_t special_key_mask,
         buffer[i+2] = keyboard_cmd[i];
     }
 
-    // ESP_LOGD(HID_LE_PRF_TAG, "the key vaule = %d,%d,%d, %d, %d, %d,%d, %d", buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], buffer[5], buffer[6], buffer[7]);
     hid_dev_send_report(hidd_le_env.gatt_if, conn_id,
                         HID_RPT_ID_KEY_IN, HID_REPORT_TYPE_INPUT, HID_KEYBOARD_IN_RPT_LEN, buffer);
     return;
@@ -119,19 +118,14 @@ void esp_hidd_send_keyboard_value(uint16_t conn_id, key_mask_t special_key_mask,
 void esp_hidd_send_mouse_value(uint16_t conn_id, uint8_t mouse_button, uint16_t mickeys_x, uint16_t mickeys_y, int8_t wheel)
 {
     uint8_t buffer[HID_MOUSE_IN_RPT_LEN];
-    // buffer[0] = mickeys_x & 0xFF;
-    // buffer[1] = (mickeys_x >> 8);
-    // buffer[2] = mickeys_y & 0xFF;
-    // buffer[3] = (mickeys_y >> 8);
-    // buffer[4] = wheel;          
-    // buffer[5] = 0;              
-    // buffer[6] = mouse_button;
-    buffer[0] = 0;
-    buffer[1] = 0xFF;
-    buffer[2] = 0;
-    buffer[3] = 0xFF;
+    buffer[0] = mickeys_x & 0xFF;
+    buffer[1] = (mickeys_x >> 8);
+    buffer[2] = mickeys_y & 0xFF;
+    buffer[3] = (mickeys_y >> 8);
+    buffer[4] = wheel;
+    buffer[5] = 0;
+    buffer[6] = mouse_button;
 
-    hid_dev_send_report(hidd_le_env.gatt_if, conn_id,
-                        HID_RPT_ID_MOUSE_IN, HID_REPORT_TYPE_INPUT, HID_MOUSE_IN_RPT_LEN, buffer);
+    hid_dev_send_report(hidd_le_env.gatt_if, conn_id, HID_RPT_ID_MOUSE_IN, HID_REPORT_TYPE_INPUT, HID_MOUSE_IN_RPT_LEN, buffer);
     return;
 }
