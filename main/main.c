@@ -14,6 +14,7 @@
 #include "ble_hid_device.h"
 #include "hid_bridge.h"
 #include "rgb/rgb_utils.h"
+#include "utils/task_monitor.h"
 
 static const char *TAG = "MAIN";
 
@@ -45,8 +46,12 @@ void app_main(void) {
 
     led_control_init(NUM_LEDS, GPIO_WS2812B_PIN);
     led_update_pattern(usb_hid_host_device_connected(), ble_hid_device_connected());
-
-    run_hid_bridge();
+    
+    ESP_ERROR_CHECK(task_monitor_init());
+    ESP_ERROR_CHECK(task_monitor_start());
+    
+    run_hid_bridge();    
+    
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(50));
         led_update_pattern(usb_hid_host_device_connected(), ble_hid_device_connected());

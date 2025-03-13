@@ -444,8 +444,22 @@ static void process_report(hid_host_device_handle_t hid_device_handle, const uin
 
     memcpy(report.raw, data, report.raw_len);
 
+    // Try sending to queue with initial timeout
     if (xQueueSend(g_report_queue, &report, pdMS_TO_TICKS(100)) != pdTRUE) {
-        ESP_LOGE(TAG, "Queue send failed");
+        // If initial send failed, wait and track time
+        TickType_t start_tick = xTaskGetTickCount();
+        while (xQueueSend(g_report_queue, &report, pdMS_TO_TICKS(50)) != pdTRUE) {
+            if ((xTaskGetTickCount() - start_tick) > pdMS_TO_TICKS(250)) {
+                // Queue has been full for >250ms, clear it
+                xQueueReset(g_report_queue);
+                ESP_LOGW(TAG, "Queue full for >250ms, cleared");
+                // Try sending one more time
+                if (xQueueSend(g_report_queue, &report, 0) != pdTRUE) {
+                    ESP_LOGE(TAG, "Queue send failed even after clear");
+                }
+                break;
+            }
+        }
     }
 
     pthread_rwlock_unlock(&g_report_maps_lock);

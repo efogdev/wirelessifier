@@ -212,8 +212,7 @@ esp_err_t hid_bridge_process_report(usb_hid_report_t *report)
     }
 
     if (!ble_hid_device_connected()) {
-        ESP_LOGI(TAG, "BLE HID device not connected, starting advertising");
-        ble_hid_device_start_advertising();
+        ESP_LOGD(TAG, "BLE HID device not connected");
         return ESP_OK;
     }
 
