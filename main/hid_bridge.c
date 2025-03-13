@@ -165,6 +165,7 @@ static esp_err_t process_keyboard_report(usb_hid_report_t *report) {
 
 static esp_err_t process_mouse_report(usb_hid_report_t *report) {
     mouse_report_t ble_mouse_report = {0};
+    uint8_t btn_index = 0;
 
     // Process each field in the report
     for (int i = 0; i < report->num_fields; i++) {
@@ -185,10 +186,10 @@ static esp_err_t process_mouse_report(usb_hid_report_t *report) {
                     break;
             }
         } else if (field->attr.usage_page == HID_USAGE_PAGE_BUTTONS) {
-            // Mouse buttons (assuming usage values 1-8 for buttons)
             if (field->attr.usage >= 1 && field->attr.usage <= 8 && value) {
-                ble_mouse_report.buttons |= (1 << (field->attr.usage - 1));
+                ble_mouse_report.buttons |= (1 << btn_index);
             }
+            btn_index++;
         }
     }
 
