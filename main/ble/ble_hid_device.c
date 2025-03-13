@@ -21,7 +21,7 @@ static bool s_connected = false;
 #define HIDD_DEVICE_NAME            "USB-to-BLE HID bridge"
 static uint8_t hidd_service_uuid128[] = {
     /* LSB <--------------------------------------------------------------------------------> MSB */
-    //first uuid, 16bit, [12],[13] is the value
+    // first uuid, 16bit, [12],[13] is the value
     0xfb, 0x34, 0x9b, 0x5f, 0x80, 0x00, 0x00, 0x80, 0x00, 0x10, 0x00, 0x00, 0x12, 0x18, 0x00, 0x00,
 };
 
@@ -29,9 +29,9 @@ static esp_ble_adv_data_t hidd_adv_data = {
     .set_scan_rsp = false,
     .include_name = true,
     .include_txpower = true,
-    .min_interval = 0x0006, //slave connection min interval, Time = min_interval * 1.25 msec
-    .max_interval = 0x0010, //slave connection max interval, Time = max_interval * 1.25 msec
-    .appearance = 0x03c0,       //HID Generic,
+    .min_interval = 0x6, // slave connection min interval, Time = min_interval * 1.25 msec
+    .max_interval = 0x6, // slave connection max interval, Time = max_interval * 1.25 msec
+    .appearance = 0x03c0,       // HID Generic,
     .manufacturer_len = 0,
     .p_manufacturer_data =  NULL,
     .service_data_len = 0,
@@ -47,7 +47,7 @@ static esp_ble_adv_params_t hidd_adv_params = {
     .adv_type           = ADV_TYPE_IND,
     .own_addr_type      = BLE_ADDR_TYPE_PUBLIC,
     .channel_map        = ADV_CHNL_ALL,
-    .adv_filter_policy = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
+    .adv_filter_policy  = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
 };
 
 static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *param)
@@ -62,11 +62,10 @@ static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *
             }
             break;
         }
-        case ESP_BAT_EVENT_REG: {
+        case ESP_BAT_EVENT_REG: 
             break;
-        }
         case ESP_HIDD_EVENT_DEINIT_FINISH:
-	     break;
+	        break;
 		case ESP_HIDD_EVENT_BLE_CONNECT: {
             ESP_LOGI(TAG, "ESP_HIDD_EVENT_BLE_CONNECT");
             s_conn_id = param->connect.conn_id;
@@ -174,8 +173,7 @@ esp_err_t ble_hid_device_init(void)
     esp_ble_gap_set_security_param(ESP_BLE_SM_MAX_KEY_SIZE, &key_size, sizeof(uint8_t));
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_INIT_KEY, &init_key, sizeof(uint8_t));
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_RSP_KEY, &rsp_key, sizeof(uint8_t));
-
-    esp_ble_gatt_set_local_mtu(32);
+    // esp_ble_gatt_set_local_mtu(500);
 
     return ESP_OK;
 }
@@ -231,8 +229,9 @@ esp_err_t ble_hid_device_send_keyboard_report(const keyboard_report_t *report)
     }
 
     uint8_t buffer[8];
-    hid_keyboard_build_report(buffer, report->modifier);
-    buffer[2] = report->keycode;
+    buffer[0] = report->modifier;
+    buffer[1] = report->reserved;
+    memcpy(&buffer[2], report->keycode, 6);
 
     esp_hidd_send_keyboard_value(s_conn_id, 0, buffer, 8);
     return ESP_OK;

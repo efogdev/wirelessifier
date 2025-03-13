@@ -5,8 +5,9 @@
 
 // Keyboard report structure
 typedef struct {
-    uint8_t modifier;  // Modifier keys
-    uint8_t keycode;   // Key code
+    uint8_t modifier;     // Modifier keys
+    uint8_t reserved;     // Reserved byte
+    uint8_t keycode[6];   // Array of 6 key codes
 } keyboard_report_t;
 
 // Mouse report structure

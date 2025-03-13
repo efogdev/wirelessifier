@@ -313,35 +313,35 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
     }
 
     // Log comprehensive field information
-    // ESP_LOGI(TAG, "=== Report Descriptor Analysis for Interface %d ===", interface_num);
-    // ESP_LOGI(TAG, "Total Fields: %d", report_map->num_fields);
-    // ESP_LOGI(TAG, "Total Bits: %d", report_map->total_bits);
-    // ESP_LOGI(TAG, "Report ID: %d", report_map->report_id);
-    // ESP_LOGI(TAG, "\n");
-    // ESP_LOGI(TAG, "Field Details:");
-    //
-    // for (int i = 0; i < report_map->num_fields; i++) {
-    //     ESP_LOGI(TAG, "\n");
-    //     ESP_LOGI(TAG, "Field %d:", i + 1);
-    //
-    //     report_field_info_t *field = &report_map->fields[i];
-    //
-    //     const char* usage_page_name = field->attr.usage_page < sizeof(usage_page_names)/sizeof(usage_page_names[0]) &&
-    //         usage_page_names[field->attr.usage_page] ? usage_page_names[field->attr.usage_page] : "Unknown";
-    //     ESP_LOGI(TAG, "  Usage Page: 0x%04X (%s)", field->attr.usage_page, usage_page_name);
-    //
-    //     const char* usage_name = field->attr.usage < sizeof(usage_names)/sizeof(usage_names[0]) &&
-    //         usage_names[field->attr.usage] ? usage_names[field->attr.usage] : "Unknown";
-    //     ESP_LOGI(TAG, "  Usage: 0x%04X (%s)", field->attr.usage, usage_name);
-    //
-    //     ESP_LOGI(TAG, "  Report Size: %d bits", (int) field->attr.report_size);
-    //     ESP_LOGI(TAG, "  Logical Min: %d", field->attr.logical_min);
-    //     ESP_LOGI(TAG, "  Logical Max: %d", field->attr.logical_max);
-    //     ESP_LOGI(TAG, "  Bit Position:");
-    //     ESP_LOGI(TAG, "    - Offset: %d", (int) field->bit_offset);
-    //     ESP_LOGI(TAG, "    - Size: %d", (int) field->bit_size);
-    // }
-    // ESP_LOGI(TAG, "\n=== End of Report Descriptor Analysis ===\n");
+    ESP_LOGI(TAG, "=== Report Descriptor Analysis for Interface %d ===", interface_num);
+    ESP_LOGI(TAG, "Total Fields: %d", report_map->num_fields);
+    ESP_LOGI(TAG, "Total Bits: %d", report_map->total_bits);
+    ESP_LOGI(TAG, "Report ID: %d", report_map->report_id);
+    ESP_LOGI(TAG, "\n");
+    ESP_LOGI(TAG, "Field Details:");
+    
+    for (int i = 0; i < report_map->num_fields; i++) {
+        ESP_LOGI(TAG, "\n");
+        ESP_LOGI(TAG, "Field %d:", i + 1);
+    
+        report_field_info_t *field = &report_map->fields[i];
+    
+        const char* usage_page_name = field->attr.usage_page < sizeof(usage_page_names)/sizeof(usage_page_names[0]) &&
+            usage_page_names[field->attr.usage_page] ? usage_page_names[field->attr.usage_page] : "Unknown";
+        ESP_LOGI(TAG, "  Usage Page: 0x%04X (%s)", field->attr.usage_page, usage_page_name);
+    
+        const char* usage_name = field->attr.usage < sizeof(usage_names)/sizeof(usage_names[0]) &&
+            usage_names[field->attr.usage] ? usage_names[field->attr.usage] : "Unknown";
+        ESP_LOGI(TAG, "  Usage: 0x%04X (%s)", field->attr.usage, usage_name);
+    
+        ESP_LOGI(TAG, "  Report Size: %d bits", (int) field->attr.report_size);
+        ESP_LOGI(TAG, "  Logical Min: %d", field->attr.logical_min);
+        ESP_LOGI(TAG, "  Logical Max: %d", field->attr.logical_max);
+        ESP_LOGI(TAG, "  Bit Position:");
+        ESP_LOGI(TAG, "    - Offset: %d", (int) field->bit_offset);
+        ESP_LOGI(TAG, "    - Size: %d", (int) field->bit_size);
+    }
+    ESP_LOGI(TAG, "\n=== End of Report Descriptor Analysis ===\n");
              
     pthread_rwlock_unlock(&g_report_maps_lock);
 }
@@ -438,7 +438,7 @@ static void process_report(hid_host_device_handle_t hid_device_handle, const uin
         fields[i].attr = field_info->attr;
         fields[i].values = &field_values[i];
 
-        // ESP_LOGI(TAG, "Field %d: usage_page=0x%04x, usage=0x%04x, value=%d",
+        // ESP_LOGI(TAG, "Field %d: usage_page=0x%04x, usage=0x%04x, value=%d", 
         //         i, field_info->attr.usage_page, field_info->attr.usage, field_values[i]);
     }
 

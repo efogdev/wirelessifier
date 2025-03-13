@@ -130,61 +130,64 @@ esp_err_t hid_bridge_stop(void)
 static esp_err_t process_keyboard_report(usb_hid_report_t *report) {
     keyboard_report_t ble_kb_report = {0};
     
+    // Process each field in the report
     for (int i = 0; i < report->num_fields; i++) {
-        usb_hid_field_t *field = &report->fields[i];
-        
+        const usb_hid_field_t *field = &report->fields[i];
+        int value = field->values[0];
+
+        // Handle keyboard fields based on usage page
         if (field->attr.usage_page == HID_USAGE_PAGE_KEYBOARD) {
-            // Handle keyboard keys
-            if (field->values && field->attr.report_count > 0) {
-                ble_kb_report.keycode = field->values[0]; // First key pressed
-            }
-        } else if (field->attr.usage_page == HID_USAGE_PAGE_BUTTON) {
-            // Handle keyboard modifiers
-            if (field->values && field->attr.report_count > 0) {
-                ble_kb_report.modifier = field->values[0];
+            if (field->attr.usage >= 0xE0 && field->attr.usage <= 0xE7) {
+                // Modifier keys (Ctrl, Shift, Alt, GUI)
+                if (value) {
+                    ble_kb_report.modifier |= (1 << (field->attr.usage - 0xE0));
+                }
+            } else if (!field->attr.constant) {
+                // Regular keys
+                if (value) {
+                    // Find first empty slot in keycode array
+                    for (int j = 0; j < 6; j++) {
+                        if (ble_kb_report.keycode[j] == 0) {
+                            ble_kb_report.keycode[j] = field->attr.usage;
+                            break;
+                        }
+                    }
+                }
             }
         }
     }
-    
-    ESP_LOGI(TAG, "Forwarding keyboard report: mod=0x%02x key=0x%02x",
-             ble_kb_report.modifier, ble_kb_report.keycode);
+
+    // ESP_LOGI(TAG, "Forwarding keyboard report: mod=0x%02x key=0x%02x",
+    //          ble_kb_report.modifier, ble_kb_report.keycode);
+
     return ble_hid_device_send_keyboard_report(&ble_kb_report);
 }
 
 static esp_err_t process_mouse_report(usb_hid_report_t *report) {
     mouse_report_t ble_mouse_report = {0};
 
-    // Process all fields
+    // Process each field in the report
     for (int i = 0; i < report->num_fields; i++) {
-        usb_hid_field_t *field = &report->fields[i];
+        const usb_hid_field_t *field = &report->fields[i];
+        int value = field->values[0];
 
-        if (!field->values) continue;
-
-        // Generic Desktop Page (0x01)
+        // Handle mouse fields based on usage page and usage
         if (field->attr.usage_page == HID_USAGE_PAGE_GENERIC_DESKTOP) {
             switch (field->attr.usage) {
-                case HID_USAGE_X: // X movement
-                    ble_mouse_report.x = (int8_t)(field->values[0]);
-                break;
-                case HID_USAGE_Y: // Y movement
-                    ble_mouse_report.y = (int8_t)(field->values[0]);
-                break;
-                case HID_USAGE_WHEEL: // Scroll wheel
-                    if (field->values[0] == 255) {
-                        ble_mouse_report.wheel = -1;  // Up
-                    } else if (field->values[0] == 1) {
-                        ble_mouse_report.wheel = 1; // Down
-                    }
-                break;
+                case HID_USAGE_X:
+                    ble_mouse_report.x = value;
+                    break;
+                case HID_USAGE_Y:
+                    ble_mouse_report.y = value;
+                    break;
+                case HID_USAGE_WHEEL:
+                    ble_mouse_report.wheel = value;
+                    break;
             }
-        }
-        // Button Page (0x09)
-        else if (field->attr.usage_page == HID_USAGE_PAGE_BUTTON) {
-            if (field->values && field->attr.usage >= 1 && field->attr.usage <= 8) {
-                // Set the corresponding bit in buttons byte based on button number (1-8)
-                if (field->values[0]) {
-                    ble_mouse_report.buttons |= (1 << (field->attr.usage - 1));
-                }
+        } else if (field->attr.usage_page == HID_USAGE_PAGE_BUTTONS) {
+            // Mouse buttons (assuming usage values 1-8 for buttons)
+            if (field->attr.usage >= 1 && field->attr.usage <= 8 && value) {
+                ble_mouse_report.buttons |= (1 << (field->attr.usage - 1));
             }
         }
     }
