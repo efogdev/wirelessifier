@@ -5,6 +5,7 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "esp_log.h"
+#include "esp_pm.h"
 #include "esp_err.h"
 #include "nvs_flash.h"
 #include "driver/gpio.h"
@@ -23,8 +24,9 @@ static const char *TAG = "MAIN";
 
 static QueueHandle_t intrQueue = NULL;
 
-static void init_gpio(void);
 static void init_variables(void);
+static void init_pm(void);
+static void init_gpio(void);
 static void run_hid_bridge(void);
 
 void app_main(void) {
@@ -38,22 +40,30 @@ void app_main(void) {
     ESP_ERROR_CHECK(ret);
 
     init_variables();
+    init_pm();
     init_gpio();
 
     led_control_init(NUM_LEDS, GPIO_WS2812B_PIN);
     led_update_pattern(usb_hid_host_device_connected(), ble_hid_device_connected());
-    
-    vTaskDelay(pdMS_TO_TICKS(100));
-    run_hid_bridge();
 
+    run_hid_bridge();
     while (1) {
+        vTaskDelay(pdMS_TO_TICKS(50));
         led_update_pattern(usb_hid_host_device_connected(), ble_hid_device_connected());
-        vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
 
 static void init_variables() {
     intrQueue = xQueueCreate(4, sizeof(int));
+}
+
+static void init_pm() {
+    const esp_pm_config_t cfg = {
+        .light_sleep_enable = true,
+        .max_freq_mhz = 80,
+        .min_freq_mhz = 10,
+    };
+    ESP_ERROR_CHECK(esp_pm_configure(&cfg));
 }
 
 static void run_hid_bridge() {
