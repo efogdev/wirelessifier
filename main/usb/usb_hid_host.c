@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <inttypes.h>
+#include <pthread.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -18,12 +19,15 @@
 
 static const char *TAG = "usb_hid_host";
 
+static uint32_t g_report_counter = 0;
+static uint32_t g_last_report_counter = 0;
+static TaskHandle_t g_perf_task_handle = NULL;
 static QueueHandle_t g_report_queue = NULL;
 static QueueHandle_t g_event_queue = NULL;
 static bool g_device_connected = false;
 static TaskHandle_t g_usb_events_task_handle = NULL;
 static TaskHandle_t g_event_task_handle = NULL;
-static SemaphoreHandle_t g_report_maps_mutex = NULL;
+static pthread_rwlock_t g_report_maps_lock;
 
 #define MAX_REPORT_FIELDS 32
 #define MAX_COLLECTION_DEPTH 8
@@ -67,6 +71,7 @@ typedef struct {
     };
 } hid_event_queue_t;
 
+static void performance_monitor_task(void *arg);
 static void usb_lib_task(void *arg);
 static void hid_host_event_task(void *arg);
 static void hid_host_device_callback(hid_host_device_handle_t hid_device_handle, hid_host_driver_event_t event, void *arg);
@@ -82,9 +87,8 @@ esp_err_t usb_hid_host_init(QueueHandle_t report_queue) {
     }
 
     g_report_queue = report_queue;
-    g_report_maps_mutex = xSemaphoreCreateMutex();
-    if (g_report_maps_mutex == NULL) {
-        ESP_LOGE(TAG, "Failed to create report maps mutex");
+    if (pthread_rwlock_init(&g_report_maps_lock, NULL) != 0) {
+        ESP_LOGE(TAG, "Failed to create report maps rwlock");
         return ESP_ERR_NO_MEM;
     }
     g_device_connected = false;
@@ -131,8 +135,18 @@ esp_err_t usb_hid_host_init(QueueHandle_t report_queue) {
         usb_host_uninstall();
         return ret;
     }
-    ESP_LOGI(TAG, "USB HID Host initialized successfully");
 
+    task_created = xTaskCreatePinnedToCore(performance_monitor_task, "perf_monitor", 4096, NULL, 1, &g_perf_task_handle, 0);
+    if (task_created != pdTRUE) {
+        ESP_LOGE(TAG, "Failed to create performance monitor task");
+        vTaskDelete(g_event_task_handle);
+        vTaskDelete(g_usb_events_task_handle);
+        vQueueDelete(g_event_queue);
+        usb_host_uninstall();
+        return ESP_ERR_NO_MEM;
+    }
+
+    ESP_LOGI(TAG, "USB HID Host initialized successfully");
     return ESP_OK;
 }
 
@@ -152,6 +166,11 @@ esp_err_t usb_hid_host_deinit(void) {
         g_usb_events_task_handle = NULL;
     }
 
+    if (g_perf_task_handle != NULL) {
+        vTaskDelete(g_perf_task_handle);
+        g_perf_task_handle = NULL;
+    }
+
     ret = usb_host_uninstall();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to uninstall USB host: %d", ret);
@@ -161,10 +180,7 @@ esp_err_t usb_hid_host_deinit(void) {
         vQueueDelete(g_event_queue);
         g_event_queue = NULL;
     }
-    if (g_report_maps_mutex != NULL) {
-        vSemaphoreDelete(g_report_maps_mutex);
-        g_report_maps_mutex = NULL;
-    }
+    pthread_rwlock_destroy(&g_report_maps_lock);
     g_report_queue = NULL;
     g_device_connected = false;
     
@@ -182,8 +198,8 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
         return;
     }
 
-    if (xSemaphoreTake(g_report_maps_mutex, pdMS_TO_TICKS(1000)) != pdTRUE) {
-        ESP_LOGE(TAG, "Failed to take report maps mutex");
+    if (pthread_rwlock_wrlock(&g_report_maps_lock) != 0) {
+        ESP_LOGE(TAG, "Failed to take report maps write lock");
         return;
     }
 
@@ -283,7 +299,7 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
     ESP_LOGI(TAG, "Parsed report descriptor for interface %d: %d fields, %d total bits", 
              interface_num, report_map->num_fields, report_map->total_bits);
              
-    xSemaphoreGive(g_report_maps_mutex);
+    pthread_rwlock_unlock(&g_report_maps_lock);
 }
 
 static uint32_t extract_field_value(const uint8_t *data, uint16_t bit_offset, uint16_t bit_size) {
@@ -324,7 +340,22 @@ static uint32_t extract_field_value(const uint8_t *data, uint16_t bit_offset, ui
     return value;
 }
 
+static void performance_monitor_task(void *arg) {
+    TickType_t last_wake_time = xTaskGetTickCount();
+    while (1) {
+        uint32_t reports = g_report_counter - g_last_report_counter;
+        g_last_report_counter = g_report_counter;
+
+        if (reports > 0) {
+            ESP_LOGI(TAG, "USB HID: %lu rps", reports);
+        }
+
+        vTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(1000));
+    }
+}
+
 static void process_report(hid_host_device_handle_t hid_device_handle, const uint8_t *data, size_t length, uint8_t report_id, uint8_t interface_num) {
+    g_report_counter++;
     if (!data || length == 0 || length > 64 || !g_report_queue) {
         ESP_LOGE(TAG, "Invalid input parameters: data=%p, length=%zu", data, length);
         return;
@@ -335,8 +366,8 @@ static void process_report(hid_host_device_handle_t hid_device_handle, const uin
         return;
     }
 
-    if (xSemaphoreTake(g_report_maps_mutex, pdMS_TO_TICKS(1000)) != pdTRUE) {
-        ESP_LOGE(TAG, "Failed to take report maps mutex");
+    if (pthread_rwlock_rdlock(&g_report_maps_lock) != 0) {
+        ESP_LOGE(TAG, "Failed to take report maps read lock");
         return;
     }
 
@@ -374,7 +405,7 @@ static void process_report(hid_host_device_handle_t hid_device_handle, const uin
         ESP_LOGE(TAG, "Failed to send report to queue");
     }
 
-    xSemaphoreGive(g_report_maps_mutex);
+    pthread_rwlock_unlock(&g_report_maps_lock);
 }
 
 static void hid_host_interface_callback(hid_host_device_handle_t hid_device_handle, const hid_host_interface_event_t event, void *arg) {
