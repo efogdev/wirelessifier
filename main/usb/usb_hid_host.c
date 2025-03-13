@@ -29,8 +29,8 @@ static TaskHandle_t g_usb_events_task_handle = NULL;
 static TaskHandle_t g_event_task_handle = NULL;
 static pthread_rwlock_t g_report_maps_lock;
 
-#define MAX_REPORT_FIELDS 32
-#define MAX_COLLECTION_DEPTH 8
+#define MAX_REPORT_FIELDS 64
+#define MAX_COLLECTION_DEPTH 16
 
 typedef struct {
     usb_hid_field_attr_t attr;
@@ -105,13 +105,13 @@ esp_err_t usb_hid_host_init(QueueHandle_t report_queue) {
 
     ESP_ERROR_CHECK(usb_host_install(&host_config));
 
-    BaseType_t task_created = xTaskCreatePinnedToCore(hid_host_event_task, "hid_events", 4096, NULL, 3, &g_event_task_handle, 0);
+    BaseType_t task_created = xTaskCreatePinnedToCore(hid_host_event_task, "hid_events", 4096, NULL, 3, &g_event_task_handle, 1);
     if (task_created != pdTRUE) {
         vQueueDelete(g_event_queue);
         return ESP_ERR_NO_MEM;
     }
 
-    task_created = xTaskCreatePinnedToCore(usb_lib_task, "usb_events", 4096, NULL, 2, &g_usb_events_task_handle, 0);
+    task_created = xTaskCreatePinnedToCore(usb_lib_task, "usb_events", 4096, NULL, 2, &g_usb_events_task_handle, 1);
     if (task_created != pdTRUE) {
         vTaskDelete(g_event_task_handle);
         vQueueDelete(g_event_queue);
@@ -356,15 +356,17 @@ static void performance_monitor_task(void *arg) {
 
 static void process_report(hid_host_device_handle_t hid_device_handle, const uint8_t *data, size_t length, uint8_t report_id, uint8_t interface_num) {
     g_report_counter++;
-    if (!data || length == 0 || length > 64 || !g_report_queue) {
-        ESP_LOGE(TAG, "Invalid input parameters: data=%p, length=%zu", data, length);
+
+    // Combined validation for better performance
+    if (!data || !g_report_queue || length == 0 || length > 64 || interface_num >= USB_HOST_MAX_INTERFACES) {
+        ESP_LOGE(TAG, "Invalid parameters: data=%p, queue=%p, len=%zu, iface=%u", data, g_report_queue, length, interface_num);
         return;
     }
 
-    if (interface_num >= USB_HOST_MAX_INTERFACES) {
-        ESP_LOGE(TAG, "Interface number %d exceeds maximum", interface_num);
-        return;
-    }
+    // Static allocation for better performance
+    static usb_hid_report_t report;
+    static uint32_t field_values[MAX_REPORT_FIELDS];
+    static usb_hid_field_t fields[MAX_REPORT_FIELDS];
 
     if (pthread_rwlock_rdlock(&g_report_maps_lock) != 0) {
         ESP_LOGE(TAG, "Failed to take report maps read lock");
@@ -372,37 +374,29 @@ static void process_report(hid_host_device_handle_t hid_device_handle, const uin
     }
 
     report_map_t *report_map = &g_interface_report_maps[interface_num];
-    usb_hid_report_t report = {
-        .report_id = report_id,
-        .type = USB_HID_FIELD_TYPE_INPUT,
-        .num_fields = report_map->num_fields,
-        .raw_len = MIN(length, sizeof(report.raw))
-    };
-
-    static uint32_t field_values[MAX_REPORT_FIELDS];
-    static usb_hid_field_t fields[MAX_REPORT_FIELDS];
     
-    // Process each field from the report descriptor
-    for (uint8_t i = 0; i < report_map->num_fields; i++) {
-        const report_field_info_t *field_info = &report_map->fields[i];
-        uint32_t value = extract_field_value(data, field_info->bit_offset, field_info->bit_size);
-        
-        field_values[i] = value;
-        fields[i] = (usb_hid_field_t) {
-            .attr = field_info->attr,
-            .values = &field_values[i]
-        };
+    // Initialize report structure
+    report.report_id = report_id;
+    report.type = USB_HID_FIELD_TYPE_INPUT;
+    report.num_fields = report_map->num_fields;
+    report.raw_len = MIN(length, sizeof(report.raw));
+    report.fields = fields;
+
+    // Batch process fields for better cache utilization
+    const report_field_info_t *field_info = report_map->fields;
+    for (uint8_t i = 0; i < report_map->num_fields; i++, field_info++) {
+        field_values[i] = extract_field_value(data, field_info->bit_offset, field_info->bit_size);
+        fields[i].attr = field_info->attr;
+        fields[i].values = &field_values[i];
 
         // ESP_LOGI(TAG, "Field %d: usage_page=0x%04x, usage=0x%04x, value=%" PRIu32,
         //         i, field_info->attr.usage_page, field_info->attr.usage, field_values[i]);
     }
 
-    report.fields = fields;
     memcpy(report.raw, data, report.raw_len);
 
-    BaseType_t queue_result = xQueueSend(g_report_queue, &report, pdMS_TO_TICKS(100));
-    if (queue_result != pdTRUE) {
-        ESP_LOGE(TAG, "Failed to send report to queue");
+    if (xQueueSend(g_report_queue, &report, pdMS_TO_TICKS(100)) != pdTRUE) {
+        ESP_LOGE(TAG, "Queue send failed");
     }
 
     pthread_rwlock_unlock(&g_report_maps_lock);

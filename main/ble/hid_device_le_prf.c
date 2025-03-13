@@ -632,8 +632,7 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
     }
 
     do {
-        int idx;
-        for (idx = 0; idx < PROFILE_NUM; idx++) {
+        for (int idx = 0; idx < PROFILE_NUM; idx++) {
             if (gatts_if == ESP_GATT_IF_NONE || /* ESP_GATT_IF_NONE, not specify a certain gatt_if, need to call every profile cb function */
                     gatts_if == heart_rate_profile_tab[idx].gatts_if) {
                 if (heart_rate_profile_tab[idx].gatts_cb) {
@@ -647,9 +646,7 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
 
 esp_err_t hidd_register_cb(void)
 {
-	esp_err_t status;
-	status = esp_ble_gatts_register_callback(gatts_event_handler);
-	return status;
+	return esp_ble_gatts_register_callback(gatts_event_handler);
 }
 
 void hidd_set_attr_value(uint16_t handle, uint16_t val_len, const uint8_t *value)
@@ -661,7 +658,6 @@ void hidd_set_attr_value(uint16_t handle, uint16_t val_len, const uint8_t *value
     } else {
         ESP_LOGE(HID_LE_PRF_TAG, "%s error:Invalid handle value.",__func__);
     }
-    return;
 }
 
 void hidd_get_attr_value(uint16_t handle, uint16_t *length, uint8_t **value)
@@ -673,40 +669,31 @@ void hidd_get_attr_value(uint16_t handle, uint16_t *length, uint8_t **value)
     } else {
         ESP_LOGE(HID_LE_PRF_TAG, "%s error:Invalid handle value.", __func__);
     }
-
-    return;
 }
 
 static void hid_add_id_tbl(void)
 {
-     // Mouse input report
-      hid_rpt_map[0].id = hidReportRefMouseIn[0];
-      hid_rpt_map[0].type = hidReportRefMouseIn[1];
-      hid_rpt_map[0].handle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_MOUSE_IN_VAL];
-      hid_rpt_map[0].cccdHandle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_MOUSE_IN_VAL];
-      hid_rpt_map[0].mode = HID_PROTOCOL_MODE_REPORT;
+    // Mouse input report
+    hid_rpt_map[0].id = hidReportRefMouseIn[0];
+    hid_rpt_map[0].type = hidReportRefMouseIn[1];
+    hid_rpt_map[0].handle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_MOUSE_IN_VAL];
+    hid_rpt_map[0].cccdHandle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_MOUSE_IN_VAL];
+    hid_rpt_map[0].mode = HID_PROTOCOL_MODE_REPORT;
 
-      // Key input report
-      hid_rpt_map[1].id = hidReportRefKeyIn[0];
-      hid_rpt_map[1].type = hidReportRefKeyIn[1];
-      hid_rpt_map[1].handle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_KEY_IN_VAL];
-      hid_rpt_map[1].cccdHandle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_KEY_IN_CCC];
-      hid_rpt_map[1].mode = HID_PROTOCOL_MODE_REPORT;
+    // Key input report
+    hid_rpt_map[1].id = hidReportRefKeyIn[0];
+    hid_rpt_map[1].type = hidReportRefKeyIn[1];
+    hid_rpt_map[1].handle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_KEY_IN_VAL];
+    hid_rpt_map[1].cccdHandle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_KEY_IN_CCC];
+    hid_rpt_map[1].mode = HID_PROTOCOL_MODE_REPORT;
 
-      // LED output report
-      hid_rpt_map[2].id = hidReportRefLedOut[0];
-      hid_rpt_map[2].type = hidReportRefLedOut[1];
-      hid_rpt_map[2].handle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_LED_OUT_VAL];
-      hid_rpt_map[2].cccdHandle = 0;
-      hid_rpt_map[2].mode = HID_PROTOCOL_MODE_REPORT;
+    // LED output report
+    hid_rpt_map[2].id = hidReportRefLedOut[0];
+    hid_rpt_map[2].type = hidReportRefLedOut[1];
+    hid_rpt_map[2].handle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_LED_OUT_VAL];
+    hid_rpt_map[2].cccdHandle = 0;
+    hid_rpt_map[2].mode = HID_PROTOCOL_MODE_REPORT;
 
-      // Boot keyboard input report
-      hid_rpt_map[3].id = hidReportRefKeyIn[0];
-      hid_rpt_map[3].type = hidReportRefKeyIn[1];
-      hid_rpt_map[3].handle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_BOOT_KB_IN_REPORT_VAL];
-      hid_rpt_map[3].cccdHandle = 0;
-      hid_rpt_map[3].mode = HID_PROTOCOL_MODE_BOOT;
-
-  // Setup report ID map
-  hid_dev_register_reports(4, hid_rpt_map);
+    // Setup report ID map
+    hid_dev_register_reports(3, hid_rpt_map);
 }

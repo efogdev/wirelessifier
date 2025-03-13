@@ -101,7 +101,6 @@ void led_control_init(int num_leds, int gpio_pin)
     }
     
     s_num_leds = num_leds;
-    
     neopixel_ctx = neopixel_Init(num_leds, gpio_pin);
     if (neopixel_ctx == NULL) {
         ESP_LOGE(TAG, "Failed to initialize NeoPixel");
@@ -114,7 +113,6 @@ void led_control_init(int num_leds, int gpio_pin)
 void led_update_pattern(bool usb_connected, bool ble_connected)
 {
     int new_pattern = LED_PATTERN_IDLE;
-    
     if (usb_connected && ble_connected) {
         new_pattern = LED_PATTERN_BOTH_CONNECTED;
     } else if (usb_connected) {
@@ -125,7 +123,6 @@ void led_update_pattern(bool usb_connected, bool ble_connected)
     
     if (new_pattern != s_led_pattern) {
         s_led_pattern = new_pattern;
-        // Reset animation state
         s_animation_start_time = pdTICKS_TO_MS(xTaskGetTickCount());
         s_use_secondary_color = false;
         s_direction_up = true;
@@ -287,7 +284,6 @@ static void led_control_task(void *arg)
     }
 
     tNeopixel pixels[s_num_leds];
-
     while (1) {
         for (int i = 1; i < s_num_leds; i++) {
             pixels[i].index = i;
@@ -295,15 +291,11 @@ static void led_control_task(void *arg)
         }
         
         update_status_led(pixels);
-        
         if (s_led_pattern >= 0 && s_led_pattern < sizeof(led_patterns)/sizeof(led_patterns[0])) {
             apply_pattern(pixels, &led_patterns[s_led_pattern]);
         }
 
         neopixel_SetPixel(neopixel_ctx, pixels, s_num_leds);
-        
-        // Fixed update rate based on FPS
-        const uint32_t UPDATE_RATE_MS = 1000 / FPS; // Convert FPS to milliseconds
-        vTaskDelay(pdMS_TO_TICKS(UPDATE_RATE_MS));
+        vTaskDelay(pdMS_TO_TICKS(1000 / FPS));
     }
 }

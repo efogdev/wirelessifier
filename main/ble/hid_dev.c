@@ -49,18 +49,7 @@ void hid_keyboard_build_report(uint8_t *buffer, keyboard_cmd_t cmd)
     memset(&buffer[2], 0, 6);
 }
 
-void hid_mouse_build_report(uint8_t *buffer, mouse_cmd_t cmd)
-{
-    if (!buffer) {
-        ESP_LOGE(HID_LE_PRF_TAG, "%s(), the buffer is NULL, hid build report failed.", __func__);
-        return;
-    }
 
-    buffer[0] = cmd;
-    buffer[1] = 0;
-    buffer[2] = 0;
-    buffer[3] = 0;
-}
 
 void hid_dev_send_report(esp_gatt_if_t gatts_if, uint16_t conn_id,
                                     uint8_t id, uint8_t type, uint8_t length, uint8_t *data)
