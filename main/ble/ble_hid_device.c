@@ -31,7 +31,7 @@ static esp_ble_adv_data_t hidd_adv_data = {
     .include_txpower = true,
     .min_interval = 0x6, // slave connection min interval, Time = min_interval * 1.25 msec
     .max_interval = 0x80, // slave connection max interval, Time = max_interval * 1.25 msec
-    .appearance = 0x03c0,       // HID Generic,
+    .appearance = ESP_BLE_APPEARANCE_HID_MOUSE,
     .manufacturer_len = 0,
     .p_manufacturer_data =  NULL,
     .service_data_len = 0,
@@ -55,10 +55,8 @@ static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *
     switch(event) {
         case ESP_HIDD_EVENT_REG_FINISH: {
             if (param->init_finish.state == ESP_HIDD_INIT_OK) {
-                //esp_bd_addr_t rand_addr = {0x04,0x11,0x11,0x11,0x11,0x05};
                 esp_ble_gap_set_device_name(HIDD_DEVICE_NAME);
                 esp_ble_gap_config_adv_data(&hidd_adv_data);
-
             }
             break;
         }
@@ -163,7 +161,7 @@ esp_err_t ble_hid_device_init(void)
     esp_hidd_register_callbacks(hidd_event_callback);
 
     /* set the security iocap & auth_req & key size & init key response key parameters to the stack*/
-    esp_ble_auth_req_t auth_req = ESP_LE_AUTH_REQ_SC_MITM_BOND;     //bonding with peer device after authentication
+    esp_ble_auth_req_t auth_req = ESP_LE_AUTH_REQ_SC_MITM_BOND;
     esp_ble_io_cap_t iocap = ESP_IO_CAP_NONE;           //set the IO capability to No output No input
     uint8_t key_size = 16;      //the key size should be 7~16 bytes
     uint8_t init_key = ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK;
@@ -173,7 +171,8 @@ esp_err_t ble_hid_device_init(void)
     esp_ble_gap_set_security_param(ESP_BLE_SM_MAX_KEY_SIZE, &key_size, sizeof(uint8_t));
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_INIT_KEY, &init_key, sizeof(uint8_t));
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_RSP_KEY, &rsp_key, sizeof(uint8_t));
-    esp_ble_gatt_set_local_mtu(64);
+    esp_ble_gatt_set_local_mtu(250);
+    esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_DEFAULT, ESP_PWR_LVL_N0);
 
     return ESP_OK;
 }

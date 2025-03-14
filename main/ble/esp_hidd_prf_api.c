@@ -67,14 +67,15 @@ esp_err_t esp_hidd_profile_deinit(void)
     }
 
     if(hidd_svc_hdl != 0) {
-	esp_ble_gatts_stop_service(hidd_svc_hdl);
-	esp_ble_gatts_delete_service(hidd_svc_hdl);
+        esp_ble_gatts_stop_service(hidd_svc_hdl);
+        esp_ble_gatts_delete_service(hidd_svc_hdl);
     } else {
-	return ESP_FAIL;
-   }
+        return ESP_FAIL;
+    }
 
     /* register the HID device profile to the BTA_GATTS module*/
     esp_ble_gatts_app_unregister(hidd_le_env.gatt_if);
+    hidd_le_env.enabled = false;
 
     return ESP_OK;
 }
