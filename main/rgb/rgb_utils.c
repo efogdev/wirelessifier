@@ -50,10 +50,10 @@ static const led_pattern_t led_patterns[] = {
     },
     // SLEEPING
     {
-        .colors = {NP_RGB(96, 96, 0), 0},
+        .colors = {NP_RGB(24, 16, 0), 0},
         .type = ANIM_TYPE_RUNNING_LIGHT_BOUNCE,
-        .trail_length = 5,
-        .speed = 2,
+        .trail_length = 6,
+        .speed = 1,
         .direction_up = true
     }
 };
@@ -72,6 +72,12 @@ static uint32_t s_animation_start_time = 0;
 static bool s_use_secondary_color = false;
 static bool s_direction_up = true;
 
+// Transition state
+static bool s_in_transition = false;
+static uint32_t s_transition_start_time = 0;
+#define TRANSITION_DURATION_MS 120
+static tNeopixel* s_previous_state = NULL;
+
 // Status LED variables
 static uint32_t s_status_color = STATUS_COLOR_OFF;
 static uint8_t s_status_mode = STATUS_MODE_OFF;
@@ -81,6 +87,10 @@ static bool s_status_blink_state = false;
 #define MAX_CYCLE_TIME_MS 2000 // Slowest complete animation cycle: 2000ms
 #define STATUS_BLINK_PERIOD_MS 500
 static uint32_t s_last_blink_time = 0;
+
+// Function prototypes
+static void update_status_led(tNeopixel* pixels);
+static inline void apply_pattern(tNeopixel* pixels, const led_pattern_t* pattern);
 
 static inline uint32_t get_cycle_time_ms(uint8_t speed) {
     if (speed == 0) return MAX_CYCLE_TIME_MS;
@@ -112,6 +122,12 @@ void led_control_init(int num_leds, int gpio_pin)
         return;
     }
     
+    // Clean up previous resources if any
+    if (s_previous_state != NULL) {
+        free(s_previous_state);
+        s_previous_state = NULL;
+    }
+    
     s_num_leds = num_leds;
     neopixel_ctx = neopixel_Init(num_leds, gpio_pin);
     if (neopixel_ctx == NULL) {
@@ -119,7 +135,34 @@ void led_control_init(int num_leds, int gpio_pin)
         return;
     }
     
+    // Allocate memory for previous state array
+    s_previous_state = (tNeopixel*)malloc(sizeof(tNeopixel) * num_leds);
+    if (s_previous_state == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory for LED transition state");
+        return;
+    }
+    
     xTaskCreatePinnedToCore(led_control_task, "led_control", 1500, NULL, configMAX_PRIORITIES - 1, &s_led_task_handle, 1);
+}
+
+void led_control_deinit(void)
+{
+    // Stop the LED control task if running
+    if (s_led_task_handle != NULL) {
+        vTaskDelete(s_led_task_handle);
+        s_led_task_handle = NULL;
+    }
+    
+    // Free allocated memory
+    if (s_previous_state != NULL) {
+        free(s_previous_state);
+        s_previous_state = NULL;
+    }
+    
+    // Reset state variables
+    s_num_leds = 0;
+    s_led_pattern = LED_PATTERN_IDLE;
+    s_in_transition = false;
 }
 
 void led_update_pattern(bool usb_connected, bool ble_connected, bool ble_paused)
@@ -157,18 +200,30 @@ void led_update_pattern(bool usb_connected, bool ble_connected, bool ble_paused)
     }
     
     if (new_pattern != s_led_pattern) {
-        // Clear all LEDs before setting new pattern
+        // Save current LED state for transition
         tNeopixel pixels[s_num_leds];
         for (int i = 0; i < s_num_leds; i++) {
             pixels[i].index = i;
-            pixels[i].rgb = 0; // Set to 0,0,0 (off)
+            pixels[i].rgb = 0; // Initialize to off
         }
-        neopixel_SetPixel(neopixel_ctx, pixels, s_num_leds);
+        
+        // Apply current pattern to get current state
+        update_status_led(pixels);
+        if (s_led_pattern >= 0 && s_led_pattern < sizeof(led_patterns)/sizeof(led_patterns[0])) {
+            apply_pattern(pixels, &led_patterns[s_led_pattern]);
+        }
+        
+        // Save current state for transition
+        memcpy(s_previous_state, pixels, sizeof(tNeopixel) * s_num_leds);
+        
+        // Start transition
+        s_in_transition = true;
+        s_transition_start_time = pdTICKS_TO_MS(xTaskGetTickCount());
         
         // Update pattern state
         s_led_pattern = new_pattern;
-        s_animation_start_time = pdTICKS_TO_MS(xTaskGetTickCount());
-        s_last_pattern_change_time = s_animation_start_time;
+        s_animation_start_time = s_transition_start_time;
+        s_last_pattern_change_time = s_transition_start_time;
         s_use_secondary_color = false;
         s_direction_up = true;
     }
@@ -320,6 +375,25 @@ static inline void apply_pattern(tNeopixel* pixels, const led_pattern_t* pattern
     }
 }
 
+static void blend_colors(tNeopixel* dest, const tNeopixel* src1, const tNeopixel* src2, float blend_factor)
+{
+    // Extract RGB components
+    uint8_t r1 = (src1->rgb >> 16) & 0xFF;
+    uint8_t g1 = (src1->rgb >> 8) & 0xFF;
+    uint8_t b1 = src1->rgb & 0xFF;
+    
+    uint8_t r2 = (src2->rgb >> 16) & 0xFF;
+    uint8_t g2 = (src2->rgb >> 8) & 0xFF;
+    uint8_t b2 = src2->rgb & 0xFF;
+    
+    // Linear interpolation between colors
+    uint8_t r = r1 + (uint8_t)((float)(r2 - r1) * blend_factor);
+    uint8_t g = g1 + (uint8_t)((float)(g2 - g1) * blend_factor);
+    uint8_t b = b1 + (uint8_t)((float)(b2 - b1) * blend_factor);
+    
+    dest->rgb = NP_RGB(r, g, b);
+}
+
 static void led_control_task(void *arg)
 {
     if (neopixel_ctx == NULL) {
@@ -329,15 +403,44 @@ static void led_control_task(void *arg)
     }
 
     tNeopixel pixels[s_num_leds];
+    tNeopixel new_state[s_num_leds];
+    
     while (1) {
-        for (int i = 1; i < s_num_leds; i++) {
+        // Initialize pixels
+        for (int i = 0; i < s_num_leds; i++) {
             pixels[i].index = i;
             pixels[i].rgb = 0;
+            new_state[i].index = i;
+            new_state[i].rgb = 0;
         }
         
-        update_status_led(pixels);
+        // Calculate new state based on current pattern
+        update_status_led(new_state);
         if (s_led_pattern >= 0 && s_led_pattern < sizeof(led_patterns)/sizeof(led_patterns[0])) {
-            apply_pattern(pixels, &led_patterns[s_led_pattern]);
+            apply_pattern(new_state, &led_patterns[s_led_pattern]);
+        }
+        
+        // Handle transition if active
+        if (s_in_transition) {
+            uint32_t current_time = pdTICKS_TO_MS(xTaskGetTickCount());
+            uint32_t elapsed = current_time - s_transition_start_time;
+            
+            if (elapsed >= TRANSITION_DURATION_MS) {
+                // Transition complete
+                s_in_transition = false;
+                memcpy(pixels, new_state, sizeof(tNeopixel) * s_num_leds);
+            } else {
+                // Calculate blend factor (0.0 to 1.0)
+                float blend_factor = (float)elapsed / TRANSITION_DURATION_MS;
+                
+                // Blend between previous and new state
+                for (int i = 0; i < s_num_leds; i++) {
+                    blend_colors(&pixels[i], &s_previous_state[i], &new_state[i], blend_factor);
+                }
+            }
+        } else {
+            // No transition, use new state directly
+            memcpy(pixels, new_state, sizeof(tNeopixel) * s_num_leds);
         }
 
         neopixel_SetPixel(neopixel_ctx, pixels, s_num_leds);

@@ -56,6 +56,9 @@ uint32_t rgb_color(uint8_t r, uint8_t g, uint8_t b);
 // Initialize LED control
 void led_control_init(int num_leds, int gpio_pin);
 
+// Deinitialize LED control and free resources
+void led_control_deinit(void);
+
 // Update LED pattern based on connection status
 void led_update_pattern(bool usb_connected, bool ble_connected, bool ble_paused);
 
