@@ -53,6 +53,14 @@ esp_err_t hid_bridge_stop(void);
  */
 esp_err_t hid_bridge_process_report(usb_hid_report_t *report);
 
+/**
+ * @brief Check if BLE stack is paused due to USB inactivity
+ * 
+ * @return true if BLE stack is paused and USB is connected
+ * @return false otherwise
+ */
+bool hid_bridge_is_ble_paused(void);
+
 #ifdef __cplusplus
 }
 #endif

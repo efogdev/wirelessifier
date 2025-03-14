@@ -47,6 +47,14 @@ static const led_pattern_t led_patterns[] = {
         .trail_length = 1,
         .speed = 1,
         .direction_up = false
+    },
+    // SLEEPING
+    {
+        .colors = {NP_RGB(127, 127, 0), 0},
+        .type = ANIM_TYPE_RUNNING_LIGHT_BOUNCE,
+        .trail_length = 1,
+        .speed = 5,
+        .direction_up = true
     }
 };
 
@@ -54,6 +62,10 @@ static int s_led_pattern = LED_PATTERN_IDLE;
 static tNeopixelContext* neopixel_ctx = NULL;
 static int s_num_leds = 0;
 static TaskHandle_t s_led_task_handle = NULL;
+static uint32_t s_last_pattern_change_time = 0;
+static bool s_in_wakeup_debounce = false;
+static uint32_t s_wakeup_debounce_start_time = 0;
+#define WAKEUP_DEBOUNCE_MS 200
 
 // Animation state
 static uint32_t s_animation_start_time = 0;
@@ -110,10 +122,15 @@ void led_control_init(int num_leds, int gpio_pin)
     xTaskCreatePinnedToCore(led_control_task, "led_control", 1500, NULL, configMAX_PRIORITIES - 1, &s_led_task_handle, 1);
 }
 
-void led_update_pattern(bool usb_connected, bool ble_connected)
+void led_update_pattern(bool usb_connected, bool ble_connected, bool ble_paused)
 {
     int new_pattern = LED_PATTERN_IDLE;
-    if (usb_connected && ble_connected) {
+    uint32_t current_time = pdTICKS_TO_MS(xTaskGetTickCount());
+    
+    if (ble_paused) {
+        new_pattern = LED_PATTERN_SLEEPING;
+        s_in_wakeup_debounce = false; // Reset debounce state when going to sleep
+    } else if (usb_connected && ble_connected) {
         new_pattern = LED_PATTERN_BOTH_CONNECTED;
     } else if (usb_connected) {
         new_pattern = LED_PATTERN_USB_CONNECTED;
@@ -121,9 +138,37 @@ void led_update_pattern(bool usb_connected, bool ble_connected)
         new_pattern = LED_PATTERN_BLE_CONNECTED;
     }
     
+    // Check if we're waking up from sleep
+    if (s_led_pattern == LED_PATTERN_SLEEPING && new_pattern != LED_PATTERN_SLEEPING && !s_in_wakeup_debounce) {
+        // Start debounce period
+        s_in_wakeup_debounce = true;
+        s_wakeup_debounce_start_time = current_time;
+        return; // Don't update pattern yet
+    }
+    
+    // If we're in debounce period, check if enough time has passed
+    if (s_in_wakeup_debounce) {
+        if ((current_time - s_wakeup_debounce_start_time) < WAKEUP_DEBOUNCE_MS) {
+            return; // Still in debounce period, don't update pattern
+        } else {
+            // Debounce period over
+            s_in_wakeup_debounce = false;
+        }
+    }
+    
     if (new_pattern != s_led_pattern) {
+        // Clear all LEDs before setting new pattern
+        tNeopixel pixels[s_num_leds];
+        for (int i = 0; i < s_num_leds; i++) {
+            pixels[i].index = i;
+            pixels[i].rgb = 0; // Set to 0,0,0 (off)
+        }
+        neopixel_SetPixel(neopixel_ctx, pixels, s_num_leds);
+        
+        // Update pattern state
         s_led_pattern = new_pattern;
         s_animation_start_time = pdTICKS_TO_MS(xTaskGetTickCount());
+        s_last_pattern_change_time = s_animation_start_time;
         s_use_secondary_color = false;
         s_direction_up = true;
     }

@@ -46,7 +46,7 @@ void app_main(void) {
     init_gpio();
 
     led_control_init(NUM_LEDS, GPIO_WS2812B_PIN);
-    led_update_pattern(usb_hid_host_device_connected(), ble_hid_device_connected());
+    led_update_pattern(usb_hid_host_device_connected(), ble_hid_device_connected(), hid_bridge_is_ble_paused());
     
     ESP_ERROR_CHECK(task_monitor_init());
     ESP_ERROR_CHECK(task_monitor_start());
@@ -60,7 +60,7 @@ void app_main(void) {
     run_hid_bridge();
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(50));
-        led_update_pattern(usb_hid_host_device_connected(), ble_hid_device_connected());
+        led_update_pattern(usb_hid_host_device_connected(), ble_hid_device_connected(), hid_bridge_is_ble_paused());
     }
 }
 

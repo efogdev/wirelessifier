@@ -45,6 +45,7 @@ typedef struct {
 #define LED_PATTERN_USB_CONNECTED 1
 #define LED_PATTERN_BLE_CONNECTED 2
 #define LED_PATTERN_BOTH_CONNECTED 3
+#define LED_PATTERN_SLEEPING 4
 
 // Global brightness setting (0-100%)
 extern uint8_t g_rgb_brightness;
@@ -56,7 +57,7 @@ uint32_t rgb_color(uint8_t r, uint8_t g, uint8_t b);
 void led_control_init(int num_leds, int gpio_pin);
 
 // Update LED pattern based on connection status
-void led_update_pattern(bool usb_connected, bool ble_connected);
+void led_update_pattern(bool usb_connected, bool ble_connected, bool ble_paused);
 
 // Update status LED (LED 0)
 void led_update_status(uint32_t color, uint8_t mode);

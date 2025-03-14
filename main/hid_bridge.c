@@ -28,14 +28,20 @@ static void inactivity_timer_callback(TimerHandle_t xTimer)
         return; // BLE stack already stopped
     }
     
+    // Only proceed if both USB and BLE devices are connected
+    if (!usb_hid_host_device_connected() || !ble_hid_device_connected()) {
+        return; // One or both devices not connected
+    }
+    
     ESP_LOGI(TAG, "No USB HID events for a while, stopping BLE stack");
     
     // Stop BLE stack
+    s_ble_stack_active = false;
     esp_err_t ret = ble_hid_device_deinit();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to deinitialize BLE HID device: %s", esp_err_to_name(ret));
+        s_ble_stack_active = true;
     } else {
-        s_ble_stack_active = false;
         ESP_LOGI(TAG, "BLE stack stopped, entering light sleep mode");
         esp_light_sleep_start();
     }
@@ -43,6 +49,8 @@ static void inactivity_timer_callback(TimerHandle_t xTimer)
 
 esp_err_t hid_bridge_init(void)
 {
+    s_ble_stack_active = true;
+
     if (s_hid_bridge_initialized) {
         ESP_LOGW(TAG, "HID bridge already initialized");
         return ESP_OK;
@@ -89,7 +97,6 @@ esp_err_t hid_bridge_init(void)
         return ret;
     }
 
-    s_ble_stack_active = true;
     s_hid_bridge_initialized = true;
     ESP_LOGI(TAG, "HID bridge initialized");
     
@@ -119,12 +126,13 @@ esp_err_t hid_bridge_deinit(void)
     }
 
     if (s_ble_stack_active) {
+        s_ble_stack_active = false;
         esp_err_t ret = ble_hid_device_deinit();
         if (ret != ESP_OK) {
+            s_ble_stack_active = true;
             ESP_LOGE(TAG, "Failed to deinitialize BLE HID device: %s", esp_err_to_name(ret));
             return ret;
         }
-        s_ble_stack_active = false;
     }
 
     esp_err_t ret = usb_hid_host_deinit();
@@ -258,6 +266,11 @@ static esp_err_t process_mouse_report(usb_hid_report_t *report) {
     return ble_hid_device_send_mouse_report(&ble_mouse_report);
 }
 
+bool hid_bridge_is_ble_paused(void)
+{
+    return !s_ble_stack_active && usb_hid_host_device_connected();
+}
+
 esp_err_t hid_bridge_process_report(usb_hid_report_t *report)
 {
     // ESP_LOGD(TAG, "Processing HID report (%d fields)", report->num_fields);
@@ -272,20 +285,22 @@ esp_err_t hid_bridge_process_report(usb_hid_report_t *report)
         return ESP_ERR_INVALID_ARG;
     }
     
-    // Reset inactivity timer on any USB HID event
-    if (s_inactivity_timer != NULL) {
+    // Reset inactivity timer on any USB HID event, but only if both devices are connected
+    if (s_inactivity_timer != NULL && usb_hid_host_device_connected() && ble_hid_device_connected()) {
         xTimerReset(s_inactivity_timer, 0);
     }
     
     // If BLE stack is not active, reinitialize it
     if (!s_ble_stack_active) {
         ESP_LOGI(TAG, "USB HID event received, restarting BLE stack");
+
+        s_ble_stack_active = true;
         esp_err_t ret = ble_hid_device_init();
         if (ret != ESP_OK) {
+            s_ble_stack_active = false;
             ESP_LOGE(TAG, "Failed to initialize BLE HID device: %s", esp_err_to_name(ret));
             return ret;
         }
-        s_ble_stack_active = true;
     }
 
     if (!ble_hid_device_connected()) {
@@ -332,7 +347,7 @@ static void hid_bridge_task(void *arg)
     ESP_LOGI(TAG, "HID bridge task started");
     usb_hid_report_t report;
     
-    // Start inactivity timer
+    // Start inactivity timer - it will only take action when both devices are connected
     if (s_inactivity_timer != NULL) {
         if (xTimerStart(s_inactivity_timer, 0) != pdPASS) {
             ESP_LOGE(TAG, "Failed to start inactivity timer");
