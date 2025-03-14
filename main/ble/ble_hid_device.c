@@ -173,7 +173,7 @@ esp_err_t ble_hid_device_init(void)
     esp_ble_gap_set_security_param(ESP_BLE_SM_MAX_KEY_SIZE, &key_size, sizeof(uint8_t));
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_INIT_KEY, &init_key, sizeof(uint8_t));
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_RSP_KEY, &rsp_key, sizeof(uint8_t));
-    // esp_ble_gatt_set_local_mtu(500);
+    esp_ble_gatt_set_local_mtu(64);
 
     return ESP_OK;
 }

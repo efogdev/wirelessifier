@@ -12,7 +12,7 @@
 
 static const char *TAG = "RGB_UTILS";
 #define FPS 120
-uint8_t g_rgb_brightness = 10;
+uint8_t g_rgb_brightness = 35;
 
 // Pattern definitions
 static const led_pattern_t led_patterns[] = {
@@ -21,7 +21,7 @@ static const led_pattern_t led_patterns[] = {
         .colors = {NP_RGB(255, 0, 0), 0},
         .type = ANIM_TYPE_BREATHING,
         .trail_length = 1,
-        .speed = 40, 
+        .speed = 25,
         .direction_up = true
     },
     // USB_CONNECTED
@@ -42,11 +42,11 @@ static const led_pattern_t led_patterns[] = {
     },
     // BOTH_CONNECTED
     {
-        .colors = {NP_RGB(0, 255, 0)},
-        .type = ANIM_TYPE_RUNNING_LIGHT_BOUNCE,
-        .trail_length = 3,
-        .speed = 50, 
-        .direction_up = true
+        .colors = {0},
+        .type = ANIM_TYPE_BREATHING,
+        .trail_length = 1,
+        .speed = 1,
+        .direction_up = false
     }
 };
 
@@ -240,7 +240,7 @@ static inline void apply_pattern(tNeopixel* pixels, const led_pattern_t* pattern
             for (int col = 0; col < 2; col++) {
                 int col_offset = 1 + (col * column_length);
                 float base_i = pattern->direction_up ? 
-                    (column_length - base_pos) : base_pos;
+                    base_pos : (column_length - base_pos);
                 
                 for (int i = 0; i < column_length; i++) {
                     float pos;
