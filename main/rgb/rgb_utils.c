@@ -50,10 +50,10 @@ static const led_pattern_t led_patterns[] = {
     },
     // SLEEPING
     {
-        .colors = {NP_RGB(127, 127, 0), 0},
+        .colors = {NP_RGB(96, 96, 0), 0},
         .type = ANIM_TYPE_RUNNING_LIGHT_BOUNCE,
-        .trail_length = 1,
-        .speed = 5,
+        .trail_length = 5,
+        .speed = 2,
         .direction_up = true
     }
 };

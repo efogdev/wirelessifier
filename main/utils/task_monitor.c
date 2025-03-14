@@ -8,6 +8,7 @@
 #include "driver/temperature_sensor.h"
 #include "esp_clk_tree.h"
 #include "task_monitor.h"
+#include "../hid_bridge.h"
 
 static const char *TAG = "TaskMonitor";
 
@@ -141,7 +142,13 @@ static void monitor_task(void *pvParameter)
         if (print_real_time_stats(STATS_TICKS) != ESP_OK) {
             ESP_LOGE(TAG, "Error getting real time stats");
         }
-        vTaskDelay(pdMS_TO_TICKS(5000)); // Print stats every 5 seconds
+        
+        // Report 5 times less frequently if BLE is paused
+        uint32_t delay_ms = 5000; // Default: print stats every 5 seconds
+        if (hid_bridge_is_ble_paused()) {
+            delay_ms = 25000; // 5 times less frequent (25 seconds)
+        }
+        vTaskDelay(pdMS_TO_TICKS(delay_ms));
     }
 }
 

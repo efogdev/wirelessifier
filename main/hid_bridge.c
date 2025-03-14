@@ -7,6 +7,7 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "freertos/timers.h"
+#include "freertos/semphr.h"
 #include "usb/usb_hid_host.h"
 #include "ble_hid_device.h"
 
@@ -14,6 +15,7 @@ static const char *TAG = "HID_BRIDGE";
 static QueueHandle_t s_hid_report_queue = NULL;
 static TaskHandle_t s_hid_bridge_task_handle = NULL;
 static TimerHandle_t s_inactivity_timer = NULL;
+static SemaphoreHandle_t s_ble_stack_mutex = NULL;
 static bool s_hid_bridge_initialized = false;
 static bool s_hid_bridge_running = false;
 static bool s_ble_stack_active = true;
@@ -24,12 +26,20 @@ static void inactivity_timer_callback(TimerHandle_t xTimer);
 
 static void inactivity_timer_callback(TimerHandle_t xTimer)
 {
+    // Take mutex to protect BLE stack state changes
+    if (xSemaphoreTake(s_ble_stack_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+        ESP_LOGW(TAG, "Failed to take BLE stack mutex in inactivity timer");
+        return;
+    }
+    
     if (!s_ble_stack_active) {
+        xSemaphoreGive(s_ble_stack_mutex);
         return; // BLE stack already stopped
     }
     
     // Only proceed if both USB and BLE devices are connected
     if (!usb_hid_host_device_connected() || !ble_hid_device_connected()) {
+        xSemaphoreGive(s_ble_stack_mutex);
         return; // One or both devices not connected
     }
     
@@ -43,22 +53,35 @@ static void inactivity_timer_callback(TimerHandle_t xTimer)
         s_ble_stack_active = true;
     } else {
         ESP_LOGI(TAG, "BLE stack stopped, entering light sleep mode");
+        xSemaphoreGive(s_ble_stack_mutex);
         esp_light_sleep_start();
+        return;
     }
+    
+    xSemaphoreGive(s_ble_stack_mutex);
 }
 
 esp_err_t hid_bridge_init(void)
 {
-    s_ble_stack_active = true;
-
     if (s_hid_bridge_initialized) {
         ESP_LOGW(TAG, "HID bridge already initialized");
         return ESP_OK;
     }
 
+    // Create BLE stack mutex
+    s_ble_stack_mutex = xSemaphoreCreateMutex();
+    if (s_ble_stack_mutex == NULL) {
+        ESP_LOGE(TAG, "Failed to create BLE stack mutex");
+        return ESP_ERR_NO_MEM;
+    }
+    
+    s_ble_stack_active = true;
+
     s_hid_report_queue = xQueueCreate(12, sizeof(usb_hid_report_t));
     if (s_hid_report_queue == NULL) {
         ESP_LOGE(TAG, "Failed to create HID report queue");
+        vSemaphoreDelete(s_ble_stack_mutex);
+        s_ble_stack_mutex = NULL;
         return ESP_ERR_NO_MEM;
     }
 
@@ -75,6 +98,8 @@ esp_err_t hid_bridge_init(void)
         ESP_LOGE(TAG, "Failed to create inactivity timer");
         vQueueDelete(s_hid_report_queue);
         s_hid_report_queue = NULL;
+        vSemaphoreDelete(s_ble_stack_mutex);
+        s_ble_stack_mutex = NULL;
         return ESP_ERR_NO_MEM;
     }
 
@@ -125,15 +150,23 @@ esp_err_t hid_bridge_deinit(void)
         s_inactivity_timer = NULL;
     }
 
+    if (xSemaphoreTake(s_ble_stack_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+        ESP_LOGE(TAG, "Failed to take BLE stack mutex in deinit");
+        return ESP_FAIL;
+    }
+    
     if (s_ble_stack_active) {
         s_ble_stack_active = false;
         esp_err_t ret = ble_hid_device_deinit();
         if (ret != ESP_OK) {
             s_ble_stack_active = true;
             ESP_LOGE(TAG, "Failed to deinitialize BLE HID device: %s", esp_err_to_name(ret));
+            xSemaphoreGive(s_ble_stack_mutex);
             return ret;
         }
     }
+    
+    xSemaphoreGive(s_ble_stack_mutex);
 
     esp_err_t ret = usb_hid_host_deinit();
     if (ret != ESP_OK) {
@@ -144,6 +177,11 @@ esp_err_t hid_bridge_deinit(void)
     if (s_hid_report_queue != NULL) {
         vQueueDelete(s_hid_report_queue);
         s_hid_report_queue = NULL;
+    }
+    
+    if (s_ble_stack_mutex != NULL) {
+        vSemaphoreDelete(s_ble_stack_mutex);
+        s_ble_stack_mutex = NULL;
     }
 
     s_hid_bridge_initialized = false;
@@ -292,15 +330,27 @@ esp_err_t hid_bridge_process_report(usb_hid_report_t *report)
     
     // If BLE stack is not active, reinitialize it
     if (!s_ble_stack_active) {
-        ESP_LOGI(TAG, "USB HID event received, restarting BLE stack");
-
-        s_ble_stack_active = true;
-        esp_err_t ret = ble_hid_device_init();
-        if (ret != ESP_OK) {
-            s_ble_stack_active = false;
-            ESP_LOGE(TAG, "Failed to initialize BLE HID device: %s", esp_err_to_name(ret));
-            return ret;
+        // Take mutex to protect BLE stack state changes
+        if (xSemaphoreTake(s_ble_stack_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+            ESP_LOGW(TAG, "Failed to take BLE stack mutex in process_report");
+            return ESP_FAIL;
         }
+        
+        // Double-check state after taking mutex
+        if (!s_ble_stack_active) {
+            ESP_LOGI(TAG, "USB HID event received, restarting BLE stack");
+
+            s_ble_stack_active = true;
+            esp_err_t ret = ble_hid_device_init();
+            if (ret != ESP_OK) {
+                s_ble_stack_active = false;
+                ESP_LOGE(TAG, "Failed to initialize BLE HID device: %s", esp_err_to_name(ret));
+                xSemaphoreGive(s_ble_stack_mutex);
+                return ret;
+            }
+        }
+        
+        xSemaphoreGive(s_ble_stack_mutex);
     }
 
     if (!ble_hid_device_connected()) {
