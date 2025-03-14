@@ -15,6 +15,7 @@
 #include "hid_bridge.h"
 #include "rgb/rgb_utils.h"
 #include "utils/task_monitor.h"
+#include "web/http_server.h"
 
 static const char *TAG = "MAIN";
 
@@ -49,9 +50,14 @@ void app_main(void) {
     
     ESP_ERROR_CHECK(task_monitor_init());
     ESP_ERROR_CHECK(task_monitor_start());
-    
-    run_hid_bridge();    
-    
+
+    if (gpio_get_level(GPIO_BUTTON_SW4) == 0) {
+        ESP_LOGI(TAG, "Initializing web services because SW4 held on boot");
+        init_web_services();
+        vTaskDelay(pdMS_TO_TICKS(500));
+    }
+
+    run_hid_bridge();
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(50));
         led_update_pattern(usb_hid_host_device_connected(), ble_hid_device_connected());
@@ -108,7 +114,7 @@ static void init_gpio(void) {
         .pin_bit_mask = (
             (1ULL<<GPIO_NUM_14) |
             (1ULL<<GPIO_NUM_15) |
-            (1ULL<<GPIO_NUM_16)
+            (1ULL<<GPIO_BUTTON_SW4)
         ),
         .mode = GPIO_MODE_INPUT,
         .pull_up_en = GPIO_PULLUP_ENABLE,

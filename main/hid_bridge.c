@@ -21,7 +21,7 @@ esp_err_t hid_bridge_init(void)
         return ESP_OK;
     }
 
-    s_hid_report_queue = xQueueCreate(10, sizeof(usb_hid_report_t));
+    s_hid_report_queue = xQueueCreate(12, sizeof(usb_hid_report_t));
     if (s_hid_report_queue == NULL) {
         ESP_LOGE(TAG, "Failed to create HID report queue");
         return ESP_ERR_NO_MEM;
@@ -94,7 +94,7 @@ esp_err_t hid_bridge_start(void)
         return ESP_OK;
     }
 
-    BaseType_t task_created = xTaskCreatePinnedToCore(hid_bridge_task, "hid_bridge", 8192, NULL, 5, &s_hid_bridge_task_handle, 1);
+    BaseType_t task_created = xTaskCreatePinnedToCore(hid_bridge_task, "hid_bridge", 2600, NULL, 5, &s_hid_bridge_task_handle, 1);
     if (task_created != pdTRUE) {
         ESP_LOGE(TAG, "Failed to create HID bridge task");
         return ESP_ERR_NO_MEM;

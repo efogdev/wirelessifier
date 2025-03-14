@@ -62,8 +62,8 @@ static esp_err_t print_real_time_stats(TickType_t xTicksToWait)
         goto exit;
     }
 
-    ESP_LOGI(TAG, " Task         |         Took | ");
-    ESP_LOGI(TAG, "--------------|--------------|------------");
+    ESP_LOGI(TAG, " Task         |         Took |     | Free, bytes ");
+    ESP_LOGI(TAG, "--------------|--------------|-----|-------------");
     //Match each task in start_array to those in the end_array
     for (int i = 0; i < start_array_size; i++) {
         int k = -1;
@@ -82,8 +82,13 @@ static esp_err_t print_real_time_stats(TickType_t xTicksToWait)
             uint32_t percentage_time = (task_elapsed_time * 100UL) / (total_elapsed_time * portNUM_PROCESSORS);
             // Convert microseconds to milliseconds
             uint32_t task_elapsed_ms = task_elapsed_time / 1000;
-            ESP_LOGI(TAG, "%-14s| %9"PRIu32" ms | %3"PRIu32"%%", 
-                    start_array[i].pcTaskName, task_elapsed_ms, percentage_time);
+            
+            // Calculate free stack space and percentage
+            UBaseType_t stack_high_water = end_array[k].usStackHighWaterMark;
+            UBaseType_t bytes_free = stack_high_water * sizeof(StackType_t);
+            
+            ESP_LOGI(TAG, "%-14s| %9"PRIu32" ms | %3"PRIu32"%% | %10d ",
+                    start_array[i].pcTaskName, task_elapsed_ms, percentage_time, bytes_free);
         }
     }
 
@@ -163,9 +168,6 @@ esp_err_t task_monitor_start(void)
         return ESP_ERR_INVALID_STATE;
     }
 
-    BaseType_t ret = xTaskCreatePinnedToCore(monitor_task, "monitor", 4096,
-                                           NULL, STATS_TASK_PRIO,
-                                           &monitor_task_handle, tskNO_AFFINITY);
-    
+    BaseType_t ret = xTaskCreatePinnedToCore(monitor_task, "monitor", 2600, NULL, STATS_TASK_PRIO, &monitor_task_handle, tskNO_AFFINITY);
     return (ret == pdPASS) ? ESP_OK : ESP_FAIL;
 }

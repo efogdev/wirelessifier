@@ -29,8 +29,8 @@ static TaskHandle_t g_usb_events_task_handle = NULL;
 static TaskHandle_t g_event_task_handle = NULL;
 static pthread_rwlock_t g_report_maps_lock;
 
-#define MAX_REPORT_FIELDS 64
-#define MAX_COLLECTION_DEPTH 16
+#define MAX_REPORT_FIELDS 36
+#define MAX_COLLECTION_DEPTH 8
 
 typedef struct {
     usb_hid_field_attr_t attr;
@@ -105,13 +105,13 @@ esp_err_t usb_hid_host_init(QueueHandle_t report_queue) {
 
     ESP_ERROR_CHECK(usb_host_install(&host_config));
 
-    BaseType_t task_created = xTaskCreatePinnedToCore(hid_host_event_task, "hid_events", 4096, NULL, 3, &g_event_task_handle, 1);
+    BaseType_t task_created = xTaskCreatePinnedToCore(hid_host_event_task, "hid_events", 3200, NULL, 3, &g_event_task_handle, 1);
     if (task_created != pdTRUE) {
         vQueueDelete(g_event_queue);
         return ESP_ERR_NO_MEM;
     }
 
-    task_created = xTaskCreatePinnedToCore(usb_lib_task, "usb_events", 4096, NULL, 2, &g_usb_events_task_handle, 1);
+    task_created = xTaskCreatePinnedToCore(usb_lib_task, "usb_events", 3200, NULL, 2, &g_usb_events_task_handle, 1);
     if (task_created != pdTRUE) {
         vTaskDelete(g_event_task_handle);
         vQueueDelete(g_event_queue);
@@ -122,7 +122,7 @@ esp_err_t usb_hid_host_init(QueueHandle_t report_queue) {
     const hid_host_driver_config_t hid_host_config = {
         .create_background_task = true,
         .task_priority = 4,
-        .stack_size = 4096,
+        .stack_size = 3200,
         .core_id = 0,
         .callback = hid_host_device_callback,
         .callback_arg = NULL
@@ -136,7 +136,7 @@ esp_err_t usb_hid_host_init(QueueHandle_t report_queue) {
         return ret;
     }
 
-    task_created = xTaskCreatePinnedToCore(performance_monitor_task, "perf_monitor", 4096, NULL, 1, &g_perf_task_handle, 0);
+    task_created = xTaskCreatePinnedToCore(performance_monitor_task, "perf_monitor", 2600, NULL, 1, &g_perf_task_handle, 0);
     if (task_created != pdTRUE) {
         ESP_LOGE(TAG, "Failed to create performance monitor task");
         vTaskDelete(g_event_task_handle);
@@ -313,35 +313,35 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
     }
 
     // Log comprehensive field information
-    ESP_LOGI(TAG, "=== Report Descriptor Analysis for Interface %d ===", interface_num);
-    ESP_LOGI(TAG, "Total Fields: %d", report_map->num_fields);
-    ESP_LOGI(TAG, "Total Bits: %d", report_map->total_bits);
-    ESP_LOGI(TAG, "Report ID: %d", report_map->report_id);
-    ESP_LOGI(TAG, "\n");
-    ESP_LOGI(TAG, "Field Details:");
-    
-    for (int i = 0; i < report_map->num_fields; i++) {
-        ESP_LOGI(TAG, "\n");
-        ESP_LOGI(TAG, "Field %d:", i + 1);
-    
-        report_field_info_t *field = &report_map->fields[i];
-    
-        const char* usage_page_name = field->attr.usage_page < sizeof(usage_page_names)/sizeof(usage_page_names[0]) &&
-            usage_page_names[field->attr.usage_page] ? usage_page_names[field->attr.usage_page] : "Unknown";
-        ESP_LOGI(TAG, "  Usage Page: 0x%04X (%s)", field->attr.usage_page, usage_page_name);
-    
-        const char* usage_name = field->attr.usage < sizeof(usage_names)/sizeof(usage_names[0]) &&
-            usage_names[field->attr.usage] ? usage_names[field->attr.usage] : "Unknown";
-        ESP_LOGI(TAG, "  Usage: 0x%04X (%s)", field->attr.usage, usage_name);
-    
-        ESP_LOGI(TAG, "  Report Size: %d bits", (int) field->attr.report_size);
-        ESP_LOGI(TAG, "  Logical Min: %d", field->attr.logical_min);
-        ESP_LOGI(TAG, "  Logical Max: %d", field->attr.logical_max);
-        ESP_LOGI(TAG, "  Bit Position:");
-        ESP_LOGI(TAG, "    - Offset: %d", (int) field->bit_offset);
-        ESP_LOGI(TAG, "    - Size: %d", (int) field->bit_size);
-    }
-    ESP_LOGI(TAG, "\n=== End of Report Descriptor Analysis ===\n");
+    // ESP_LOGI(TAG, "=== Report Descriptor Analysis for Interface %d ===", interface_num);
+    // ESP_LOGI(TAG, "Total Fields: %d", report_map->num_fields);
+    // ESP_LOGI(TAG, "Total Bits: %d", report_map->total_bits);
+    // ESP_LOGI(TAG, "Report ID: %d", report_map->report_id);
+    // ESP_LOGI(TAG, "\n");
+    // ESP_LOGI(TAG, "Field Details:");
+    //
+    // for (int i = 0; i < report_map->num_fields; i++) {
+    //     ESP_LOGI(TAG, "\n");
+    //     ESP_LOGI(TAG, "Field %d:", i + 1);
+    //
+    //     report_field_info_t *field = &report_map->fields[i];
+    //
+    //     const char* usage_page_name = field->attr.usage_page < sizeof(usage_page_names)/sizeof(usage_page_names[0]) &&
+    //         usage_page_names[field->attr.usage_page] ? usage_page_names[field->attr.usage_page] : "Unknown";
+    //     ESP_LOGI(TAG, "  Usage Page: 0x%04X (%s)", field->attr.usage_page, usage_page_name);
+    //
+    //     const char* usage_name = field->attr.usage < sizeof(usage_names)/sizeof(usage_names[0]) &&
+    //         usage_names[field->attr.usage] ? usage_names[field->attr.usage] : "Unknown";
+    //     ESP_LOGI(TAG, "  Usage: 0x%04X (%s)", field->attr.usage, usage_name);
+    //
+    //     ESP_LOGI(TAG, "  Report Size: %d bits", (int) field->attr.report_size);
+    //     ESP_LOGI(TAG, "  Logical Min: %d", field->attr.logical_min);
+    //     ESP_LOGI(TAG, "  Logical Max: %d", field->attr.logical_max);
+    //     ESP_LOGI(TAG, "  Bit Position:");
+    //     ESP_LOGI(TAG, "    - Offset: %d", (int) field->bit_offset);
+    //     ESP_LOGI(TAG, "    - Size: %d", (int) field->bit_size);
+    // }
+    // ESP_LOGI(TAG, "\n=== End of Report Descriptor Analysis ===\n");
              
     pthread_rwlock_unlock(&g_report_maps_lock);
 }
