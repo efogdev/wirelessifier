@@ -44,10 +44,17 @@ static esp_err_t validate_image_header(esp_app_desc_t *new_app_info) {
     return ESP_OK;
 }
 
+// Static variables for OTA state
+static esp_ota_handle_t update_handle = 0;
+static const esp_partition_t *update_partition = NULL;
+static bool image_header_was_checked = false;
+static int last_progress = 0;
+
 static esp_err_t handle_ota_upload(httpd_req_t *req) {
     esp_err_t err;
-    esp_ota_handle_t update_handle = 0;
-    const esp_partition_t *update_partition = NULL;
+    update_handle = 0;
+    image_header_was_checked = false;
+    last_progress = 0;
 
     ESP_LOGI(OTA_TAG, "Starting OTA update...");
     ws_log("Starting OTA update...");
@@ -65,7 +72,6 @@ static esp_err_t handle_ota_upload(httpd_req_t *req) {
     int total_size = req->content_len;
     int remaining = total_size;
     int received = 0;
-    bool image_header_was_checked = false;
 
     while (remaining > 0) {
         int recv_len = MIN(remaining, BUFFSIZE);
@@ -111,7 +117,6 @@ static esp_err_t handle_ota_upload(httpd_req_t *req) {
         
         // Report progress every 10%
         int progress = ((total_size - remaining) * 100) / total_size;
-        static int last_progress = 0;
         if (progress / 10 != last_progress / 10) {
             last_progress = progress;
             report_ota_progress(progress);

@@ -12,7 +12,18 @@
 #include "ble_hid_device.h"
 
 static const char *TAG = "HID_BRIDGE";
+#define HID_QUEUE_SIZE 6
+#define HID_QUEUE_ITEM_SIZE sizeof(usb_hid_report_t)
+
+// Static queue buffer and structure
+static StaticQueue_t s_hid_report_queue_struct;
+static uint8_t s_hid_report_queue_storage[HID_QUEUE_SIZE * HID_QUEUE_ITEM_SIZE];
 static QueueHandle_t s_hid_report_queue = NULL;
+
+// Static timer and mutex structures
+static StaticTimer_t s_inactivity_timer_struct;
+static StaticSemaphore_t s_ble_stack_mutex_struct;
+
 static TaskHandle_t s_hid_bridge_task_handle = NULL;
 static TimerHandle_t s_inactivity_timer = NULL;
 static SemaphoreHandle_t s_ble_stack_mutex = NULL;
@@ -68,8 +79,8 @@ esp_err_t hid_bridge_init(void)
         return ESP_OK;
     }
 
-    // Create BLE stack mutex
-    s_ble_stack_mutex = xSemaphoreCreateMutex();
+    // Create BLE stack mutex using static allocation
+    s_ble_stack_mutex = xSemaphoreCreateMutexStatic(&s_ble_stack_mutex_struct);
     if (s_ble_stack_mutex == NULL) {
         ESP_LOGE(TAG, "Failed to create BLE stack mutex");
         return ESP_ERR_NO_MEM;
@@ -77,7 +88,11 @@ esp_err_t hid_bridge_init(void)
     
     s_ble_stack_active = true;
 
-    s_hid_report_queue = xQueueCreate(12, sizeof(usb_hid_report_t));
+    // Create queue using static allocation
+    s_hid_report_queue = xQueueCreateStatic(HID_QUEUE_SIZE, 
+                                          HID_QUEUE_ITEM_SIZE,
+                                          s_hid_report_queue_storage,
+                                          &s_hid_report_queue_struct);
     if (s_hid_report_queue == NULL) {
         ESP_LOGE(TAG, "Failed to create HID report queue");
         vSemaphoreDelete(s_ble_stack_mutex);
@@ -85,13 +100,14 @@ esp_err_t hid_bridge_init(void)
         return ESP_ERR_NO_MEM;
     }
 
-    // Create inactivity timer
-    s_inactivity_timer = xTimerCreate(
+    // Create inactivity timer using static allocation
+    s_inactivity_timer = xTimerCreateStatic(
         "inactivity_timer",
         pdMS_TO_TICKS(INACTIVITY_TIMEOUT_MS),
         pdFALSE,  // Auto-reload disabled
         NULL,
-        inactivity_timer_callback
+        inactivity_timer_callback,
+        &s_inactivity_timer_struct
     );
     
     if (s_inactivity_timer == NULL) {
@@ -235,7 +251,8 @@ esp_err_t hid_bridge_stop(void)
 }
 
 static esp_err_t process_keyboard_report(usb_hid_report_t *report) {
-    keyboard_report_t ble_kb_report = {0};
+    static keyboard_report_t ble_kb_report;
+    memset(&ble_kb_report, 0, sizeof(ble_kb_report));
     
     // Process each field in the report
     for (int i = 0; i < report->num_fields; i++) {
@@ -271,7 +288,8 @@ static esp_err_t process_keyboard_report(usb_hid_report_t *report) {
 }
 
 static esp_err_t process_mouse_report(usb_hid_report_t *report) {
-    mouse_report_t ble_mouse_report = {0};
+    static mouse_report_t ble_mouse_report;
+    memset(&ble_mouse_report, 0, sizeof(ble_mouse_report));
     uint8_t btn_index = 0;
 
     // Process each field in the report

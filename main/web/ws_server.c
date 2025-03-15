@@ -18,6 +18,14 @@ typedef struct {
     size_t len;
 } ws_message_t;  // Using fixed buffer to avoid heap fragmentation
 
+// Static buffers for client handling
+static int client_fds[CONFIG_LWIP_MAX_LISTENING_TCP];
+static httpd_ws_frame_t broadcast_frame = {
+    .final = true,
+    .fragmented = false,
+    .type = HTTPD_WS_TYPE_TEXT
+};
+
 esp_err_t ws_send_frame_to_all_clients(const char *data, size_t len) {
     if (!server) {
         return ESP_FAIL;
@@ -25,25 +33,19 @@ esp_err_t ws_send_frame_to_all_clients(const char *data, size_t len) {
 
     static size_t max_clients = CONFIG_LWIP_MAX_LISTENING_TCP;
     size_t fds = max_clients;
-    int client_fds[max_clients];
 
     esp_err_t ret = httpd_get_client_list(server, &fds, client_fds);
     if (ret != ESP_OK) {
         return ret;
     }
 
-    httpd_ws_frame_t ws_pkt = {
-        .final = true,
-        .fragmented = false,
-        .type = HTTPD_WS_TYPE_TEXT,
-        .payload = (uint8_t*)data,
-        .len = len
-    };
+    broadcast_frame.payload = (uint8_t*)data;
+    broadcast_frame.len = len;
 
     for (int i = 0; i < fds; i++) {
         int client_info = httpd_ws_get_fd_info(server, client_fds[i]);
         if (client_info == HTTPD_WS_CLIENT_WEBSOCKET) {
-            httpd_ws_send_frame_async(server, client_fds[i], &ws_pkt);
+            httpd_ws_send_frame_async(server, client_fds[i], &broadcast_frame);
         }
     }
 
@@ -78,7 +80,7 @@ static esp_err_t ws_handler(httpd_req_t *req) {
     }
 
     httpd_ws_frame_t ws_pkt;
-    uint8_t *buf = NULL;
+    static uint8_t frame_buffer[WS_MAX_MESSAGE_LEN];  // Fixed buffer for frame data
     memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
     ws_pkt.type = HTTPD_WS_TYPE_TEXT;
     
@@ -89,27 +91,22 @@ static esp_err_t ws_handler(httpd_req_t *req) {
     }
 
     if (ws_pkt.len && ws_pkt.len < WS_MAX_MESSAGE_LEN) {
-        buf = malloc(ws_pkt.len + 1);  // Using malloc instead of calloc, we'll null terminate manually
-        if (buf == NULL) {
-            ESP_LOGE(WS_TAG, "Failed to allocate memory for buf");
-            return ESP_ERR_NO_MEM;
-        }
-        ws_pkt.payload = buf;
+        ws_pkt.payload = frame_buffer;
         ret = httpd_ws_recv_frame(req, &ws_pkt, ws_pkt.len);
         if (ret != ESP_OK) {
             ESP_LOGE(WS_TAG, "httpd_ws_recv_frame failed with %d", ret);
-            free(buf);
             return ret;
         }
-        buf[ws_pkt.len] = '\0';  // Manually null terminate
-        ESP_LOGI(WS_TAG, "Got packet with message: %s", buf);
+        frame_buffer[ws_pkt.len] = '\0';  // Null terminate
+        ESP_LOGI(WS_TAG, "Got packet with message: %s", frame_buffer);
+        
+        // Echo the message back
+        ret = httpd_ws_send_frame(req, &ws_pkt);
+    } else if (ws_pkt.len >= WS_MAX_MESSAGE_LEN) {
+        ESP_LOGW(WS_TAG, "Frame too large, ignoring");
+        ret = ESP_ERR_NO_MEM;
     }
     
-    // Echo the message back
-    ret = httpd_ws_send_frame(req, &ws_pkt);
-    if (buf) {
-        free(buf);
-    }
     return ret;
 }
 

@@ -127,7 +127,7 @@ esp_err_t usb_hid_host_init(QueueHandle_t report_queue) {
     const hid_host_driver_config_t hid_host_config = {
         .create_background_task = true,
         .task_priority = 4,
-        .stack_size = 3200,
+        .stack_size = 2048,
         .core_id = 0,
         .callback = hid_host_device_callback,
         .callback_arg = NULL
