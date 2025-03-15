@@ -111,10 +111,12 @@ httpd_handle_t start_webserver(void)
     }
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 4;
-    config.stack_size = 2048;
+    config.max_uri_handlers = 3; // We only have root, redirect, and websocket
+    config.stack_size = 1536;    // Reduced stack size as handlers are simple
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.lru_purge_enable = true;
+    config.recv_wait_timeout = 3;  // Reduce timeout for faster resource cleanup
+    config.send_wait_timeout = 3;
 
     ESP_LOGI(HTTP_TAG, "Starting server on port: '%d'", config.server_port);
     
@@ -124,13 +126,13 @@ httpd_handle_t start_webserver(void)
         httpd_register_uri_handler(server, &redirect);
 
         // Initialize websocket server
-        init_websocket(server);
+        // init_websocket(server);
         
         // Initialize OTA server
-        init_ota_server(server);
+        // init_ota_server(server);
         
         // Start DNS server for captive portal
-        start_dns_server(&dns_task_handle);
+        // start_dns_server(&dns_task_handle);
         
         return server;
     }

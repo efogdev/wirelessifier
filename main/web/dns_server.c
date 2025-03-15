@@ -15,12 +15,13 @@
 #include "lwip/netdb.h"
 
 #define DNS_PORT (53)
-#define DNS_MAX_LEN (256)
+#define DNS_MAX_LEN (128)  
+#define DNS_NAME_MAX_LEN (32)  // Maximum length for domain names
 
 #define OPCODE_MASK (0x7800)
 #define QR_FLAG (1 << 7)
 #define QD_TYPE_A (0x0001)
-#define ANS_TTL_SEC (300)
+#define ANS_TTL_SEC (60) 
 
 static const char *DNS_TAG = "DNS";
 
@@ -49,7 +50,7 @@ typedef struct __attribute__((__packed__))
     uint32_t ip_addr;
 } dns_answer_t;
 
-static char *parse_dns_name(char *raw_name, char *parsed_name, size_t parsed_name_max_len)
+static inline char *parse_dns_name(char *raw_name, char *parsed_name, size_t parsed_name_max_len)  // Made inline for performance
 {
     char *label = raw_name;
     char *name_itr = parsed_name;
@@ -105,7 +106,7 @@ static int parse_dns_request(char *req, size_t req_len, char *dns_reply, size_t 
     // Pointer to current answer and question
     char *cur_ans_ptr = dns_reply + req_len;
     char *cur_qd_ptr = dns_reply + sizeof(dns_header_t);
-    char name[128];
+    char name[DNS_NAME_MAX_LEN];  // Using defined max length
 
     // Respond to all questions with the ESP32's IP address
     for (int i = 0; i < qd_count; i++) {
@@ -142,8 +143,8 @@ static int parse_dns_request(char *req, size_t req_len, char *dns_reply, size_t 
 
 static void dns_server_task(void *pvParameters)
 {
-    char rx_buffer[256];
-    char addr_str[128];
+    char rx_buffer[DNS_MAX_LEN];  // Using defined max length
+    char addr_str[DNS_NAME_MAX_LEN];  // Using defined max length
     int addr_family;
     int ip_protocol;
 
@@ -213,5 +214,5 @@ static void dns_server_task(void *pvParameters)
 
 void start_dns_server(TaskHandle_t *dns_task_handle)
 {
-    xTaskCreatePinnedToCore(&dns_server_task, "dns_server", 2048, NULL, 2, dns_task_handle, 0);
+    xTaskCreatePinnedToCore(&dns_server_task, "dns_server", 2048, NULL, 2, dns_task_handle, 1); 
 }
