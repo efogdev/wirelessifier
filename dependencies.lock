@@ -16,7 +16,7 @@ dependencies:
   idf:
     source:
       type: idf
-    version: 5.4.0
+    version: 5.5.0
   zorxx/neopixel:
     component_hash: eb2457ac2b7fca04be1834cf3af7a901f72969918a30ce68a1c1b0c160306201
     dependencies: []

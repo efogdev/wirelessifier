@@ -29,7 +29,7 @@ static TaskHandle_t g_usb_events_task_handle = NULL;
 static TaskHandle_t g_event_task_handle = NULL;
 static pthread_rwlock_t g_report_maps_lock;
 
-#define MAX_REPORT_FIELDS 36
+#define MAX_REPORT_FIELDS 48
 #define MAX_COLLECTION_DEPTH 8
 
 typedef struct {
@@ -52,22 +52,27 @@ typedef struct {
 // Map of interface number to report map
 static report_map_t g_interface_report_maps[USB_HOST_MAX_INTERFACES] = {0};
 
+// Define named struct types for events
+typedef struct {
+    hid_host_device_handle_t handle;
+    hid_host_driver_event_t event;
+    void *arg;
+} device_event_t;
+
+typedef struct {
+    hid_host_device_handle_t handle;
+    hid_host_interface_event_t event;
+    void *arg;
+} interface_event_t;
+
 typedef struct {
     enum {
         APP_EVENT_HID_DEVICE,
         APP_EVENT_INTERFACE
     } event_group;
     union {
-        struct {
-            hid_host_device_handle_t handle;
-            hid_host_driver_event_t event;
-            void *arg;
-        } device_event;
-        struct {
-            hid_host_device_handle_t handle;
-            hid_host_interface_event_t event;
-            void *arg;
-        } interface_event;
+        device_event_t device_event;
+        interface_event_t interface_event;
     };
 } hid_event_queue_t;
 
@@ -403,6 +408,11 @@ static void performance_monitor_task(void *arg) {
     }
 }
 
+// Static allocations for process_report function
+static usb_hid_report_t g_report;
+static int g_field_values[MAX_REPORT_FIELDS];
+static usb_hid_field_t g_fields[MAX_REPORT_FIELDS];
+
 static void process_report(hid_host_device_handle_t hid_device_handle, const uint8_t *data, size_t length, uint8_t report_id, uint8_t interface_num) {
     g_report_counter++;
 
@@ -412,11 +422,6 @@ static void process_report(hid_host_device_handle_t hid_device_handle, const uin
         return;
     }
 
-    // Static allocation for better performance
-    static usb_hid_report_t report;
-    static int field_values[MAX_REPORT_FIELDS];
-    static usb_hid_field_t fields[MAX_REPORT_FIELDS];
-
     if (pthread_rwlock_rdlock(&g_report_maps_lock) != 0) {
         ESP_LOGE(TAG, "Failed to take report maps read lock");
         return;
@@ -425,36 +430,36 @@ static void process_report(hid_host_device_handle_t hid_device_handle, const uin
     report_map_t *report_map = &g_interface_report_maps[interface_num];
     
     // Initialize report structure
-    report.report_id = report_id;
-    report.type = USB_HID_FIELD_TYPE_INPUT;
-    report.num_fields = report_map->num_fields;
-    report.raw_len = MIN(length, sizeof(report.raw));
-    report.fields = fields;
+    g_report.report_id = report_id;
+    g_report.type = USB_HID_FIELD_TYPE_INPUT;
+    g_report.num_fields = report_map->num_fields;
+    g_report.raw_len = MIN(length, sizeof(g_report.raw));
+    g_report.fields = g_fields;
 
     // Batch process fields for better cache utilization
     const report_field_info_t *field_info = report_map->fields;
     for (uint8_t i = 0; i < report_map->num_fields; i++, field_info++) {
-        field_values[i] = extract_field_value(data, field_info->bit_offset, field_info->bit_size);
-        fields[i].attr = field_info->attr;
-        fields[i].values = &field_values[i];
+        g_field_values[i] = extract_field_value(data, field_info->bit_offset, field_info->bit_size);
+        g_fields[i].attr = field_info->attr;
+        g_fields[i].values = &g_field_values[i];
 
         // ESP_LOGI(TAG, "Field %d: usage_page=0x%04x, usage=0x%04x, value=%d", 
         //         i, field_info->attr.usage_page, field_info->attr.usage, field_values[i]);
     }
 
-    memcpy(report.raw, data, report.raw_len);
+    memcpy(g_report.raw, data, g_report.raw_len);
 
     // Try sending to queue with initial timeout
-    if (xQueueSend(g_report_queue, &report, pdMS_TO_TICKS(100)) != pdTRUE) {
+    if (xQueueSend(g_report_queue, &g_report, pdMS_TO_TICKS(100)) != pdTRUE) {
         // If initial send failed, wait and track time
         TickType_t start_tick = xTaskGetTickCount();
-        while (xQueueSend(g_report_queue, &report, pdMS_TO_TICKS(50)) != pdTRUE) {
+        while (xQueueSend(g_report_queue, &g_report, pdMS_TO_TICKS(50)) != pdTRUE) {
             if ((xTaskGetTickCount() - start_tick) > pdMS_TO_TICKS(250)) {
                 // Queue has been full for >250ms, clear it
                 xQueueReset(g_report_queue);
                 ESP_LOGW(TAG, "Queue full for >250ms, cleared");
                 // Try sending one more time
-                if (xQueueSend(g_report_queue, &report, 0) != pdTRUE) {
+                if (xQueueSend(g_report_queue, &g_report, 0) != pdTRUE) {
                     ESP_LOGE(TAG, "Queue send failed even after clear");
                 }
                 break;
@@ -465,21 +470,41 @@ static void process_report(hid_host_device_handle_t hid_device_handle, const uin
     pthread_rwlock_unlock(&g_report_maps_lock);
 }
 
+// Static allocation for event handling
+static hid_event_queue_t g_interface_event = {
+    .event_group = APP_EVENT_INTERFACE
+};
+
 static void hid_host_interface_callback(hid_host_device_handle_t hid_device_handle, const hid_host_interface_event_t event, void *arg) {
     if (!g_event_queue) {
         return;
     }
 
-    hid_event_queue_t evt = {
-        .event_group = APP_EVENT_INTERFACE,
-        .interface_event = {
-            .handle = hid_device_handle,
-            .event = event,
-            .arg = arg
-        }
+    g_interface_event.interface_event = (interface_event_t){
+        .handle = hid_device_handle,
+        .event = event,
+        .arg = arg
     };
 
-    xQueueSend(g_event_queue, &evt, 0);
+    xQueueSend(g_event_queue, &g_interface_event, 0);
+}
+
+static hid_event_queue_t g_device_event = {
+    .event_group = APP_EVENT_HID_DEVICE
+};
+
+static void hid_host_device_callback(hid_host_device_handle_t hid_device_handle, const hid_host_driver_event_t event, void *arg) {
+    if (!g_event_queue) {
+        return;
+    }
+
+    g_device_event.device_event = (device_event_t){
+        .handle = hid_device_handle,
+        .event = event,
+        .arg = arg
+    };
+
+    xQueueSend(g_event_queue, &g_device_event, 0);
 }
 
 static const char *hid_proto_name_str[] = {
@@ -488,22 +513,6 @@ static const char *hid_proto_name_str[] = {
     "MOUSE"
 };
 
-static void hid_host_device_callback(hid_host_device_handle_t hid_device_handle, const hid_host_driver_event_t event, void *arg) {
-    if (!g_event_queue) {
-        return;
-    }
-
-    hid_event_queue_t evt = {
-        .event_group = APP_EVENT_HID_DEVICE,
-        .device_event = {
-            .handle = hid_device_handle,
-            .event = event,
-            .arg = arg
-        }
-    };
-
-    xQueueSend(g_event_queue, &evt, 0);
-}
 
 static void process_device_event(hid_host_device_handle_t hid_device_handle, const hid_host_driver_event_t event, void *arg) {
     hid_host_dev_params_t dev_params;
