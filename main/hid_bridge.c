@@ -12,7 +12,7 @@
 #include "ble_hid_device.h"
 
 static const char *TAG = "HID_BRIDGE";
-#define HID_QUEUE_SIZE 6
+#define HID_QUEUE_SIZE 4
 #define HID_QUEUE_ITEM_SIZE sizeof(usb_hid_report_t)
 
 // Static queue buffer and structure

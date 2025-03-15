@@ -126,13 +126,13 @@ httpd_handle_t start_webserver(void)
         httpd_register_uri_handler(server, &redirect);
 
         // Initialize websocket server
-        // init_websocket(server);
+        init_websocket(server);
         
         // Initialize OTA server
         // init_ota_server(server);
         
         // Start DNS server for captive portal
-        // start_dns_server(&dns_task_handle);
+        start_dns_server(&dns_task_handle);
         
         return server;
     }
