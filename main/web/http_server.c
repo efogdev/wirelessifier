@@ -111,7 +111,7 @@ httpd_handle_t start_webserver(void)
     }
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 16;
+    config.max_uri_handlers = 4;
     config.stack_size = 2048;
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.lru_purge_enable = true;

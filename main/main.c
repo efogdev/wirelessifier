@@ -51,13 +51,13 @@ void app_main(void) {
     ESP_ERROR_CHECK(task_monitor_init());
     ESP_ERROR_CHECK(task_monitor_start());
 
+    run_hid_bridge();
     if (gpio_get_level(GPIO_BUTTON_SW4) == 0) {
+        vTaskDelay(pdMS_TO_TICKS(50));
         ESP_LOGI(TAG, "Initializing web services because SW4 held on boot");
         init_web_services();
-        vTaskDelay(pdMS_TO_TICKS(500));
     }
 
-    run_hid_bridge();
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(50));
         led_update_pattern(usb_hid_host_device_connected(), ble_hid_device_connected(), hid_bridge_is_ble_paused());

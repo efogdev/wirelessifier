@@ -132,9 +132,8 @@ void init_websocket(httpd_handle_t server_handle) {
         return;
     }
 
-    xTaskCreatePinnedToCore(ws_queue_task, "ws_queue", 2048, NULL, 5, NULL, 1);
-    
     ESP_LOGI(WS_TAG, "Registering WebSocket handler");
+    xTaskCreatePinnedToCore(ws_queue_task, "ws_queue", 2048, NULL, 5, NULL, 1);
     httpd_register_uri_handler(server, &ws);
 }
 
