@@ -210,5 +210,6 @@ static void dns_server_task(void *pvParameters)
 
 void start_dns_server(TaskHandle_t *dns_task_handle)
 {
+    vTaskDelay(pdMS_TO_TICKS(350));
     xTaskCreatePinnedToCore(&dns_server_task, "dns_server", 2400, NULL, 5, dns_task_handle, 1);
 }

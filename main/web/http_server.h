@@ -1,13 +1,21 @@
 #pragma once
 
 #include <esp_http_server.h>
+#include "freertos/event_groups.h"
+
+// Expose event group for WiFi events
+extern EventGroupHandle_t wifi_event_group;
+
+// Event bits
+#define WIFI_CONNECTED_BIT BIT0
+#define WIFI_FAIL_BIT      BIT1
 
 /**
  * @brief Initialize WiFi in Access Point mode
  * 
  * Sets up the ESP32 as a WiFi access point with the configured SSID and password.
  */
-void init_wifi_ap(void);
+void init_wifi_apsta(void);
 
 /**
  * @brief Start the HTTP web server

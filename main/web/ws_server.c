@@ -45,13 +45,16 @@ esp_err_t ws_send_frame_to_all_clients(const char *data, const size_t len) {
 void ws_broadcast_json(const char *type, const char *content) {
     if (!type || !content) return;
     
-    char buffer[WS_MAX_MESSAGE_LEN];
+    static char buffer[WS_MAX_MESSAGE_LEN];
     const int len = snprintf(buffer, sizeof(buffer), "{\"type\":\"%s\",\"content\":%s}", type, content);
     if (len > 0 && len < sizeof(buffer)) {
         ws_send_frame_to_all_clients(buffer, len);
     }
 }
 
+
+// Forward declaration for WiFi manager function
+extern void process_wifi_ws_message(const char* message);
 
 static esp_err_t ws_handler(httpd_req_t *req) {
     if (req->method == HTTP_GET) {
@@ -79,6 +82,9 @@ static esp_err_t ws_handler(httpd_req_t *req) {
         }
         frame_buffer[ws_pkt.len] = '\0';  // Null terminate
         ESP_LOGI(WS_TAG, "Got packet with message: %s", frame_buffer);
+        
+        // Process the message
+        process_wifi_ws_message((const char*)frame_buffer);
         
         // Echo the message back
         ret = httpd_ws_send_frame(req, &ws_pkt);
@@ -119,7 +125,7 @@ void ws_queue_message(const char *data) {
 
 void ws_log(const char* text) {
     if (!text) return;
-    char buffer[WS_MAX_MESSAGE_LEN];
+    static char buffer[WS_MAX_MESSAGE_LEN];
     const int len = snprintf(buffer, sizeof(buffer), "{\"type\":\"log\",\"content\":\"%s\"}", text);
     if (len > 0 && len < sizeof(buffer)) {
         ws_send_frame_to_all_clients(buffer, len);

@@ -2,6 +2,7 @@
 #include "dns_server.h"
 #include "ws_server.h"
 #include "ota_server.h"
+#include "wifi_manager.h"
 #include <esp_log.h>
 #include <esp_wifi.h>
 #include <esp_event.h>
@@ -13,11 +14,16 @@
 static const char *HTTP_TAG = "HTTP";
 static httpd_handle_t server = NULL;
 static TaskHandle_t dns_task_handle = NULL;
+EventGroupHandle_t wifi_event_group;
 
 // Default WiFi configuration
 #define WIFI_SSID      "AnyBLE WEB"
 #define WIFI_CHANNEL   1
 #define MAX_CONN       4
+
+// Event bits
+#define WIFI_CONNECTED_BIT BIT0
+#define WIFI_FAIL_BIT      BIT1
 
 static esp_err_t root_get_handler(httpd_req_t *req)
 {
@@ -54,29 +60,57 @@ static const httpd_uri_t redirect = {
     .user_ctx = NULL
 };
 
-static void wifi_event_handler(void* arg, esp_event_base_t event_base,
-                             int32_t event_id, void* event_data)
+// External reference to retry counter
+extern int s_retry_num;
+
+static void event_handler(void* arg, esp_event_base_t event_base,
+    int32_t event_id, void* event_data)
 {
-    // if (event_id == WIFI_EVENT_AP_STACONNECTED) {
-    //     wifi_event_ap_staconnected_t* event = (wifi_event_ap_staconnected_t*) event_data;
-    //     ESP_LOGI(HTTP_TAG, "Station "MACSTR" joined, AID=%d",
-    //              MAC2STR(event->mac), event->aid);
-    // } else if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
-    //     wifi_event_ap_stadisconnected_t* event = (wifi_event_ap_stadisconnected_t*) event_data;
-    //     ESP_LOGI(HTTP_TAG, "Station "MACSTR" left, AID=%d",
-    //              MAC2STR(event->mac), event->aid);
-    // }
+    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
+        esp_wifi_connect();
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        ESP_LOGI(HTTP_TAG, "WIFI_EVENT_STA_DISCONNECTED");
+        
+        // Increment retry counter
+        s_retry_num++;
+        
+        if (s_retry_num < MAX_RETRY) {
+            ESP_LOGI(HTTP_TAG, "Retry to connect to the AP, attempt %d/%d", s_retry_num, MAX_RETRY);
+            esp_wifi_connect();
+        } else {
+            ESP_LOGI(HTTP_TAG, "Failed to connect after %d attempts", MAX_RETRY);
+            xEventGroupSetBits(wifi_event_group, WIFI_FAIL_BIT);
+        }
+        
+        xEventGroupClearBits(wifi_event_group, WIFI_CONNECTED_BIT);
+        update_wifi_connection_status(false, NULL);
+    } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+        ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
+        char ip_str[16];
+        snprintf(ip_str, sizeof(ip_str), IPSTR, IP2STR(&event->ip_info.ip));
+        ESP_LOGI(HTTP_TAG, "Got IP: %s", ip_str);
+        xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
+        update_wifi_connection_status(true, ip_str);
+    }
 }
 
-void init_wifi_ap(void)
+void init_wifi_apsta(void)
 {
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
-    esp_netif_create_default_wifi_ap();
+
+    if (!has_wifi_credentials()) {
+        esp_netif_create_default_wifi_ap();
+    }
+
+    esp_netif_create_default_wifi_sta();
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL, NULL));
+
+    // Register event handlers
+    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL));
 
     wifi_config_t wifi_config = {
         .ap = {
@@ -88,10 +122,16 @@ void init_wifi_ap(void)
         },
     };
 
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
+    if (has_wifi_credentials()) {
+        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+        ESP_LOGI(HTTP_TAG, "WiFi AP initialized in STA mode. SSID:%s channel:%d", WIFI_SSID, WIFI_CHANNEL);
+    } else {
+        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
+        ESP_LOGI(HTTP_TAG, "WiFi AP initialized in APSTA mode.");
+    }
+
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
-    ESP_LOGI(HTTP_TAG, "WiFi AP initialized. SSID:%s channel:%d", WIFI_SSID, WIFI_CHANNEL);
 }
 
 httpd_handle_t start_webserver(void)
@@ -103,7 +143,7 @@ httpd_handle_t start_webserver(void)
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.max_uri_handlers = 4;
-    config.stack_size = 3200;
+    config.stack_size = 5600;
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.lru_purge_enable = true;
     config.recv_wait_timeout = 3;
@@ -114,7 +154,6 @@ httpd_handle_t start_webserver(void)
     if (httpd_start(&server, &config) == ESP_OK) {
         // Register URI handlers
         httpd_register_uri_handler(server, &root);
-        httpd_register_uri_handler(server, &redirect);
 
         // Initialize websocket server
         init_websocket(server);
@@ -124,7 +163,10 @@ httpd_handle_t start_webserver(void)
         
         // Start DNS server for captive portal
         start_dns_server(&dns_task_handle);
-        
+
+        // Other
+        httpd_register_uri_handler(server, &redirect);
+
         return server;
     }
 
@@ -157,8 +199,17 @@ static void web_services_task(void *pvParameters)
     }
     ESP_ERROR_CHECK(ret);
     
-    // Initialize WiFi AP
-    init_wifi_ap();
+    // Initialize WiFi AP+STA
+    init_wifi_apsta();
+    
+    // Check if we have stored WiFi credentials
+    if (has_wifi_credentials()) {
+        // Try to connect with stored credentials
+        ESP_LOGI(HTTP_TAG, "Found stored WiFi credentials, attempting to connect");
+    
+        xEventGroupWaitBits(wifi_event_group,
+            WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdFALSE, pdTRUE, 5000 / portTICK_PERIOD_MS);
+    }
     
     // Start the web server
     start_webserver();
@@ -172,5 +223,6 @@ static void web_services_task(void *pvParameters)
 void init_web_services(void)
 {
     ESP_LOGI(HTTP_TAG, "Starting web services task");
+    wifi_event_group = xEventGroupCreate();
     xTaskCreatePinnedToCore(web_services_task, "web_services", 4096, NULL, 5, NULL, 1);
 }
