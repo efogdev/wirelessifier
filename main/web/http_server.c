@@ -67,7 +67,9 @@ static void event_handler(void* arg, esp_event_base_t event_base,
     int32_t event_id, void* event_data)
 {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
-        esp_wifi_connect();
+        if (has_wifi_credentials()) {
+            esp_wifi_connect();
+        }
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
         ESP_LOGI(HTTP_TAG, "WIFI_EVENT_STA_DISCONNECTED");
         
@@ -99,10 +101,8 @@ void init_wifi_apsta(void)
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
-    if (!has_wifi_credentials()) {
-        esp_netif_create_default_wifi_ap();
-    }
-
+    // Always create both netifs regardless of credentials
+    esp_netif_create_default_wifi_ap();
     esp_netif_create_default_wifi_sta();
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
@@ -123,14 +123,16 @@ void init_wifi_apsta(void)
     };
 
     if (has_wifi_credentials()) {
+        // Use STA mode when credentials exist
         ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-        ESP_LOGI(HTTP_TAG, "WiFi AP initialized in STA mode. SSID:%s channel:%d", WIFI_SSID, WIFI_CHANNEL);
+        ESP_LOGI(HTTP_TAG, "WiFi initialized in STA mode.");
     } else {
+        // Use APSTA mode when no credentials
         ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
-        ESP_LOGI(HTTP_TAG, "WiFi AP initialized in APSTA mode.");
+        ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
+        ESP_LOGI(HTTP_TAG, "WiFi initialized in APSTA mode.");
     }
 
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
 }
 
@@ -161,8 +163,10 @@ httpd_handle_t start_webserver(void)
         // Initialize OTA server
         init_ota_server(server);
         
-        // Start DNS server for captive portal
-        start_dns_server(&dns_task_handle);
+        // Start DNS server for captive portal if in AP mode
+        if (!has_wifi_credentials() || esp_wifi_get_mode(NULL) == WIFI_MODE_APSTA) {
+            start_dns_server(&dns_task_handle);
+        }
 
         // Other
         httpd_register_uri_handler(server, &redirect);

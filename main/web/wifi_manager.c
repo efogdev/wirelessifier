@@ -18,8 +18,8 @@ static const char *WIFI_TAG = "WIFI_MGR";
 #define NVS_KEY_SSID "ssid"
 #define NVS_KEY_PASS "password"
 
-// Connection attempt counter
 int s_retry_num = 0;
+static bool connecting = false;
 
 // WiFi connection status
 static bool is_connected = false;
@@ -147,6 +147,10 @@ esp_err_t clear_wifi_credentials(void) {
 
 // Check if WiFi credentials are stored
 bool has_wifi_credentials(void) {
+    if (connecting) {
+        return true;
+    }
+
     nvs_handle_t nvs_handle;
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READONLY, &nvs_handle);
     if (err != ESP_OK) {
@@ -246,8 +250,15 @@ esp_err_t connect_to_wifi(const char* ssid, const char* password) {
         return ESP_ERR_INVALID_ARG;
     }
 
+    if (connecting) {
+        return ESP_OK;
+    }
+
+    connecting = true;
     s_retry_num = 0;
-    esp_wifi_disconnect();
+    if (is_connected) {
+        esp_wifi_disconnect();
+    }
     
     // Configure WiFi
     wifi_config_t wifi_config = {0};
@@ -274,6 +285,8 @@ esp_err_t connect_to_wifi(const char* ssid, const char* password) {
     EventBits_t bits = xEventGroupWaitBits(wifi_event_group,
         WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdFALSE, pdTRUE, 40000 / portTICK_PERIOD_MS);
     
+    connecting = false;
+
     if (bits & WIFI_CONNECTED_BIT) {
         ESP_LOGI(WIFI_TAG, "Connected to %s", ssid);
         

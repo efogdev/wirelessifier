@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AnyBLE Device Settings</title>
+    <!-- Inline CSS -->
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+
+        .container {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #09f;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-bottom: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .setting-group {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .setting-group:last-child {
+            border-bottom: none;
+        }
+
+        .setting-title {
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .setting-description {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #2196F3;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        select, input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        .status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        .success {
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+
+        .error {
+            background-color: #f2dede;
+            color: #a94442;
+        }
+
+        .info {
+            background-color: #d9edf7;
+            color: #31708f;
+        }
+    </style>
+    <!-- Load React -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <!-- Load Babel for JSX -->
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <!-- Inline React component -->
+    <script type="text/babel">
+        // Main App component
+        const App = () => {
+          const [connected, setConnected] = React.useState(false);
+          const [loading, setLoading] = React.useState(true);
+          const [error, setError] = React.useState(null);
+          const [settings, setSettings] = React.useState({
+            deviceInfo: {
+              name: 'AnyBLE Device',
+              firmwareVersion: '1.0.0',
+              hardwareVersion: 'v1',
+              macAddress: '00:11:22:33:44:55'
+            },
+            power: {
+              sleepTimeout: 300, // seconds
+              lowPowerMode: false,
+              autoPowerOff: false,
+              autoPowerOffTimeout: 3600 // seconds
+            },
+            led: {
+              brightness: 80, // percentage
+              pattern: 'solid', // solid, blink, pulse, rainbow
+              color: '#0088ff'
+            },
+            connectivity: {
+              bluetoothEnabled: true,
+              wifiEnabled: true,
+              autoReconnect: true
+            }
+          });
+          const [statusMessage, setStatusMessage] = React.useState(null);
+          const [statusType, setStatusType] = React.useState('info');
+          const socketRef = React.useRef(null);
+
+          // Connect to WebSocket
+          React.useEffect(() => {
+            connectWebSocket();
+            
+            // Cleanup on unmount
+            return () => {
+              if (socketRef.current) {
+                socketRef.current.close();
+              }
+            };
+          }, []);
+
+          // Connect to WebSocket
+          const connectWebSocket = () => {
+            setLoading(true);
+            setError(null);
+            
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
+            
+            const socket = new WebSocket(wsUrl);
+            socketRef.current = socket;
+            
+            socket.onopen = () => {
+              console.log('WebSocket connected');
+              setConnected(true);
+              setLoading(false);
+              
+              // Request current settings
+              requestSettings();
+            };
+            
+            socket.onclose = () => {
+              console.log('WebSocket disconnected');
+              setConnected(false);
+              
+              // Try to reconnect after a delay
+              setTimeout(connectWebSocket, 3000);
+            };
+            
+            socket.onerror = (error) => {
+              console.error('WebSocket error:', error);
+              setError('Failed to connect to the device. Please try again later.');
+              setLoading(false);
+            };
+            
+            socket.onmessage = (event) => {
+              handleWebSocketMessage(event.data);
+            };
+          };
+
+          // Handle WebSocket messages
+          const handleWebSocketMessage = (data) => {
+            try {
+              const message = JSON.parse(data);
+              
+              switch (message.type) {
+                case 'settings':
+                  // Update settings with data from server
+                  if (message.content) {
+                    setSettings(prevSettings => ({
+                      ...prevSettings,
+                      ...message.content
+                    }));
+                  }
+                  break;
+                case 'settings_update_status':
+                  // Show status message
+                  if (message.content.success) {
+                    showStatus('Settings updated successfully', 'success');
+                  } else {
+                    showStatus(`Failed to update settings: ${message.content.error}`, 'error');
+                  }
+                  break;
+                case 'log':
+                  console.log('Server log:', message.content);
+                  break;
+                default:
+                  console.log('Unknown message type:', message.type);
+              }
+            } catch (error) {
+              console.error('Error parsing WebSocket message:', error);
+            }
+          };
+
+          // Request current settings from the server
+          const requestSettings = () => {
+            if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+              showStatus('WebSocket not connected', 'error');
+              return;
+            }
+            
+            socketRef.current.send(JSON.stringify({
+              type: 'get_settings'
+            }));
+          };
+
+          // Save settings to the server
+          const saveSettings = () => {
+            if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+              showStatus('WebSocket not connected', 'error');
+              return;
+            }
+            
+            socketRef.current.send(JSON.stringify({
+              type: 'update_settings',
+              content: settings
+            }));
+            
+            showStatus('Saving settings...', 'info');
+          };
+
+          // Update a specific setting
+          const updateSetting = (category, key, value) => {
+            setSettings(prevSettings => ({
+              ...prevSettings,
+              [category]: {
+                ...prevSettings[category],
+                [key]: value
+              }
+            }));
+          };
+
+          // Show status message
+          const showStatus = (message, type) => {
+            setStatusMessage(message);
+            setStatusType(type);
+            
+            // Clear status after 5 seconds
+            setTimeout(() => {
+              setStatusMessage(null);
+            }, 5000);
+          };
+
+          // If loading, show spinner
+          if (loading) {
+            return (
+              <div className="loading">
+                <div className="spinner"></div>
+                <p>Connecting to device...</p>
+              </div>
+            );
+          }
+
+          // If error, show error message
+          if (error) {
+            return (
+              <div className="container">
+                <div className="status error">{error}</div>
+                <button onClick={connectWebSocket}>Retry Connection</button>
+              </div>
+            );
+          }
+
+          return (
+            <div>
+              <h1>Device Settings</h1>
+              
+              <div className="container">
+                {!connected && (
+                  <div className="status error">
+                    Disconnected from device. Attempting to reconnect...
+                  </div>
+                )}
+                
+                {statusMessage && (
+                  <div className={`status ${statusType}`}>
+                    {statusMessage}
+                  </div>
+                )}
+                
+                {/* Device Information */}
+                <div className="setting-group">
+                  <h2>Device Information</h2>
+                  
+                  <div className="setting-item">
+                    <div className="setting-title">Device Name</div>
+                    <div>{settings.deviceInfo.name}</div>
+                  </div>
+                  
+                  <div className="setting-item">
+                    <div className="setting-title">Firmware Version</div>
+                    <div>{settings.deviceInfo.firmwareVersion}</div>
+                  </div>
+                  
+                  <div className="setting-item">
+                    <div className="setting-title">Hardware Version</div>
+                    <div>{settings.deviceInfo.hardwareVersion}</div>
+                  </div>
+                  
+                  <div className="setting-item">
+                    <div className="setting-title">MAC Address</div>
+                    <div>{settings.deviceInfo.macAddress}</div>
+                  </div>
+                </div>
+                
+                {/* Power Management */}
+                <div className="setting-group">
+                  <h2>Power Management</h2>
+                  
+                  <div className="setting-item">
+                    <div className="setting-title">Sleep Timeout</div>
+                    <div className="setting-description">
+                      Time in seconds before device enters sleep mode
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      max="3600"
+                      value={settings.power.sleepTimeout}
+                      onChange={(e) => updateSetting('power', 'sleepTimeout', parseInt(e.target.value))}
+                    />
+                  </div>
+                  
+                  <div className="setting-item">
+                    <div className="setting-title">Low Power Mode</div>
+                    <div className="setting-description">
+                      Reduces power consumption by limiting functionality
+                    </div>
+                    <label className="toggle-switch">
+                      <input
+                        type="checkbox"
+                        checked={settings.power.lowPowerMode}
+                        onChange={(e) => updateSetting('power', 'lowPowerMode', e.target.checked)}
+                      />
+                      <span className="slider"></span>
+                    </label>
+                  </div>
+                  
+                  <div className="setting-item">
+                    <div className="setting-title">Auto Power Off</div>
+                    <div className="setting-description">
+                      Automatically power off device after period of inactivity
+                    </div>
+                    <label className="toggle-switch">
+                      <input
+                        type="checkbox"
+                        checked={settings.power.autoPowerOff}
+                        onChange={(e) => updateSetting('power', 'autoPowerOff', e.target.checked)}
+                      />
+                      <span className="slider"></span>
+                    </label>
+                  </div>
+                  
+                  {settings.power.autoPowerOff && (
+                    <div className="setting-item">
+                      <div className="setting-title">Auto Power Off Timeout</div>
+                      <div className="setting-description">
+                        Time in seconds before device powers off
+                      </div>
+                      <input
+                        type="number"
+                        min="60"
+                        max="86400"
+                        value={settings.power.autoPowerOffTimeout}
+                        onChange={(e) => updateSetting('power', 'autoPowerOffTimeout', parseInt(e.target.value))}
+                      />
+                    </div>
+                  )}
+                </div>
+                
+                {/* LED Configuration */}
+                <div className="setting-group">
+                  <h2>LED Configuration</h2>
+                  
+                  <div className="setting-item">
+                    <div className="setting-title">Brightness</div>
+                    <div className="setting-description">
+                      LED brightness percentage
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={settings.led.brightness}
+                      onChange={(e) => updateSetting('led', 'brightness', parseInt(e.target.value))}
+                    />
+                  </div>
+                  
+                  <div className="setting-item">
+                    <div className="setting-title">Pattern</div>
+                    <div className="setting-description">
+                      LED lighting pattern
+                    </div>
+                    <select
+                      value={settings.led.pattern}
+                      onChange={(e) => updateSetting('led', 'pattern', e.target.value)}
+                    >
+                      <option value="solid">Solid</option>
+                      <option value="blink">Blink</option>
+                      <option value="pulse">Pulse</option>
+                      <option value="rainbow">Rainbow</option>
+                    </select>
+                  </div>
+                  
+                  {settings.led.pattern === 'solid' && (
+                    <div className="setting-item">
+                      <div className="setting-title">Color</div>
+                      <div className="setting-description">
+                        LED color (for solid pattern)
+                      </div>
+                      <input
+                        type="color"
+                        value={settings.led.color}
+                        onChange={(e) => updateSetting('led', 'color', e.target.value)}
+                      />
+                    </div>
+                  )}
+                </div>
+                
+                {/* Connectivity Options */}
+                <div className="setting-group">
+                  <h2>Connectivity</h2>
+                  
+                  <div className="setting-item">
+                    <div className="setting-title">Bluetooth</div>
+                    <div className="setting-description">
+                      Enable/disable Bluetooth connectivity
+                    </div>
+                    <label className="toggle-switch">
+                      <input
+                        type="checkbox"
+                        checked={settings.connectivity.bluetoothEnabled}
+                        onChange={(e) => updateSetting('connectivity', 'bluetoothEnabled', e.target.checked)}
+                      />
+                      <span className="slider"></span>
+                    </label>
+                  </div>
+                  
+                  <div className="setting-item">
+                    <div className="setting-title">WiFi</div>
+                    <div className="setting-description">
+                      Enable/disable WiFi connectivity
+                    </div>
+                    <label className="toggle-switch">
+                      <input
+                        type="checkbox"
+                        checked={settings.connectivity.wifiEnabled}
+                        onChange={(e) => updateSetting('connectivity', 'wifiEnabled', e.target.checked)}
+                      />
+                      <span className="slider"></span>
+                    </label>
+                  </div>
+                  
+                  <div className="setting-item">
+                    <div className="setting-title">Auto Reconnect</div>
+                    <div className="setting-description">
+                      Automatically reconnect to known networks
+                    </div>
+                    <label className="toggle-switch">
+                      <input
+                        type="checkbox"
+                        checked={settings.connectivity.autoReconnect}
+                        onChange={(e) => updateSetting('connectivity', 'autoReconnect', e.target.checked)}
+                      />
+                      <span className="slider"></span>
+                    </label>
+                  </div>
+                </div>
+                
+                <button onClick={saveSettings} disabled={!connected}>
+                  Save Settings
+                </button>
+              </div>
+            </div>
+          );
+        };
+
+        // Render the App component
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
