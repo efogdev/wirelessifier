@@ -29,7 +29,8 @@ void stop_webserver(void);
 /**
  * @brief Initialize all web services
  * 
- * This is the main initialization function that should be called to set up
- * all web-related services. It initializes NVS, WiFi AP, and starts the web server.
+ * This function starts a task on core 1 with stack size 4096 that initializes
+ * all web-related services including NVS, WiFi AP, and the web server.
+ * The task remains running to keep the web server alive.
  */
 void init_web_services(void);

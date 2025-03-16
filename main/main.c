@@ -53,7 +53,7 @@ void app_main(void) {
 
     run_hid_bridge();
     if (gpio_get_level(GPIO_BUTTON_SW4) == 0) {
-        vTaskDelay(pdMS_TO_TICKS(250));
+        vTaskDelay(pdMS_TO_TICKS(60));
         ESP_LOGI(TAG, "Initializing web services because SW4 held on boot");
         init_web_services();
     }

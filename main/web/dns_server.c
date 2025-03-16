@@ -132,7 +132,6 @@ static int parse_dns_request(char *req, size_t req_len, char *dns_reply, size_t 
 
             struct in_addr ip_addr;
             ip_addr.s_addr = ip_info.ip.addr;
-            ESP_LOGI(DNS_TAG, "Host IP: %s", inet_ntoa(ip_addr));
 
             answer->addr_len = htons(sizeof(ip_info.ip.addr));
             answer->ip_addr = ip_info.ip.addr;
@@ -211,5 +210,5 @@ static void dns_server_task(void *pvParameters)
 
 void start_dns_server(TaskHandle_t *dns_task_handle)
 {
-    xTaskCreatePinnedToCore(&dns_server_task, "dns_server", 2600, NULL, 2, dns_task_handle, 1);
+    xTaskCreatePinnedToCore(&dns_server_task, "dns_server", 2400, NULL, 5, dns_task_handle, 1);
 }

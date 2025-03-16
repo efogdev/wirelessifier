@@ -76,12 +76,7 @@ void init_wifi_ap(void)
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
-                                                      ESP_EVENT_ANY_ID,
-                                                      &wifi_event_handler,
-                                                      NULL,
-                                                      NULL));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL, NULL));
 
     wifi_config_t wifi_config = {
         .ap = {
@@ -107,11 +102,11 @@ httpd_handle_t start_webserver(void)
     }
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 3; // We only have root, redirect, and websocket
-    config.stack_size = 1536;    // Reduced stack size as handlers are simple
+    config.max_uri_handlers = 4;
+    config.stack_size = 3200;
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.lru_purge_enable = true;
-    config.recv_wait_timeout = 3;  // Reduce timeout for faster resource cleanup
+    config.recv_wait_timeout = 3;
     config.send_wait_timeout = 3;
 
     ESP_LOGI(HTTP_TAG, "Starting server on port: '%d'", config.server_port);
@@ -150,9 +145,9 @@ void stop_webserver(void)
     }
 }
 
-void init_web_services(void)
+static void web_services_task(void *pvParameters)
 {
-    ESP_LOGI(HTTP_TAG, "Initializing web services");
+    ESP_LOGI(HTTP_TAG, "Initializing web services in task");
     
     // Initialize NVS
     esp_err_t ret = nvs_flash_init();
@@ -167,4 +162,15 @@ void init_web_services(void)
     
     // Start the web server
     start_webserver();
+    
+    // Task should remain running to keep the web server alive
+    while (1) {
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+
+void init_web_services(void)
+{
+    ESP_LOGI(HTTP_TAG, "Starting web services task");
+    xTaskCreatePinnedToCore(web_services_task, "web_services", 4096, NULL, 5, NULL, 1);
 }
