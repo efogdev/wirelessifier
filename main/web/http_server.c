@@ -124,6 +124,9 @@ static const httpd_uri_t redirect = {
 // External reference to retry counter
 extern int s_retry_num;
 
+// Forward declaration for the scan completion handler
+extern void process_wifi_scan_results(void);
+
 static void event_handler(void* arg, esp_event_base_t event_base,
     int32_t event_id, void* event_data)
 {
@@ -147,6 +150,9 @@ static void event_handler(void* arg, esp_event_base_t event_base,
         
         xEventGroupClearBits(wifi_event_group, WIFI_CONNECTED_BIT);
         update_wifi_connection_status(false, NULL);
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_SCAN_DONE) {
+        ESP_LOGI(HTTP_TAG, "WIFI_EVENT_SCAN_DONE");
+        process_wifi_scan_results();
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
         char ip_str[16];
@@ -205,8 +211,8 @@ httpd_handle_t start_webserver(void)
     }
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 8;
-    config.stack_size = 5600;
+    config.max_uri_handlers = 7;
+    config.stack_size = 6200;
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.lru_purge_enable = true;
     config.recv_wait_timeout = 3;
@@ -309,5 +315,5 @@ void init_web_services(void)
 {
     ESP_LOGI(HTTP_TAG, "Starting web services task");
     wifi_event_group = xEventGroupCreate();
-    xTaskCreatePinnedToCore(web_services_task, "web_services", 4096, NULL, 5, NULL, 1);
+    xTaskCreatePinnedToCore(web_services_task, "web_services", 5200, NULL, 5, NULL, 1);
 }

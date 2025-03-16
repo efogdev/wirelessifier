@@ -1,6 +1,6 @@
 idf_component_register(SRCS "main.c"
-                           "usb/usb_hid_host.c"
                            "hid_bridge.c"
+                           "usb/usb_hid_host.c"
                            "rgb/rgb_utils.c"
                            "ble/ble_hid_device.c"
                            "ble/esp_hidd_prf_api.c"
@@ -12,13 +12,14 @@ idf_component_register(SRCS "main.c"
                            "web/ws_server.c"
                            "web/wifi_manager.c"
                            "utils/task_monitor.c"
+                           "utils/temp_sensor.c"
                          EMBED_TXTFILES "web/front/index.html" 
                            "web/front/settings.html"
                            "web/front/lib/babel.min.js"
                            "web/front/lib/react-dom.production.min.js"
                            "web/front/lib/react.production.min.js"  
                       INCLUDE_DIRS "." "ble" "usb" "rgb" "utils" "web" "web/front"
-                      REQUIRES neopixel esp_hid bt nvs_flash esp_http_server app_update
+                      REQUIRES neopixel esp_hid bt nvs_flash esp_http_server app_update json
                       PRIV_REQUIRES usb
 )
 

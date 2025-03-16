@@ -164,6 +164,25 @@
             background-color: #d9edf7;
             color: #31708f;
         }
+        
+        /* Fullscreen loader styles */
+        #loadingContainer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
     </style>
     
     <script src="/lib/babel.min.js"></script>
@@ -179,45 +198,71 @@
           const [connected, setConnected] = React.useState(false);
           const [loading, setLoading] = React.useState(true);
           const [error, setError] = React.useState(null);
+          const [lastMessageTime, setLastMessageTime] = React.useState(0);
+          const [systemInfo, setSystemInfo] = React.useState({
+            freeHeap: 0,
+            socTemp: 0
+          });
           const [settings, setSettings] = React.useState({
             deviceInfo: {
-              name: 'AnyBLE Device',
-              firmwareVersion: '1.0.0',
-              hardwareVersion: 'v1',
-              macAddress: '00:11:22:33:44:55'
+              name: 'TBD',
+              firmwareVersion: 'TBD',
+              hardwareVersion: 'TBD',
+              macAddress: '00:00:00:00:00:00'
             },
             power: {
-              sleepTimeout: 300, // seconds
+              sleepTimeout: 30, // seconds
               lowPowerMode: false,
-              autoPowerOff: false,
-              autoPowerOffTimeout: 3600 // seconds
+              enableSleep: true
             },
             led: {
-              brightness: 80, // percentage
-              pattern: 'solid', // solid, blink, pulse, rainbow
-              color: '#0088ff'
+              brightness: 80
             },
             connectivity: {
-              bluetoothEnabled: true,
-              wifiEnabled: true,
-              autoReconnect: true
+              bleTxPower: 'low', // low, medium, high, default
+              bleReconnectDelay: 3 // seconds
             }
           });
           const [statusMessage, setStatusMessage] = React.useState(null);
           const [statusType, setStatusType] = React.useState('info');
           const socketRef = React.useRef(null);
+          const wsCheckIntervalRef = React.useRef(null);
 
-          // Connect to WebSocket
+          // Connect to WebSocket and request settings
           React.useEffect(() => {
             connectWebSocket();
+            
+            // Start checking for WebSocket inactivity
+            wsCheckIntervalRef.current = setInterval(checkWebSocketActivity, 1000);
             
             // Cleanup on unmount
             return () => {
               if (socketRef.current) {
                 socketRef.current.close();
               }
+              if (wsCheckIntervalRef.current) {
+                clearInterval(wsCheckIntervalRef.current);
+              }
             };
           }, []);
+          
+          // Check WebSocket activity
+          const checkWebSocketActivity = () => {
+            const now = Date.now();
+            if (lastMessageTime > 0 && now - lastMessageTime > 1500) {
+              setConnected(false);
+              setLoading(true);
+              if (socketRef.current && socketRef.current.readyState !== WebSocket.CLOSED) {
+                try {
+                  socketRef.current.close();
+                } catch (e) {
+                  console.error('Error closing socket:', e);
+                }
+              }
+              // Force reconnection attempt
+              setTimeout(connectWebSocket, 1000);
+            }
+          };
 
           // Connect to WebSocket
           const connectWebSocket = () => {
@@ -234,6 +279,7 @@
               console.log('WebSocket connected');
               setConnected(true);
               setLoading(false);
+              setLastMessageTime(Date.now());
               
               // Request current settings
               requestSettings();
@@ -242,9 +288,10 @@
             socket.onclose = () => {
               console.log('WebSocket disconnected');
               setConnected(false);
+              setLoading(true);
               
               // Try to reconnect after a delay
-              setTimeout(connectWebSocket, 3000);
+              setTimeout(connectWebSocket, 1000);
             };
             
             socket.onerror = (error) => {
@@ -260,6 +307,9 @@
 
           // Handle WebSocket messages
           const handleWebSocketMessage = (data) => {
+            // Update last message time
+            setLastMessageTime(Date.now());
+            
             try {
               const message = JSON.parse(data);
               
@@ -284,6 +334,23 @@
                 case 'log':
                   console.log('Server log:', message.content);
                   break;
+                case 'ping':
+                  // Update system info from ping message
+                  if (message.content) {
+                    try {
+                      const pingData = typeof message.content === 'string' 
+                        ? JSON.parse(message.content) 
+                        : message.content;
+                      
+                      setSystemInfo({
+                        freeHeap: pingData.freeHeap || 0,
+                        socTemp: pingData.socTemp || 0
+                      });
+                    } catch (e) {
+                      console.error('Error parsing ping data:', e);
+                    }
+                  }
+                  break;
                 default:
                   console.log('Unknown message type:', message.type);
               }
@@ -300,7 +367,8 @@
             }
             
             socketRef.current.send(JSON.stringify({
-              type: 'get_settings'
+              type: 'command',
+              command: 'get_settings'
             }));
           };
 
@@ -312,7 +380,8 @@
             }
             
             socketRef.current.send(JSON.stringify({
-              type: 'update_settings',
+              type: 'command',
+              command: 'update_settings',
               content: settings
             }));
             
@@ -341,12 +410,12 @@
             }, 5000);
           };
 
-          // If loading, show spinner
-          if (loading) {
+          // If loading or not connected, show fullscreen loader
+          if (loading || !connected) {
             return (
-              <div className="loading">
+              <div id="loadingContainer">
                 <div className="spinner"></div>
-                <p>Connecting to device...</p>
+                <p>{connected ? 'Loading settings' : 'Waiting for connection...'}</p>
               </div>
             );
           }
@@ -366,11 +435,6 @@
               <h1>Device Settings</h1>
               
               <div className="container">
-                {!connected && (
-                  <div className="status error">
-                    Disconnected from device. Attempting to reconnect...
-                  </div>
-                )}
                 
                 {statusMessage && (
                   <div className={`status ${statusType}`}>
@@ -401,6 +465,16 @@
                     <div className="setting-title">MAC Address</div>
                     <div>{settings.deviceInfo.macAddress}</div>
                   </div>
+                  
+                  <div className="setting-item">
+                    <div className="setting-title">Free Heap</div>
+                    <div>{(systemInfo.freeHeap / 1000).toFixed(0)} kb</div>
+                  </div>
+                  
+                  <div className="setting-item">
+                    <div className="setting-title">SoC Temperature</div>
+                    <div>{systemInfo.socTemp.toFixed(0)}°C</div>
+                  </div>
                 </div>
                 
                 {/* Power Management */}
@@ -408,9 +482,24 @@
                   <h2>Power Management</h2>
                   
                   <div className="setting-item">
+                    <div className="setting-title">Enable Sleep</div>
+                    <div className="setting-description">
+                      Enable device to enter sleep mode and disable Bluetooth when no events received in the time window
+                    </div>
+                    <label className="toggle-switch">
+                      <input
+                        type="checkbox"
+                        checked={settings.power.enableSleep}
+                        onChange={(e) => updateSetting('power', 'enableSleep', e.target.checked)}
+                      />
+                      <span className="slider"></span>
+                    </label>
+                  </div>
+                  
+                  <div className="setting-item">
                     <div className="setting-title">Sleep Timeout</div>
                     <div className="setting-description">
-                      Time in seconds before device enters sleep mode
+                      Time without USB events in seconds before device enters sleep mode
                     </div>
                     <input
                       type="number"
@@ -420,52 +509,6 @@
                       onChange={(e) => updateSetting('power', 'sleepTimeout', parseInt(e.target.value))}
                     />
                   </div>
-                  
-                  <div className="setting-item">
-                    <div className="setting-title">Low Power Mode</div>
-                    <div className="setting-description">
-                      Reduces power consumption by limiting functionality
-                    </div>
-                    <label className="toggle-switch">
-                      <input
-                        type="checkbox"
-                        checked={settings.power.lowPowerMode}
-                        onChange={(e) => updateSetting('power', 'lowPowerMode', e.target.checked)}
-                      />
-                      <span className="slider"></span>
-                    </label>
-                  </div>
-                  
-                  <div className="setting-item">
-                    <div className="setting-title">Auto Power Off</div>
-                    <div className="setting-description">
-                      Automatically power off device after period of inactivity
-                    </div>
-                    <label className="toggle-switch">
-                      <input
-                        type="checkbox"
-                        checked={settings.power.autoPowerOff}
-                        onChange={(e) => updateSetting('power', 'autoPowerOff', e.target.checked)}
-                      />
-                      <span className="slider"></span>
-                    </label>
-                  </div>
-                  
-                  {settings.power.autoPowerOff && (
-                    <div className="setting-item">
-                      <div className="setting-title">Auto Power Off Timeout</div>
-                      <div className="setting-description">
-                        Time in seconds before device powers off
-                      </div>
-                      <input
-                        type="number"
-                        min="60"
-                        max="86400"
-                        value={settings.power.autoPowerOffTimeout}
-                        onChange={(e) => updateSetting('power', 'autoPowerOffTimeout', parseInt(e.target.value))}
-                      />
-                    </div>
-                  )}
                 </div>
                 
                 {/* LED Configuration */}
@@ -475,7 +518,7 @@
                   <div className="setting-item">
                     <div className="setting-title">Brightness</div>
                     <div className="setting-description">
-                      LED brightness percentage
+                      Global LED brightness percentage
                     </div>
                     <input
                       type="range"
@@ -485,36 +528,6 @@
                       onChange={(e) => updateSetting('led', 'brightness', parseInt(e.target.value))}
                     />
                   </div>
-                  
-                  <div className="setting-item">
-                    <div className="setting-title">Pattern</div>
-                    <div className="setting-description">
-                      LED lighting pattern
-                    </div>
-                    <select
-                      value={settings.led.pattern}
-                      onChange={(e) => updateSetting('led', 'pattern', e.target.value)}
-                    >
-                      <option value="solid">Solid</option>
-                      <option value="blink">Blink</option>
-                      <option value="pulse">Pulse</option>
-                      <option value="rainbow">Rainbow</option>
-                    </select>
-                  </div>
-                  
-                  {settings.led.pattern === 'solid' && (
-                    <div className="setting-item">
-                      <div className="setting-title">Color</div>
-                      <div className="setting-description">
-                        LED color (for solid pattern)
-                      </div>
-                      <input
-                        type="color"
-                        value={settings.led.color}
-                        onChange={(e) => updateSetting('led', 'color', e.target.value)}
-                      />
-                    </div>
-                  )}
                 </div>
                 
                 {/* Connectivity Options */}
@@ -522,48 +535,32 @@
                   <h2>Connectivity</h2>
                   
                   <div className="setting-item">
-                    <div className="setting-title">Bluetooth</div>
+                    <div className="setting-title">BLE TX Power</div>
                     <div className="setting-description">
-                      Enable/disable Bluetooth connectivity
+                      Bluetooth transmission power level
                     </div>
-                    <label className="toggle-switch">
-                      <input
-                        type="checkbox"
-                        checked={settings.connectivity.bluetoothEnabled}
-                        onChange={(e) => updateSetting('connectivity', 'bluetoothEnabled', e.target.checked)}
-                      />
-                      <span className="slider"></span>
-                    </label>
+                    <select
+                      value={settings.connectivity.bleTxPower}
+                      onChange={(e) => updateSetting('connectivity', 'bleTxPower', e.target.value)}
+                    >
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                    </select>
                   </div>
                   
                   <div className="setting-item">
-                    <div className="setting-title">WiFi</div>
+                    <div className="setting-title">Reconnect Delay</div>
                     <div className="setting-description">
-                      Enable/disable WiFi connectivity
+                      Delay in seconds before attempting to reconnect after Bluetooth disconnect (doesn't affect wake from sleep)
                     </div>
-                    <label className="toggle-switch">
-                      <input
-                        type="checkbox"
-                        checked={settings.connectivity.wifiEnabled}
-                        onChange={(e) => updateSetting('connectivity', 'wifiEnabled', e.target.checked)}
-                      />
-                      <span className="slider"></span>
-                    </label>
-                  </div>
-                  
-                  <div className="setting-item">
-                    <div className="setting-title">Auto Reconnect</div>
-                    <div className="setting-description">
-                      Automatically reconnect to known networks
-                    </div>
-                    <label className="toggle-switch">
-                      <input
-                        type="checkbox"
-                        checked={settings.connectivity.autoReconnect}
-                        onChange={(e) => updateSetting('connectivity', 'autoReconnect', e.target.checked)}
-                      />
-                      <span className="slider"></span>
-                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="60"
+                      value={settings.connectivity.bleReconnectDelay}
+                      onChange={(e) => updateSetting('connectivity', 'bleReconnectDelay', parseInt(e.target.value))}
+                    />
                   </div>
                 </div>
                 

@@ -5,10 +5,10 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "esp_heap_caps.h"
-#include "driver/temperature_sensor.h"
 #include "esp_clk_tree.h"
 #include "task_monitor.h"
 #include "../hid_bridge.h"
+#include "temp_sensor.h"
 
 static const char *TAG = "TaskMonitor";
 
@@ -24,7 +24,6 @@ static uint32_t g_usb_last_report_counter = 0;
 static TaskStatus_t start_array[MAX_TASKS];
 static TaskStatus_t end_array[MAX_TASKS];
 static TaskHandle_t monitor_task_handle = NULL;
-static temperature_sensor_handle_t temp_sensor = NULL;
 
 // Static strings for logging
 static const char *const HEADER_FORMAT = " Task           |         Took |     | Free, bytes ";
@@ -115,7 +114,7 @@ static void monitor_task(void *pvParameter)
         
         // Get and print temperature
         float tsens_value;
-        if (temperature_sensor_get_celsius(temp_sensor, &tsens_value) == ESP_OK) {
+        if (temp_sensor_get_temperature(&tsens_value) == ESP_OK) {
             ESP_LOGI(TAG, "SOC temperature: %.1f°C", tsens_value);
         } else {
             ESP_LOGE(TAG, "Failed to read temperature");
@@ -144,13 +143,7 @@ static void monitor_task(void *pvParameter)
 esp_err_t task_monitor_init(void)
 {
     // Initialize temperature sensor
-    temperature_sensor_config_t temp_sensor_config = TEMPERATURE_SENSOR_CONFIG_DEFAULT(10, 50);
-    esp_err_t ret = temperature_sensor_install(&temp_sensor_config, &temp_sensor);
-    if (ret != ESP_OK) {
-        return ret;
-    }
-
-    ret = temperature_sensor_enable(temp_sensor);
+    esp_err_t ret = temp_sensor_init();
     if (ret != ESP_OK) {
         return ret;
     }

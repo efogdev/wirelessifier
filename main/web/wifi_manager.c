@@ -11,12 +11,13 @@
 #include "freertos/event_groups.h"
 #include "ws_server.h"
 #include "http_server.h"
+#include "../utils/temp_sensor.h"
 
 static const char *WIFI_TAG = "WIFI_MGR";
 
 // WebSocket ping task parameters
-#define WS_PING_TASK_STACK_SIZE 2048
-#define WS_PING_TASK_PRIORITY 5
+#define WS_PING_TASK_STACK_SIZE 2600
+#define WS_PING_TASK_PRIORITY 9
 #define WS_PING_INTERVAL_MS 125
 
 // NVS keys
@@ -170,39 +171,25 @@ bool has_wifi_credentials(void) {
     return (err == ESP_OK && ssid_len > 0);
 }
 
-// Scan for available WiFi networks
-esp_err_t scan_wifi_networks(void) {
-    ESP_LOGI(WIFI_TAG, "Starting WiFi scan...");
-    
-    // Configure scan
-    wifi_scan_config_t scan_config = {
-        .ssid = NULL,
-        .bssid = NULL,
-        .channel = 0,
-        .show_hidden = false,
-        .scan_type = WIFI_SCAN_TYPE_ACTIVE,
-        .scan_time.active.min = 100,
-        .scan_time.active.max = 300
-    };
-    
-    // Start scan
-    ESP_ERROR_CHECK(esp_wifi_scan_start(&scan_config, true));
-    
+// Process WiFi scan results and send them via WebSocket
+void process_wifi_scan_results(void) {
     // Get scan results
     uint16_t ap_count = 0;
     ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_count));
     
+    ESP_LOGI(WIFI_TAG, "WiFi scan completed, found %d networks", ap_count);
+    
     if (ap_count == 0) {
         ESP_LOGI(WIFI_TAG, "No networks found");
         ws_broadcast_json("wifi_scan_result", "[]");
-        return ESP_OK;
+        return;
     }
     
     // Allocate memory for results
     wifi_ap_record_t *ap_records = malloc(ap_count * sizeof(wifi_ap_record_t));
     if (ap_records == NULL) {
         ESP_LOGE(WIFI_TAG, "Failed to allocate memory for scan results");
-        return ESP_ERR_NO_MEM;
+        return;
     }
     
     // Get scan results
@@ -213,7 +200,7 @@ esp_err_t scan_wifi_networks(void) {
     if (json_buffer == NULL) {
         free(ap_records);
         ESP_LOGE(WIFI_TAG, "Failed to allocate memory for JSON buffer");
-        return ESP_ERR_NO_MEM;
+        return;
     }
     
     int offset = 0;
@@ -246,6 +233,32 @@ esp_err_t scan_wifi_networks(void) {
     // Clean up
     free(json_buffer);
     free(ap_records);
+}
+
+// Scan for available WiFi networks
+esp_err_t scan_wifi_networks(void) {
+    ESP_LOGI(WIFI_TAG, "Starting WiFi scan...");
+    
+    // Stop any ongoing scan
+    esp_wifi_scan_stop();
+    
+    // Configure scan
+    wifi_scan_config_t scan_config = {
+        .ssid = NULL,
+        .bssid = NULL,
+        .channel = 0,
+        .show_hidden = false,
+        .scan_type = WIFI_SCAN_TYPE_ACTIVE,
+        .scan_time.active.min = 100,
+        .scan_time.active.max = 300
+    };
+    
+    // Start scan asynchronously - results will be processed in the WIFI_EVENT_SCAN_DONE event handler
+    esp_err_t ret = esp_wifi_scan_start(&scan_config, false);
+    if (ret != ESP_OK) {
+        ESP_LOGE(WIFI_TAG, "Failed to start WiFi scan: %s", esp_err_to_name(ret));
+        return ret;
+    }
     
     return ESP_OK;
 }
@@ -406,8 +419,21 @@ static void ws_ping_task(void *pvParameters) {
     ESP_LOGI(WIFI_TAG, "WebSocket ping task started");
     
     while (1) {
+        // Get free heap size
+        uint32_t free_heap = esp_get_free_heap_size();
+        
+        // Get SoC temperature
+        float temp = 0;
+        temp_sensor_get_temperature(&temp);
+        
+        // Create JSON with system info
+        char ping_data[100];
+        snprintf(ping_data, sizeof(ping_data), 
+                "{\"freeHeap\":%lu,\"socTemp\":%.1f}", 
+                free_heap, temp);
+        
         // Send a ping message to all connected clients
-        ws_broadcast_json("ping", "{}");
+        ws_broadcast_json("ping", ping_data);
         
         // Wait for the next ping interval
         vTaskDelay(pdMS_TO_TICKS(WS_PING_INTERVAL_MS));

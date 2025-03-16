@@ -44,11 +44,18 @@ esp_err_t clear_wifi_credentials(void);
 bool has_wifi_credentials(void);
 
 /**
- * @brief Scan for available WiFi networks and broadcast results via WebSocket
+ * @brief Scan for available WiFi networks asynchronously
+ * Results will be processed in the WIFI_EVENT_SCAN_DONE event handler
  * 
  * @return esp_err_t ESP_OK on success
  */
 esp_err_t scan_wifi_networks(void);
+
+/**
+ * @brief Process WiFi scan results and broadcast them via WebSocket
+ * This function is called from the WIFI_EVENT_SCAN_DONE event handler
+ */
+void process_wifi_scan_results(void);
 
 /**
  * @brief Connect to a specific WiFi network
