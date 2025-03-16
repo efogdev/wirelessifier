@@ -16,7 +16,6 @@ static TaskHandle_t dns_task_handle = NULL;
 
 // Default WiFi configuration
 #define WIFI_SSID      "AnyBLE WEB"
-#define WIFI_PASS      "USBTOBLE"
 #define WIFI_CHANNEL   1
 #define MAX_CONN       4
 
@@ -89,18 +88,15 @@ void init_wifi_ap(void)
             .ssid = WIFI_SSID,
             .ssid_len = strlen(WIFI_SSID),
             .channel = WIFI_CHANNEL,
-            .password = WIFI_PASS,
             .max_connection = MAX_CONN,
-            .authmode = WIFI_AUTH_WPA_WPA2_PSK
+            .authmode = WIFI_AUTH_OPEN
         },
     };
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
-
-    ESP_LOGI(HTTP_TAG, "WiFi AP initialized. SSID:%s password:%s channel:%d",
-             WIFI_SSID, WIFI_PASS, WIFI_CHANNEL);
+    ESP_LOGI(HTTP_TAG, "WiFi AP initialized. SSID:%s channel:%d", WIFI_SSID, WIFI_CHANNEL);
 }
 
 httpd_handle_t start_webserver(void)
@@ -129,7 +125,7 @@ httpd_handle_t start_webserver(void)
         init_websocket(server);
         
         // Initialize OTA server
-        // init_ota_server(server);
+        init_ota_server(server);
         
         // Start DNS server for captive portal
         start_dns_server(&dns_task_handle);

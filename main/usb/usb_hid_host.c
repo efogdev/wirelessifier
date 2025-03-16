@@ -16,12 +16,9 @@
 #include "usb/usb_host.h"
 #include "usb/hid_host.h"
 #include "usb_hid_host.h"
+#include "../utils/task_monitor.h"
 
 static const char *TAG = "usb_hid_host";
-
-static uint32_t g_report_counter = 0;
-static uint32_t g_last_report_counter = 0;
-static TaskHandle_t g_perf_task_handle = NULL;
 static QueueHandle_t g_report_queue = NULL;
 static QueueHandle_t g_event_queue = NULL;
 static bool g_device_connected = false;
@@ -76,7 +73,6 @@ typedef struct {
     };
 } hid_event_queue_t;
 
-static void performance_monitor_task(void *arg);
 static void usb_lib_task(void *arg);
 static void hid_host_event_task(void *arg);
 static void hid_host_device_callback(hid_host_device_handle_t hid_device_handle, hid_host_driver_event_t event, void *arg);
@@ -110,13 +106,13 @@ esp_err_t usb_hid_host_init(QueueHandle_t report_queue) {
 
     ESP_ERROR_CHECK(usb_host_install(&host_config));
 
-    BaseType_t task_created = xTaskCreatePinnedToCore(hid_host_event_task, "hid_events", 3200, NULL, 3, &g_event_task_handle, 1);
+    BaseType_t task_created = xTaskCreatePinnedToCore(hid_host_event_task, "hid_events", 2048, NULL, 3, &g_event_task_handle, 1);
     if (task_created != pdTRUE) {
         vQueueDelete(g_event_queue);
         return ESP_ERR_NO_MEM;
     }
 
-    task_created = xTaskCreatePinnedToCore(usb_lib_task, "usb_events", 3200, NULL, 2, &g_usb_events_task_handle, 1);
+    task_created = xTaskCreatePinnedToCore(usb_lib_task, "usb_events", 2600, NULL, 2, &g_usb_events_task_handle, 1);
     if (task_created != pdTRUE) {
         vTaskDelete(g_event_task_handle);
         vQueueDelete(g_event_queue);
@@ -127,8 +123,8 @@ esp_err_t usb_hid_host_init(QueueHandle_t report_queue) {
     const hid_host_driver_config_t hid_host_config = {
         .create_background_task = true,
         .task_priority = 4,
-        .stack_size = 2048,
-        .core_id = 0,
+        .stack_size = 2350,
+        .core_id = 1,
         .callback = hid_host_device_callback,
         .callback_arg = NULL
     };
@@ -141,15 +137,6 @@ esp_err_t usb_hid_host_init(QueueHandle_t report_queue) {
         return ret;
     }
 
-    task_created = xTaskCreatePinnedToCore(performance_monitor_task, "perf_monitor", 2600, NULL, 1, &g_perf_task_handle, 0);
-    if (task_created != pdTRUE) {
-        ESP_LOGE(TAG, "Failed to create performance monitor task");
-        vTaskDelete(g_event_task_handle);
-        vTaskDelete(g_usb_events_task_handle);
-        vQueueDelete(g_event_queue);
-        usb_host_uninstall();
-        return ESP_ERR_NO_MEM;
-    }
 
     ESP_LOGI(TAG, "USB HID Host initialized successfully");
     return ESP_OK;
@@ -171,10 +158,6 @@ esp_err_t usb_hid_host_deinit(void) {
         g_usb_events_task_handle = NULL;
     }
 
-    if (g_perf_task_handle != NULL) {
-        vTaskDelete(g_perf_task_handle);
-        g_perf_task_handle = NULL;
-    }
 
     ret = usb_host_uninstall();
     if (ret != ESP_OK) {
@@ -394,19 +377,6 @@ static int extract_field_value(const uint8_t *data, uint16_t bit_offset, uint16_
     return value;
 }
 
-static void performance_monitor_task(void *arg) {
-    TickType_t last_wake_time = xTaskGetTickCount();
-    while (1) {
-        uint32_t reports = g_report_counter - g_last_report_counter;
-        g_last_report_counter = g_report_counter;
-
-        if (reports > 0) {
-            ESP_LOGI(TAG, "USB HID: %lu rps", reports);
-        }
-
-        vTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(1000));
-    }
-}
 
 // Static allocations for process_report function
 static usb_hid_report_t g_report;
@@ -414,7 +384,7 @@ static int g_field_values[MAX_REPORT_FIELDS];
 static usb_hid_field_t g_fields[MAX_REPORT_FIELDS];
 
 static void process_report(hid_host_device_handle_t hid_device_handle, const uint8_t *data, size_t length, uint8_t report_id, uint8_t interface_num) {
-    g_report_counter++;
+    task_monitor_increment_usb_report_counter();
 
     // Combined validation for better performance
     if (!data || !g_report_queue || length == 0 || length > 64 || interface_num >= USB_HOST_MAX_INTERFACES) {

@@ -12,59 +12,56 @@
 
 static const char *TAG = "TaskMonitor";
 
+// USB HID report counter variables
+static uint32_t g_usb_report_counter = 0;
+static uint32_t g_usb_last_report_counter = 0;
+
 #define STATS_TICKS         pdMS_TO_TICKS(1000)
-#define ARRAY_SIZE_OFFSET   5   //Increase this if print_real_time_stats returns ESP_ERR_INVALID_SIZE
+#define MAX_TASKS           32  // Maximum number of tasks to monitor
 #define STATS_TASK_PRIO     3
 
+// Static allocations for task arrays
+static TaskStatus_t start_array[MAX_TASKS];
+static TaskStatus_t end_array[MAX_TASKS];
 static TaskHandle_t monitor_task_handle = NULL;
 static temperature_sensor_handle_t temp_sensor = NULL;
 
+// Static strings for logging
+static const char *const HEADER_FORMAT = " Task           |         Took |     | Free, bytes ";
+static const char *const HEADER_SEPARATOR = "----------------|--------------|-----|-------------";
+
+void task_monitor_increment_usb_report_counter(void)
+{
+    g_usb_report_counter++;
+}
+
 static esp_err_t print_real_time_stats(TickType_t xTicksToWait)
 {
-    TaskStatus_t *start_array = NULL, *end_array = NULL;
     UBaseType_t start_array_size, end_array_size;
     uint32_t start_run_time, end_run_time;
-    esp_err_t ret;
 
-    //Allocate array to store current task states
-    start_array_size = uxTaskGetNumberOfTasks() + ARRAY_SIZE_OFFSET;
-    start_array = malloc(sizeof(TaskStatus_t) * start_array_size);
-    if (start_array == NULL) {
-        ret = ESP_ERR_NO_MEM;
-        goto exit;
-    }
-    //Get current task states
-    start_array_size = uxTaskGetSystemState(start_array, start_array_size, &start_run_time);
-    if (start_array_size == 0) {
-        ret = ESP_ERR_INVALID_SIZE;
-        goto exit;
+    // Get current task states
+    start_array_size = uxTaskGetSystemState(start_array, MAX_TASKS, &start_run_time);
+    if (start_array_size == 0 || start_array_size > MAX_TASKS) {
+        return ESP_ERR_INVALID_SIZE;
     }
 
     vTaskDelay(xTicksToWait);
 
-    //Allocate array to store tasks states post delay
-    end_array_size = uxTaskGetNumberOfTasks() + ARRAY_SIZE_OFFSET;
-    end_array = malloc(sizeof(TaskStatus_t) * end_array_size);
-    if (end_array == NULL) {
-        ret = ESP_ERR_NO_MEM;
-        goto exit;
-    }
-    //Get post delay task states
-    end_array_size = uxTaskGetSystemState(end_array, end_array_size, &end_run_time);
-    if (end_array_size == 0) {
-        ret = ESP_ERR_INVALID_SIZE;
-        goto exit;
+    // Get post delay task states
+    end_array_size = uxTaskGetSystemState(end_array, MAX_TASKS, &end_run_time);
+    if (end_array_size == 0 || end_array_size > MAX_TASKS) {
+        return ESP_ERR_INVALID_SIZE;
     }
 
-    //Calculate total_elapsed_time in units of run time stats clock period.
+    // Calculate total_elapsed_time in units of run time stats clock period.
     uint32_t total_elapsed_time = (end_run_time - start_run_time);
     if (total_elapsed_time == 0) {
-        ret = ESP_ERR_INVALID_STATE;
-        goto exit;
+        return ESP_ERR_INVALID_STATE;
     }
 
-    ESP_LOGI(TAG, " Task         |         Took |     | Free, bytes ");
-    ESP_LOGI(TAG, "--------------|--------------|-----|-------------");
+    ESP_LOGI(TAG, "%s", HEADER_FORMAT);
+    ESP_LOGI(TAG, "%s", HEADER_SEPARATOR);
     //Match each task in start_array to those in the end_array
     for (int i = 0; i < start_array_size; i++) {
         int k = -1;
@@ -88,7 +85,7 @@ static esp_err_t print_real_time_stats(TickType_t xTicksToWait)
             UBaseType_t stack_high_water = end_array[k].usStackHighWaterMark;
             UBaseType_t bytes_free = stack_high_water * sizeof(StackType_t);
             
-            ESP_LOGI(TAG, "%-14s| %9"PRIu32" ms | %3"PRIu32"%% | %10d ",
+            ESP_LOGI(TAG, "%-16s| %9"PRIu32" ms | %2"PRIu32"%% | %d ",
                     start_array[i].pcTaskName, task_elapsed_ms, percentage_time, bytes_free);
         }
     }
@@ -104,12 +101,7 @@ static esp_err_t print_real_time_stats(TickType_t xTicksToWait)
             ESP_LOGI(TAG, "%-14s| Created", end_array[i].pcTaskName);
         }
     }
-    ret = ESP_OK;
-
-exit:    //Common return path
-    free(start_array);
-    free(end_array);
-    return ret;
+    return ESP_OK;
 }
 
 static void monitor_task(void *pvParameter)
@@ -119,7 +111,7 @@ static void monitor_task(void *pvParameter)
 
         // Get and print heap info
         size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
-        ESP_LOGI(TAG, "Free heap: %zu bytes", free_heap);
+        ESP_LOGI(TAG, "Free heap: %d kb", free_heap / 1024);
         
         // Get and print temperature
         float tsens_value;
@@ -143,6 +135,13 @@ static void monitor_task(void *pvParameter)
             ESP_LOGE(TAG, "Error getting real time stats");
         }
         
+        // Print USB HID reports per second
+        uint32_t reports = g_usb_report_counter - g_usb_last_report_counter;
+        g_usb_last_report_counter = g_usb_report_counter;
+        if (reports > 0) {
+            ESP_LOGI(TAG, "USB HID: %lu rps", reports);
+        }
+
         // Report 5 times less frequently if BLE is paused
         uint32_t delay_ms = 5000; // Default: print stats every 5 seconds
         if (hid_bridge_is_ble_paused()) {
@@ -175,6 +174,6 @@ esp_err_t task_monitor_start(void)
         return ESP_ERR_INVALID_STATE;
     }
 
-    BaseType_t ret = xTaskCreatePinnedToCore(monitor_task, "monitor", 2600, NULL, STATS_TASK_PRIO, &monitor_task_handle, tskNO_AFFINITY);
+    BaseType_t ret = xTaskCreatePinnedToCore(monitor_task, "monitor", 2048, NULL, STATS_TASK_PRIO, &monitor_task_handle, tskNO_AFFINITY);
     return (ret == pdPASS) ? ESP_OK : ESP_FAIL;
 }

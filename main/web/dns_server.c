@@ -211,5 +211,5 @@ static void dns_server_task(void *pvParameters)
 
 void start_dns_server(TaskHandle_t *dns_task_handle)
 {
-    xTaskCreatePinnedToCore(&dns_server_task, "dns_server", 2048, NULL, 2, dns_task_handle, 1); 
+    xTaskCreatePinnedToCore(&dns_server_task, "dns_server", 2600, NULL, 2, dns_task_handle, 1);
 }

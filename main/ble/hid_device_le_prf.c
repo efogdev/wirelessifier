@@ -194,20 +194,20 @@ static uint8_t hidReportRefMouseIn[HID_REPORT_REF_LEN] =
 
 
 // HID Report Reference characteristic descriptor, key input
-static uint8_t hidReportRefKeyIn[HID_REPORT_REF_LEN] =
-        {HID_RPT_ID_KEY_IN, HID_REPORT_TYPE_INPUT};
+// static uint8_t hidReportRefKeyIn[HID_REPORT_REF_LEN] =
+        // {HID_RPT_ID_KEY_IN, HID_REPORT_TYPE_INPUT};
 
 // HID Report Reference characteristic descriptor, LED output
-static uint8_t hidReportRefLedOut[HID_REPORT_REF_LEN] =
-        {HID_RPT_ID_LED_OUT, HID_REPORT_TYPE_OUTPUT};
+// static uint8_t hidReportRefLedOut[HID_REPORT_REF_LEN] =
+        // {HID_RPT_ID_LED_OUT, HID_REPORT_TYPE_OUTPUT};
 
 // HID Report Reference characteristic descriptor, Feature
 static uint8_t hidReportRefFeature[HID_REPORT_REF_LEN] =
         {HID_RPT_ID_FEATURE, HID_REPORT_TYPE_FEATURE};
 
 // HID Report Reference characteristic descriptor, consumer control input
-static uint8_t hidReportRefCCIn[HID_REPORT_REF_LEN] =
-        {HID_RPT_ID_CC_IN, HID_REPORT_TYPE_INPUT};
+// static uint8_t hidReportRefCCIn[HID_REPORT_REF_LEN] =
+        // {HID_RPT_ID_CC_IN, HID_REPORT_TYPE_INPUT};
 
 
 /*
@@ -231,21 +231,21 @@ static const uint16_t hid_report_map_uuid = ESP_GATT_UUID_HID_REPORT_MAP;
 static const uint16_t hid_control_point_uuid = ESP_GATT_UUID_HID_CONTROL_POINT;
 static const uint16_t hid_report_uuid = ESP_GATT_UUID_HID_REPORT;
 static const uint16_t hid_proto_mode_uuid = ESP_GATT_UUID_HID_PROTO_MODE;
-static const uint16_t hid_kb_input_uuid = ESP_GATT_UUID_HID_BT_KB_INPUT;
-static const uint16_t hid_kb_output_uuid = ESP_GATT_UUID_HID_BT_KB_OUTPUT;
-static const uint16_t hid_mouse_input_uuid = ESP_GATT_UUID_HID_BT_MOUSE_INPUT;
+// static const uint16_t hid_kb_input_uuid = ESP_GATT_UUID_HID_BT_KB_INPUT;
+// static const uint16_t hid_kb_output_uuid = ESP_GATT_UUID_HID_BT_KB_OUTPUT;
+// static const uint16_t hid_mouse_input_uuid = ESP_GATT_UUID_HID_BT_MOUSE_INPUT;
 static const uint16_t hid_repot_map_ext_desc_uuid = ESP_GATT_UUID_EXT_RPT_REF_DESCR;
 static const uint16_t hid_report_ref_descr_uuid = ESP_GATT_UUID_RPT_REF_DESCR;
 
-static const uint8_t char_prop_notify = ESP_GATT_CHAR_PROP_BIT_NOTIFY;
+// static const uint8_t char_prop_notify = ESP_GATT_CHAR_PROP_BIT_NOTIFY;
 static const uint8_t char_prop_read = ESP_GATT_CHAR_PROP_BIT_READ;
 static const uint8_t char_prop_write_nr = ESP_GATT_CHAR_PROP_BIT_WRITE_NR;
 static const uint8_t char_prop_read_write = ESP_GATT_CHAR_PROP_BIT_WRITE | ESP_GATT_CHAR_PROP_BIT_READ;
 static const uint8_t char_prop_read_notify = ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_NOTIFY;
-static const uint8_t char_prop_read_write_notify =
-        ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE | ESP_GATT_CHAR_PROP_BIT_NOTIFY;
-static const uint8_t char_prop_read_write_write_nr =
-        ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE | ESP_GATT_CHAR_PROP_BIT_WRITE_NR;
+// static const uint8_t char_prop_read_write_notify =
+        // ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE | ESP_GATT_CHAR_PROP_BIT_NOTIFY;
+// static const uint8_t char_prop_read_write_write_nr =
+        // ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE | ESP_GATT_CHAR_PROP_BIT_WRITE_NR;
 
 /// battery Service
 static const uint16_t battery_svc = ESP_GATT_UUID_BATTERY_SERVICE_SVC;
