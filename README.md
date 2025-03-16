@@ -57,4 +57,4 @@ The device implements power-saving features:
 
 ## License
 
-[License information to be added]
+MIT
