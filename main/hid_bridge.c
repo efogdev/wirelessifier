@@ -33,7 +33,7 @@ static bool s_ble_stack_active = true;
 static void hid_bridge_task(void *arg);
 static void inactivity_timer_callback(TimerHandle_t xTimer);
 
-#define INACTIVITY_TIMEOUT_MS (10 * 1000) 
+#define INACTIVITY_TIMEOUT_MS (30 * 1000) 
 
 static void inactivity_timer_callback(TimerHandle_t xTimer)
 {

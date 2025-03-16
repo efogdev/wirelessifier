@@ -37,12 +37,52 @@ static esp_err_t root_get_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
-static const httpd_uri_t root = {
-    .uri = "/",
-    .method = HTTP_GET,
-    .handler = root_get_handler,
-    .user_ctx = NULL
-};
+static esp_err_t settings_get_handler(httpd_req_t *req)
+{
+    extern const uint8_t web_front_settings_html_start[] asm("_binary_settings_html_start");
+    extern const uint8_t web_front_settings_html_end[] asm("_binary_settings_html_end");
+    const size_t settings_html_size = (web_front_settings_html_end - web_front_settings_html_start);
+    
+    httpd_resp_set_type(req, "text/html");
+    httpd_resp_send(req, (const char*)web_front_settings_html_start, settings_html_size);
+    
+    return ESP_OK;
+}
+
+static esp_err_t lib_get_handler(httpd_req_t *req)
+{
+    const char *req_uri = req->uri;
+    
+    if (strstr(req_uri, "react.production.min.js")) {
+        extern const uint8_t web_front_lib_react_production_min_js_start[] asm("_binary_react_production_min_js_start");
+        extern const uint8_t web_front_lib_react_production_min_js_end[] asm("_binary_react_production_min_js_end");
+        const size_t js_size = (web_front_lib_react_production_min_js_end - web_front_lib_react_production_min_js_start) - 1;
+        
+        httpd_resp_set_type(req, "application/javascript");
+        httpd_resp_send(req, (const char*)web_front_lib_react_production_min_js_start, js_size);
+    } 
+    else if (strstr(req_uri, "react-dom.production.min.js")) {
+        extern const uint8_t web_front_lib_react_dom_production_min_js_start[] asm("_binary_react_dom_production_min_js_start");
+        extern const uint8_t web_front_lib_react_dom_production_min_js_end[] asm("_binary_react_dom_production_min_js_end");
+        const size_t js_size = (web_front_lib_react_dom_production_min_js_end - web_front_lib_react_dom_production_min_js_start) - 1;
+        
+        httpd_resp_set_type(req, "application/javascript");
+        httpd_resp_send(req, (const char*)web_front_lib_react_dom_production_min_js_start, js_size);
+    }
+    else if (strstr(req_uri, "babel.min.js")) {
+        extern const uint8_t web_front_lib_babel_min_js_start[] asm("_binary_babel_min_js_start");
+        extern const uint8_t web_front_lib_babel_min_js_end[] asm("_binary_babel_min_js_end");
+        const size_t js_size = (web_front_lib_babel_min_js_end - web_front_lib_babel_min_js_start) - 1;
+        
+        httpd_resp_set_type(req, "application/javascript");
+        httpd_resp_send(req, (const char*)web_front_lib_babel_min_js_start, js_size);
+    }
+    else {
+        return ESP_ERR_NOT_FOUND;
+    }
+    
+    return ESP_OK;
+}
 
 // Redirect handler for captive portal
 static esp_err_t redirect_handler(httpd_req_t *req)
@@ -52,6 +92,27 @@ static esp_err_t redirect_handler(httpd_req_t *req)
     httpd_resp_send(req, NULL, 0);
     return ESP_OK;
 }
+
+static const httpd_uri_t root = {
+    .uri = "/",
+    .method = HTTP_GET,
+    .handler = root_get_handler,
+    .user_ctx = NULL
+};
+
+static const httpd_uri_t settings = {
+    .uri = "/settings",
+    .method = HTTP_GET,
+    .handler = settings_get_handler,
+    .user_ctx = NULL
+};
+
+static const httpd_uri_t lib = {
+    .uri = "/lib/*",
+    .method = HTTP_GET,
+    .handler = lib_get_handler,
+    .user_ctx = NULL
+};
 
 static const httpd_uri_t redirect = {
     .uri = "/*",
@@ -144,7 +205,7 @@ httpd_handle_t start_webserver(void)
     }
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 4;
+    config.max_uri_handlers = 8;
     config.stack_size = 5600;
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.lru_purge_enable = true;
@@ -156,6 +217,8 @@ httpd_handle_t start_webserver(void)
     if (httpd_start(&server, &config) == ESP_OK) {
         // Register URI handlers
         httpd_register_uri_handler(server, &root);
+        httpd_register_uri_handler(server, &settings);
+        httpd_register_uri_handler(server, &lib);
 
         // Initialize websocket server
         init_websocket(server);

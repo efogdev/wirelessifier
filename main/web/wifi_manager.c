@@ -331,7 +331,13 @@ esp_err_t connect_to_wifi(const char* ssid, const char* password) {
 // Process WebSocket messages for WiFi management
 void process_wifi_ws_message(const char* message) {
     // Simple JSON parsing - in a real application, use a proper JSON parser
-    if (strstr(message, "\"type\":\"wifi_scan\"")) {
+    if (strstr(message, "\"type\":\"wifi_check_saved\"")) {
+        bool has_creds = has_wifi_credentials();
+        char status_json[32];
+        snprintf(status_json, sizeof(status_json), "%s", has_creds ? "true" : "false");
+        ws_broadcast_json("wifi_saved_credentials", status_json);
+    }
+    else if (strstr(message, "\"type\":\"wifi_scan\"")) {
         scan_wifi_networks();
     } 
     else if (strstr(message, "\"type\":\"wifi_connect\"")) {

@@ -388,7 +388,7 @@ static void process_report(hid_host_device_handle_t hid_device_handle, const uin
 
     // Combined validation for better performance
     if (!data || !g_report_queue || length == 0 || length > 64 || interface_num >= USB_HOST_MAX_INTERFACES) {
-        ESP_LOGE(TAG, "Invalid parameters: data=%p, queue=%p, len=%zu, iface=%u", data, g_report_queue, length, interface_num);
+        ESP_LOGE(TAG, "Invalid parameters: data=%p, queue=%p, len=%d, iface=%u", data, g_report_queue, length, interface_num);
         return;
     }
 
@@ -506,7 +506,7 @@ static void process_device_event(hid_host_device_handle_t hid_device_handle, con
         size_t desc_len;
         const uint8_t *desc = hid_host_get_report_descriptor(hid_device_handle, &desc_len);
         if (desc != NULL) {
-            ESP_LOGI(TAG, "Got report descriptor, length = %zu", desc_len);
+            ESP_LOGI(TAG, "Got report descriptor, length = %d", desc_len);
             parse_report_descriptor(desc, desc_len, dev_params.iface_num);
         }
 

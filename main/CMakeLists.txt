@@ -12,10 +12,14 @@ idf_component_register(SRCS "main.c"
                            "web/ws_server.c"
                            "web/wifi_manager.c"
                            "utils/task_monitor.c"
-                           "web/front/index.html"
+                         EMBED_TXTFILES "web/front/index.html" 
+                           "web/front/settings.html"
+                           "web/front/lib/babel.min.js"
+                           "web/front/lib/react-dom.production.min.js"
+                           "web/front/lib/react.production.min.js"  
                       INCLUDE_DIRS "." "ble" "usb" "rgb" "utils" "web" "web/front"
                       REQUIRES neopixel esp_hid bt nvs_flash esp_http_server app_update
                       PRIV_REQUIRES usb
-                      EMBED_TXTFILES "web/front/index.html")
+)
 
 target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-error=unused-const-variable)

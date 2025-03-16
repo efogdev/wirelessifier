@@ -120,6 +120,10 @@
             <button id="connectBtn" disabled>Connect</button>
             <span id="connectSpinner" class="spinner hidden"></span>
         </div>
+        
+        <div class="form-group" style="margin-top: 20px; text-align: center;">
+            <button id="settingsBtn" style="background-color: #6c757d;">Go to Settings</button>
+        </div>
     </div>
 
     <script>
@@ -148,7 +152,7 @@
                 console.log('WebSocket connected');
                 reconnectAttempts = 0;
 
-                scanWifiNetworks();
+                checkSavedCredentials();
             };
             
             socket.onclose = function() {
@@ -180,6 +184,9 @@
                     case 'wifi_connect_status':
                         handleWifiConnectStatus(message.content);
                         break;
+                    case 'wifi_saved_credentials':
+                        handleSavedCredentials(message.content);
+                        break;
                     case 'log':
                         console.log('Server log:', message.content);
                         break;
@@ -188,6 +195,15 @@
                 }
             } catch (error) {
                 console.error('Error parsing WebSocket message:', error);
+            }
+        }
+        
+        // Handle saved credentials check
+        function handleSavedCredentials(hasCredentials) {
+            if (!hasCredentials) {
+                scanWifiNetworks();
+            } else {
+                updateStatus('Using saved WiFi credentials...', 'info');
             }
         }
         
@@ -249,6 +265,18 @@
             statusDiv.className = `status ${type}`;
         }
         
+        // Check for saved credentials
+        function checkSavedCredentials() {
+            if (!socket || socket.readyState !== WebSocket.OPEN) {
+                updateStatus('WebSocket not connected. Please refresh the page.', 'error');
+                return;
+            }
+            
+            socket.send(JSON.stringify({
+                type: 'wifi_check_saved'
+            }));
+        }
+        
         // Send WiFi scan request
         function scanWifiNetworks() {
             if (!socket || socket.readyState !== WebSocket.OPEN) {
@@ -296,6 +324,9 @@
         // Event listeners
         scanBtn.addEventListener('click', scanWifiNetworks);
         connectBtn.addEventListener('click', connectToWifi);
+        document.getElementById('settingsBtn').addEventListener('click', function() {
+            window.location.href = '/settings';
+        });
         
         // Initialize WebSocket connection when page loads
         window.addEventListener('load', connectWebSocket);
