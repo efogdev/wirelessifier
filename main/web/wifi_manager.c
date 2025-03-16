@@ -11,6 +11,7 @@
 #include "freertos/event_groups.h"
 #include "ws_server.h"
 #include "http_server.h"
+#include "dns_server.h"
 #include "../utils/temp_sensor.h"
 
 static const char *WIFI_TAG = "WIFI_MGR";
@@ -358,6 +359,27 @@ esp_err_t connect_to_wifi(const char* ssid, const char* password) {
     }
 }
 
+// Disable WiFi and web stack
+void disable_wifi_and_web_stack(void) {
+    ESP_LOGI(WIFI_TAG, "Disabling WiFi and web stack...");
+    
+    // Stop web server and related services (HTTP, WebSocket, OTA, DNS)
+    stop_webserver();
+    
+    // Stop WiFi
+    esp_wifi_stop();
+    
+    // Clear one-time boot flag to prevent auto-starting WiFi on next boot
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
+    if (err == ESP_OK) {
+        nvs_set_u8(nvs_handle, NVS_KEY_BOOT_WITH_WIFI, 0);
+        nvs_commit(nvs_handle);
+        nvs_close(nvs_handle);
+        ESP_LOGI(WIFI_TAG, "Cleared boot with WiFi flag");
+    }
+}
+
 // Process WebSocket messages for WiFi management
 void process_wifi_ws_message(const char* message) {
     // Simple JSON parsing - in a real application, use a proper JSON parser
@@ -369,7 +391,15 @@ void process_wifi_ws_message(const char* message) {
     }
     else if (strstr(message, "\"type\":\"wifi_scan\"")) {
         scan_wifi_networks();
-    } 
+    }
+    else if (strstr(message, "\"type\":\"disable_web_stack\"")) {
+        // Send acknowledgment before disabling
+        ws_broadcast_json("log", "\"Disabling WiFi and web stack...\"");
+        vTaskDelay(pdMS_TO_TICKS(500)); // Give time for the message to be sent
+        
+        // Disable WiFi and web stack
+        disable_wifi_and_web_stack();
+    }
     else if (strstr(message, "\"type\":\"wifi_connect\"")) {
         // Extract SSID and password
         char ssid[33] = {0};

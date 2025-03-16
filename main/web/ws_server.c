@@ -47,6 +47,33 @@ static httpd_ws_frame_t broadcast_frame = {
     .type = HTTPD_WS_TYPE_TEXT
 };
 
+// Track clients that have failed to receive messages
+static int failed_clients[CONFIG_LWIP_MAX_LISTENING_TCP];
+static int failed_clients_count = 0;
+
+// Helper function to check if a client is in the failed list
+static bool is_failed_client(int fd) {
+    for (int i = 0; i < failed_clients_count; i++) {
+        if (failed_clients[i] == fd) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Helper function to add a client to the failed list
+static void add_failed_client(int fd) {
+    // Check if already in the list
+    if (is_failed_client(fd)) {
+        return;
+    }
+    
+    // Add to the list if there's space
+    if (failed_clients_count < CONFIG_LWIP_MAX_LISTENING_TCP) {
+        failed_clients[failed_clients_count++] = fd;
+    }
+}
+
 esp_err_t ws_send_frame_to_all_clients(const char *data, const size_t len) {
     if (!server) {
         return ESP_FAIL;
@@ -64,11 +91,23 @@ esp_err_t ws_send_frame_to_all_clients(const char *data, const size_t len) {
     broadcast_frame.len = len;
 
     for (int i = 0; i < fds; i++) {
+        // Skip clients that have previously failed
+        if (is_failed_client(client_fds[i])) {
+            continue;
+        }
+        
         const int client_info = httpd_ws_get_fd_info(server, client_fds[i]);
         if (client_info == HTTPD_WS_CLIENT_WEBSOCKET) {
             esp_err_t err = httpd_ws_send_frame_async(server, client_fds[i], &broadcast_frame);
             if (err != ESP_OK) {
                 ESP_LOGW(WS_TAG, "Failed to send WS frame to client %d, error: %d", client_fds[i], err);
+                
+                // Close the connection for any send error to clean up resources
+                httpd_sess_trigger_close(server, client_fds[i]);
+                ESP_LOGI(WS_TAG, "Closed connection to client %d after send error", client_fds[i]);
+                
+                // Add to failed clients list to avoid future send attempts
+                add_failed_client(client_fds[i]);
             }
         }
     }
@@ -91,9 +130,34 @@ void ws_broadcast_json(const char *type, const char *content) {
 extern void process_wifi_ws_message(const char* message);
 static void process_settings_ws_message(const char* message);
 
+// Helper function to remove a client from the failed list
+static void remove_failed_client(int fd) {
+    for (int i = 0; i < failed_clients_count; i++) {
+        if (failed_clients[i] == fd) {
+            // Move the last element to this position (if not already the last)
+            if (i < failed_clients_count - 1) {
+                failed_clients[i] = failed_clients[failed_clients_count - 1];
+            }
+            failed_clients_count--;
+            break;
+        }
+    }
+}
+
 static esp_err_t ws_handler(httpd_req_t *req) {
     if (req->method == HTTP_GET) {
         ESP_LOGI(WS_TAG, "Handshake done, the new connection was opened");
+        
+        // Register the socket with the server
+        int sockfd = httpd_req_to_sockfd(req);
+        if (sockfd != -1) {
+            ESP_LOGI(WS_TAG, "New WebSocket client connected: %d", sockfd);
+            
+            // Remove this socket from failed clients list if it was there
+            // (in case the same file descriptor is reused for a new connection)
+            remove_failed_client(sockfd);
+        }
+        
         return ESP_OK;
     }
 
@@ -105,6 +169,18 @@ static esp_err_t ws_handler(httpd_req_t *req) {
     esp_err_t ret = httpd_ws_recv_frame(req, &ws_pkt, 0);
     if (ret != ESP_OK) {
         ESP_LOGE(WS_TAG, "httpd_ws_recv_frame failed with %d", ret);
+        if (ret == ESP_ERR_INVALID_STATE || ret == HTTPD_SOCK_ERR_FAIL) {
+            // Client likely disconnected
+            int sockfd = httpd_req_to_sockfd(req);
+            ESP_LOGI(WS_TAG, "Client %d appears to be disconnected, closing session", sockfd);
+            
+            // Add to failed clients list to avoid future send attempts
+            if (sockfd != -1) {
+                add_failed_client(sockfd);
+            }
+            
+            return ESP_FAIL; // This will trigger connection closure
+        }
         return ret;
     }
 
@@ -113,6 +189,18 @@ static esp_err_t ws_handler(httpd_req_t *req) {
         ret = httpd_ws_recv_frame(req, &ws_pkt, ws_pkt.len);
         if (ret != ESP_OK) {
             ESP_LOGE(WS_TAG, "httpd_ws_recv_frame failed with %d", ret);
+            if (ret == ESP_ERR_INVALID_STATE || ret == HTTPD_SOCK_ERR_FAIL) {
+                // Client likely disconnected
+                int sockfd = httpd_req_to_sockfd(req);
+                ESP_LOGI(WS_TAG, "Client %d appears to be disconnected during frame receive, closing session", sockfd);
+                
+                // Add to failed clients list to avoid future send attempts
+                if (sockfd != -1) {
+                    add_failed_client(sockfd);
+                }
+                
+                return ESP_FAIL; // This will trigger connection closure
+            }
             return ret;
         }
         frame_buffer[ws_pkt.len] = '\0';  // Null terminate
@@ -126,6 +214,13 @@ static esp_err_t ws_handler(httpd_req_t *req) {
         esp_err_t send_ret = httpd_ws_send_frame(req, &ws_pkt);
         if (send_ret != ESP_OK) {
             ESP_LOGW(WS_TAG, "Failed to echo WS frame, error: %d. Closing connection.", send_ret);
+            
+            // Add to failed clients list to avoid future send attempts
+            int sockfd = httpd_req_to_sockfd(req);
+            if (sockfd != -1) {
+                add_failed_client(sockfd);
+            }
+            
             return ESP_FAIL; // This will trigger connection closure
         }
         ret = send_ret;
@@ -150,6 +245,9 @@ void init_websocket(httpd_handle_t server_handle) {
     ESP_LOGI(WS_TAG, "Registering WebSocket handler");
     httpd_register_uri_handler(server, &ws);
     
+    // Initialize client tracking
+    failed_clients_count = 0;
+    
     // Initialize device settings
     ESP_LOGI(WS_TAG, "Initializing device settings");
     init_device_settings();
@@ -165,7 +263,10 @@ void ws_queue_message(const char *data) {
     }
     
     // Send directly instead of queuing
-    ws_send_frame_to_all_clients(data, len);
+    esp_err_t err = ws_send_frame_to_all_clients(data, len);
+    if (err != ESP_OK) {
+        ESP_LOGW(WS_TAG, "Failed to send message to clients: %s", esp_err_to_name(err));
+    }
 }
 
 void ws_log(const char* text) {

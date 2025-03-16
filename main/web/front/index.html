@@ -121,6 +121,8 @@
             <button id="settingsBtn" style="background-color: #6c757d;">Settings</button>
             <button id="scanBtn">Scan WiFi</button>
             <span id="scanSpinner" class="spinner hidden"></span>
+            <br />
+            <button id="disableWebStackBtn" style="background-color: #d5706e;">Disable WiFi</button>
         </div>
         
         <div class="form-group">
@@ -395,6 +397,22 @@
         connectBtn.addEventListener('click', connectToWifi);
         document.getElementById('settingsBtn').addEventListener('click', function() {
             window.location.href = '/settings';
+        });
+        document.getElementById('disableWebStackBtn').addEventListener('click', function() {
+            if (confirm('Are you sure you want to disable WiFi and web stack?')) {
+                if (!socket || socket.readyState !== WebSocket.OPEN) {
+                    updateStatus('Device not connected. Please refresh the page.', 'error');
+                    return;
+                }
+                
+                updateStatus('Disabling WiFi and web stack...', 'info');
+                
+                socket.send(JSON.stringify({
+                    type: 'disable_web_stack'
+                }));
+
+                setTimeout(() => window.close(), 1000);
+            }
         });
         
         // Check WebSocket activity
