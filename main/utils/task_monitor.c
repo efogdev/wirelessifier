@@ -120,15 +120,6 @@ static void monitor_task(void *pvParameter)
         } else {
             ESP_LOGE(TAG, "Failed to read temperature");
         }
-        
-        // Get and print CPU frequency
-        uint32_t cpu_freq;
-        esp_err_t freq_ret = esp_clk_tree_src_get_freq_hz(SOC_MOD_CLK_CPU, ESP_CLK_TREE_SRC_FREQ_PRECISION_EXACT, &cpu_freq);
-        if (freq_ret == ESP_OK) {
-            ESP_LOGI(TAG, "CPU frequency: %"PRIu32" MHz", cpu_freq / 1000000); // Convert to MHz
-        } else {
-            ESP_LOGE(TAG, "Failed to get CPU frequency");
-        }
 
         ESP_LOGI(TAG, "");
         if (print_real_time_stats(STATS_TICKS) != ESP_OK) {
@@ -138,15 +129,14 @@ static void monitor_task(void *pvParameter)
         // Print USB HID reports per second
         uint32_t reports = g_usb_report_counter - g_usb_last_report_counter;
         g_usb_last_report_counter = g_usb_report_counter;
-        if (reports > 0) {
-            ESP_LOGI(TAG, "USB HID: %lu rps", reports);
+
+        uint32_t delay_ms = 10000; 
+        if (hid_bridge_is_ble_paused()) {
+            delay_ms = 120000;
+        } else if (reports > 0) {
+            ESP_LOGI(TAG, "USB HID: %lu rps", reports / 10);
         }
 
-        // Report 5 times less frequently if BLE is paused
-        uint32_t delay_ms = 5000; // Default: print stats every 5 seconds
-        if (hid_bridge_is_ble_paused()) {
-            delay_ms = 25000; // 5 times less frequent (25 seconds)
-        }
         vTaskDelay(pdMS_TO_TICKS(delay_ms));
     }
 }

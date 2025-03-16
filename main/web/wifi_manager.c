@@ -8,15 +8,22 @@
 #include <nvs.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/event_groups.h"
 #include "ws_server.h"
 #include "http_server.h"
 
 static const char *WIFI_TAG = "WIFI_MGR";
 
+// WebSocket ping task parameters
+#define WS_PING_TASK_STACK_SIZE 2048
+#define WS_PING_TASK_PRIORITY 5
+#define WS_PING_INTERVAL_MS 125
+
 // NVS keys
 #define NVS_NAMESPACE "wifi_config"
 #define NVS_KEY_SSID "ssid"
 #define NVS_KEY_PASS "password"
+#define NVS_KEY_BOOT_WITH_WIFI "boot_wifi"
 
 int s_retry_num = 0;
 static bool connecting = false;
@@ -62,7 +69,6 @@ esp_err_t connect_wifi_with_stored_credentials(void) {
     strlcpy((char*)wifi_config.sta.password, password, sizeof(wifi_config.sta.password));
     
     ESP_LOGI(WIFI_TAG, "Connecting to %s...", ssid);
-    
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     
     // Use esp_err_t to handle the return value instead of ESP_ERROR_CHECK
@@ -299,6 +305,17 @@ esp_err_t connect_to_wifi(const char* ssid, const char* password) {
                 "{\"connected\":true,\"ip\":\"%s\",\"attempt\":%d}", 
                 connected_ip, s_retry_num);
         ws_broadcast_json("wifi_connect_status", status_json);
+        
+        // Set one-time boot flag to start with WiFi regardless of SW4 state
+        nvs_handle_t nvs_handle;
+        esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
+        if (err == ESP_OK) {
+            nvs_set_u8(nvs_handle, NVS_KEY_BOOT_WITH_WIFI, 1);
+            nvs_commit(nvs_handle);
+            nvs_close(nvs_handle);
+            ESP_LOGI(WIFI_TAG, "Set boot with WiFi flag");
+        }
+        
         vTaskDelay(pdMS_TO_TICKS(100));
         esp_restart();
 
@@ -382,4 +399,45 @@ void update_wifi_connection_status(bool connected, const char* ip) {
 // Check if device is connected to WiFi
 bool is_wifi_connected(void) {
     return is_connected;
+}
+
+// WebSocket ping task function
+static void ws_ping_task(void *pvParameters) {
+    ESP_LOGI(WIFI_TAG, "WebSocket ping task started");
+    
+    while (1) {
+        // Send a ping message to all connected clients
+        ws_broadcast_json("ping", "{}");
+        
+        // Wait for the next ping interval
+        vTaskDelay(pdMS_TO_TICKS(WS_PING_INTERVAL_MS));
+    }
+    
+    // This should never be reached
+    vTaskDelete(NULL);
+}
+
+// Start the WebSocket ping task
+void start_ws_ping_task(void) {
+    static TaskHandle_t ping_task_handle = NULL;
+    
+    // Only create the task if it doesn't already exist
+    if (ping_task_handle == NULL) {
+        BaseType_t result = xTaskCreate(
+            ws_ping_task,
+            "ws_ping_task",
+            WS_PING_TASK_STACK_SIZE,
+            NULL,
+            WS_PING_TASK_PRIORITY,
+            &ping_task_handle
+        );
+        
+        if (result != pdPASS) {
+            ESP_LOGE(WIFI_TAG, "Failed to create WebSocket ping task");
+        } else {
+            ESP_LOGI(WIFI_TAG, "WebSocket ping task created");
+        }
+    } else {
+        ESP_LOGW(WIFI_TAG, "WebSocket ping task already running");
+    }
 }

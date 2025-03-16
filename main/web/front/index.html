@@ -46,6 +46,7 @@
             border-radius: 4px;
             cursor: pointer;
             font-size: 16px;
+            margin-right: 6px;
         }
         button:hover {
             background-color: #45a049;
@@ -72,6 +73,10 @@
             background-color: #d9edf7;
             color: #31708f;
         }
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
         .spinner {
             border: 4px solid rgba(0, 0, 0, 0.1);
             width: 20px;
@@ -83,6 +88,14 @@
             vertical-align: middle;
             margin-right: 10px;
             margin-left: 8px;
+        }
+        .loading .spinner {
+            width: 36px;
+            height: 36px;
+            margin-bottom: 10px;
+            margin-right: 0;
+            margin-left: 0;
+            vertical-align: initial;
         }
         @keyframes spin {
             0% { transform: rotate(0deg); }
@@ -96,11 +109,17 @@
 <body>
     <h1>AnyBLE WiFi Setup</h1>
     
-    <div class="container">
+    <div id="loadingContainer" class="loading hidden">
+        <div class="spinner"></div>
+        <p>Connecting to device...</p>
+    </div>
+    
+    <div id="mainContainer" class="container">
         <div id="status" class="status info"></div>
         
         <div class="form-group">
-            <button id="scanBtn">Scan for Networks</button>
+            <button id="settingsBtn" style="background-color: #6c757d;">Settings</button>
+            <button id="scanBtn">Scan WiFi</button>
             <span id="scanSpinner" class="spinner hidden"></span>
         </div>
         
@@ -120,14 +139,12 @@
             <button id="connectBtn" disabled>Connect</button>
             <span id="connectSpinner" class="spinner hidden"></span>
         </div>
-        
-        <div class="form-group" style="margin-top: 20px; text-align: center;">
-            <button id="settingsBtn" style="background-color: #6c757d;">Go to Settings</button>
-        </div>
     </div>
 
     <script>
         // DOM elements
+        const loadingContainer = document.getElementById('loadingContainer');
+        const mainContainer = document.getElementById('mainContainer');
         const scanBtn = document.getElementById('scanBtn');
         const scanSpinner = document.getElementById('scanSpinner');
         const networkSelect = document.getElementById('networkSelect');
@@ -139,10 +156,16 @@
         // WebSocket connection
         let socket = null;
         let reconnectAttempts = 0;
-        const maxReconnectAttempts = 5;
+        const maxReconnectAttempts = 125;
+        let lastMessageTime = 0;
+        let wsCheckInterval = null;
         
         // Connect to WebSocket
         function connectWebSocket() {
+            // Show loading screen
+            loadingContainer.classList.remove('hidden');
+            mainContainer.classList.add('hidden');
+            
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsUrl = `${protocol}//${window.location.host}/ws`;
             
@@ -151,23 +174,56 @@
             socket.onopen = function() {
                 console.log('WebSocket connected');
                 reconnectAttempts = 0;
+                
+                // Hide loading screen
+                loadingContainer.classList.add('hidden');
+                mainContainer.classList.remove('hidden');
+
+                // Initialize last message time
+                lastMessageTime = Date.now();
+                
+                // Start checking for WebSocket inactivity
+                if (wsCheckInterval) {
+                    clearInterval(wsCheckInterval);
+                }
+                wsCheckInterval = setInterval(checkWebSocketActivity, 1000);
 
                 checkSavedCredentials();
             };
             
             socket.onclose = function() {
                 console.log('WebSocket disconnected');
+                if (wsCheckInterval) {
+                    clearInterval(wsCheckInterval);
+                    wsCheckInterval = null;
+                }
+                
                 if (reconnectAttempts < maxReconnectAttempts) {
                     reconnectAttempts++;
+                    // Show loading screen during reconnection
+                    loadingContainer.classList.remove('hidden');
+                    mainContainer.classList.add('hidden');
+                    // Update loading text to show reconnection status
+                    const loadingText = loadingContainer.querySelector('p');
+                    if (loadingText) {
+                        loadingText.textContent = `Waiting for connection...`;
+                    }
                     setTimeout(connectWebSocket, 1000);
                 }
             };
             
             socket.onerror = function(error) {
                 console.error('WebSocket error:', error);
+                // Keep loading screen visible but update text
+                const loadingText = loadingContainer.querySelector('p');
+                if (loadingText) {
+                    loadingText.textContent = 'Waiting for connection...';
+                }
             };
             
             socket.onmessage = function(event) {
+                // Update last message time
+                lastMessageTime = Date.now();
                 handleWebSocketMessage(event.data);
             };
         }
@@ -190,6 +246,8 @@
                     case 'log':
                         console.log('Server log:', message.content);
                         break;
+                    case 'ping':
+                        break;
                     default:
                         console.log('Unknown message type:', message.type);
                 }
@@ -203,7 +261,7 @@
             if (!hasCredentials) {
                 scanWifiNetworks();
             } else {
-                updateStatus('Using saved WiFi credentials...', 'info');
+                updateStatus('WiFi credentials present!', 'success');
             }
         }
         
@@ -221,7 +279,18 @@
                 networks.forEach(network => {
                     const option = document.createElement('option');
                     option.value = network.ssid;
-                    option.textContent = `${network.ssid} (${network.rssi} dBm)`;
+                    // Add signal quality description based on RSSI value
+                    let signalQuality = "";
+                    if (network.rssi >= -50) {
+                        signalQuality = "excellent";
+                    } else if (network.rssi >= -60) {
+                        signalQuality = "good";
+                    } else if (network.rssi >= -70) {
+                        signalQuality = "fair";
+                    } else {
+                        signalQuality = "bad";
+                    }
+                    option.textContent = `${network.ssid} (${network.rssi} dBm: ${signalQuality})`;
                     networkSelect.appendChild(option);
                 });
                 
@@ -268,7 +337,7 @@
         // Check for saved credentials
         function checkSavedCredentials() {
             if (!socket || socket.readyState !== WebSocket.OPEN) {
-                updateStatus('WebSocket not connected. Please refresh the page.', 'error');
+                updateStatus('Device not connected. Please refresh the page.', 'error');
                 return;
             }
             
@@ -280,7 +349,7 @@
         // Send WiFi scan request
         function scanWifiNetworks() {
             if (!socket || socket.readyState !== WebSocket.OPEN) {
-                updateStatus('WebSocket not connected. Please refresh the page.', 'error');
+                updateStatus('Device not connected. Please refresh the page.', 'error');
                 return;
             }
             
@@ -304,7 +373,7 @@
             }
             
             if (!socket || socket.readyState !== WebSocket.OPEN) {
-                updateStatus('WebSocket not connected. Please refresh the page.', 'error');
+                updateStatus('Device not connected. Please refresh the page.', 'error');
                 return;
             }
             
@@ -327,6 +396,24 @@
         document.getElementById('settingsBtn').addEventListener('click', function() {
             window.location.href = '/settings';
         });
+        
+        // Check WebSocket activity
+        function checkWebSocketActivity() {
+            const now = Date.now();
+            if (now - lastMessageTime > 1000) {
+                console.log('WebSocket inactive for more than 1 second, reconnecting...');
+                // Show loading screen with reconnecting message
+                loadingContainer.classList.remove('hidden');
+                mainContainer.classList.add('hidden');
+                const loadingText = loadingContainer.querySelector('p');
+                if (loadingText) {
+                    loadingText.textContent = 'Waiting for connection...';
+                }
+                if (socket) {
+                    socket.close();
+                }
+            }
+        }
         
         // Initialize WebSocket connection when page loads
         window.addEventListener('load', connectWebSocket);

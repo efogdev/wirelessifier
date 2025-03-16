@@ -223,6 +223,9 @@ httpd_handle_t start_webserver(void)
         // Initialize websocket server
         init_websocket(server);
         
+        // Start WebSocket ping task
+        start_ws_ping_task();
+        
         // Initialize OTA server
         init_ota_server(server);
         
@@ -274,8 +277,23 @@ static void web_services_task(void *pvParameters)
         // Try to connect with stored credentials
         ESP_LOGI(HTTP_TAG, "Found stored WiFi credentials, attempting to connect");
     
-        xEventGroupWaitBits(wifi_event_group,
-            WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdFALSE, pdTRUE, 5000 / portTICK_PERIOD_MS);
+        EventBits_t bits = xEventGroupWaitBits(wifi_event_group,
+            WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdFALSE, pdTRUE, 10000 / portTICK_PERIOD_MS);
+
+        if (bits & WIFI_FAIL_BIT) {
+            // Set one-time boot flag to start with WiFi and reboot
+            nvs_handle_t nvs_handle;
+            esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
+            if (err == ESP_OK) {
+                nvs_set_u8(nvs_handle, NVS_KEY_BOOT_WITH_WIFI, 1);
+                nvs_commit(nvs_handle);
+                nvs_close(nvs_handle);
+                ESP_LOGI(HTTP_TAG, "Set boot with WiFi flag");
+                vTaskDelay(pdMS_TO_TICKS(100));
+                esp_restart();
+            }
+        }
+
     }
     
     // Start the web server

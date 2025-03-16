@@ -8,6 +8,7 @@
 #include "esp_pm.h"
 #include "esp_err.h"
 #include "nvs_flash.h"
+#include "nvs.h"
 #include "driver/gpio.h"
 #include "driver/ledc.h"
 #include "usb/usb_hid_host.h"
@@ -30,6 +31,7 @@ static void init_variables(void);
 static void init_pm(void);
 static void init_gpio(void);
 static void run_hid_bridge(void);
+static void init_web_stack(void);
 
 void app_main(void) {
     ESP_LOGI(TAG, "Starting USB HID to BLE HID bridge");
@@ -52,11 +54,7 @@ void app_main(void) {
     ESP_ERROR_CHECK(task_monitor_start());
 
     run_hid_bridge();
-    if (gpio_get_level(GPIO_BUTTON_SW4) == 0) {
-        vTaskDelay(pdMS_TO_TICKS(60));
-        ESP_LOGI(TAG, "Initializing web services because SW4 held on boot");
-        init_web_services();
-    }
+    init_web_stack();
 
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(50));
@@ -91,6 +89,36 @@ static void run_hid_bridge() {
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to start HID bridge: %s", esp_err_to_name(ret));
         return;
+    }
+}
+
+static void init_web_stack(void) {
+    bool start_web_services = false;
+    
+    // Check if SW4 button is pressed
+    if (gpio_get_level(GPIO_BUTTON_SW4) == 0) {
+        vTaskDelay(pdMS_TO_TICKS(60));
+        ESP_LOGI(TAG, "Initializing web services because SW4 held on boot");
+        start_web_services = true;
+    } else {
+        // Check for one-time boot flag
+        nvs_handle_t nvs_handle;
+        uint8_t boot_with_wifi = 0;
+        if (nvs_open("wifi_config", NVS_READWRITE, &nvs_handle) == ESP_OK) {
+            if (nvs_get_u8(nvs_handle, "boot_wifi", &boot_with_wifi) == ESP_OK && boot_with_wifi == 1) {
+                ESP_LOGI(TAG, "Initializing web services because of one-time boot flag");
+                start_web_services = true;
+                
+                // Clear the flag since it's one-time
+                nvs_set_u8(nvs_handle, "boot_wifi", 0);
+                nvs_commit(nvs_handle);
+            }
+            nvs_close(nvs_handle);
+        }
+    }
+    
+    if (start_web_services) {
+        init_web_services();
     }
 }
 

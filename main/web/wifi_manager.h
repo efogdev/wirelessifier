@@ -6,6 +6,12 @@
 // Maximum number of connection retry attempts
 #define MAX_RETRY 3
 
+// NVS keys
+#define NVS_NAMESPACE "wifi_config"
+#define NVS_KEY_SSID "ssid"
+#define NVS_KEY_PASS "password"
+#define NVS_KEY_BOOT_WITH_WIFI "boot_wifi"
+
 /**
  * @brief Connect to WiFi using credentials stored in NVS
  * 
@@ -75,3 +81,11 @@ void update_wifi_connection_status(bool connected, const char* ip);
  * @return false if not connected
  */
 bool is_wifi_connected(void);
+
+/**
+ * @brief Start the WebSocket ping task
+ * 
+ * This task sends periodic ping messages to all connected WebSocket clients
+ * to keep the connection alive and prevent timeouts.
+ */
+void start_ws_ping_task(void);
