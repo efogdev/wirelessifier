@@ -6,6 +6,11 @@
           content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>AnyBLE WiFi Setup</title>
+    <link rel="manifest" href="/lib/manifest.json">
+    <meta name="theme-color" content="#4CAF50">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="AnyBLE">
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -37,6 +42,9 @@
             border: 1px solid #ddd;
             border-radius: 4px;
             box-sizing: border-box;
+        }
+        input[type="checkbox"] { 
+            width: auto;
         }
         button {
             background-color: #4CAF50;
@@ -104,6 +112,10 @@
         .hidden {
             display: none;
         }
+        .fg-spacer {
+            height: 12px;
+            min-height: 12px;
+        }
     </style>
 </head>
 <body>
@@ -119,17 +131,21 @@
         
         <div class="form-group">
             <button id="settingsBtn" style="background-color: #6c757d;">Settings</button>
-            <button id="scanBtn">Scan WiFi</button>
-            <span id="scanSpinner" class="spinner hidden"></span>
-            <br />
             <button id="disableWebStackBtn" style="background-color: #d5706e;">Disable WiFi</button>
+            <div class="fg-spacer"></div>
         </div>
         
         <div class="form-group">
-            <label for="networkSelect">Available Networks:</label>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                <label for="networkSelect">Available:</label>
+                <label style="font-weight: normal;">
+                    <input type="checkbox" id="manualSsidCheckbox"> Enter SSID
+                </label>
+            </div>
             <select id="networkSelect" disabled>
                 <option value="">-- Select a network --</option>
             </select>
+            <input type="text" id="manualSsidInput" placeholder="Enter SSID manually" class="hidden">
         </div>
         
         <div class="form-group">
@@ -138,21 +154,36 @@
         </div>
         
         <div class="form-group">
+            <button id="scanBtn">Scan</button>
             <button id="connectBtn" disabled>Connect</button>
-            <span id="connectSpinner" class="spinner hidden"></span>
+            <span id="actionSpinner" class="spinner hidden"></span>
         </div>
     </div>
 
     <script>
+        // Register Service Worker for offline support
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/lib/sw.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                    })
+                    .catch(error => {
+                        console.error('ServiceWorker registration failed: ', error);
+                    });
+            });
+        }
+
         // DOM elements
         const loadingContainer = document.getElementById('loadingContainer');
         const mainContainer = document.getElementById('mainContainer');
         const scanBtn = document.getElementById('scanBtn');
-        const scanSpinner = document.getElementById('scanSpinner');
         const networkSelect = document.getElementById('networkSelect');
+        const manualSsidCheckbox = document.getElementById('manualSsidCheckbox');
+        const manualSsidInput = document.getElementById('manualSsidInput');
         const passwordInput = document.getElementById('passwordInput');
         const connectBtn = document.getElementById('connectBtn');
-        const connectSpinner = document.getElementById('connectSpinner');
+        const actionSpinner = document.getElementById('actionSpinner');
         const statusDiv = document.getElementById('status');
         
         // WebSocket connection
@@ -175,11 +206,18 @@
             
             socket.onopen = function() {
                 console.log('WebSocket connected');
-                reconnectAttempts = 0;
                 
                 // Hide loading screen
                 loadingContainer.classList.add('hidden');
                 mainContainer.classList.remove('hidden');
+
+                // If this was a reconnection, hide spinner and enable scan button
+                if (reconnectAttempts > 0) {
+                    actionSpinner.classList.add('hidden');
+                    scanBtn.disabled = false;
+                }
+                
+                reconnectAttempts = 0;
 
                 // Initialize last message time
                 lastMessageTime = Date.now();
@@ -250,6 +288,9 @@
                         break;
                     case 'ping':
                         break;
+                    case 'web_stack_disabled':
+                        updateStatus('WiFi disabled. You can close this tab.', 'success');
+                        break;
                     default:
                         console.log('Unknown message type:', message.type);
                 }
@@ -269,7 +310,7 @@
         
         // Handle WiFi scan results
         function handleWifiScanResult(networks) {
-            scanSpinner.classList.add('hidden');
+            actionSpinner.classList.add('hidden');
             scanBtn.disabled = false;
             
             // Clear existing options except the first one
@@ -296,9 +337,11 @@
                     networkSelect.appendChild(option);
                 });
                 
-                networkSelect.disabled = false;
-                passwordInput.disabled = false;
-                connectBtn.disabled = false;
+                if (!manualSsidCheckbox.checked) {
+                    networkSelect.disabled = false;
+                    passwordInput.disabled = false;
+                    connectBtn.disabled = false;
+                }
                 
                 updateStatus('', 'info');
             } else {
@@ -308,7 +351,7 @@
         
         // Handle WiFi connection status
         function handleWifiConnectStatus(status) {
-            connectSpinner.classList.add('hidden');
+            actionSpinner.classList.add('hidden');
             
             if (status.connected) {
                 updateStatus('Successfully connected! Device will restart and connect to the WiFi network.', 'success');
@@ -356,7 +399,7 @@
             }
             
             scanBtn.disabled = true;
-            scanSpinner.classList.remove('hidden');
+            actionSpinner.classList.remove('hidden');
             updateStatus('', 'info');
             
             socket.send(JSON.stringify({
@@ -366,13 +409,21 @@
         
         // Send WiFi connect request
         function connectToWifi() {
-            const ssid = networkSelect.value;
-            const password = passwordInput.value;
-            
-            if (!ssid) {
-                updateStatus('Please select a network.', 'error');
-                return;
+            let ssid;
+            if (manualSsidCheckbox.checked) {
+                ssid = manualSsidInput.value.trim();
+                if (!ssid) {
+                    updateStatus('Please enter an SSID.', 'error');
+                    return;
+                }
+            } else {
+                ssid = networkSelect.value;
+                if (!ssid) {
+                    updateStatus('Please select a network.', 'error');
+                    return;
+                }
             }
+            const password = passwordInput.value;
             
             if (!socket || socket.readyState !== WebSocket.OPEN) {
                 updateStatus('Device not connected. Please refresh the page.', 'error');
@@ -380,7 +431,7 @@
             }
             
             connectBtn.disabled = true;
-            connectSpinner.classList.remove('hidden');
+            actionSpinner.classList.remove('hidden');
             updateStatus('Connecting to network...', 'info');
             
             socket.send(JSON.stringify({
@@ -395,6 +446,21 @@
         // Event listeners
         scanBtn.addEventListener('click', scanWifiNetworks);
         connectBtn.addEventListener('click', connectToWifi);
+        manualSsidCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                networkSelect.classList.add('hidden');
+                manualSsidInput.classList.remove('hidden');
+                passwordInput.disabled = false;
+                connectBtn.disabled = false;
+            } else {
+                networkSelect.classList.remove('hidden');
+                manualSsidInput.classList.add('hidden');
+                // Restore original state based on network selection
+                const hasSelectedNetwork = networkSelect.value !== "";
+                passwordInput.disabled = !hasSelectedNetwork;
+                connectBtn.disabled = !hasSelectedNetwork;
+            }
+        });
         document.getElementById('settingsBtn').addEventListener('click', function() {
             window.location.href = '/settings';
         });
@@ -410,15 +476,13 @@
                 socket.send(JSON.stringify({
                     type: 'disable_web_stack'
                 }));
-
-                setTimeout(() => window.close(), 1000);
             }
         });
         
         // Check WebSocket activity
         function checkWebSocketActivity() {
             const now = Date.now();
-            if (now - lastMessageTime > 2500) {
+            if (now - lastMessageTime > 3500) {
                 // Show loading screen with reconnecting message
                 loadingContainer.classList.remove('hidden');
                 mainContainer.classList.add('hidden');

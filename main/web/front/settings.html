@@ -565,7 +565,10 @@
                 </div>
                 
                 <button onClick={saveSettings} disabled={!connected}>
-                  Save Settings
+                  Save
+                </button>
+                <button onClick={() => window.location.href = '/'} style={{marginLeft: '10px'}}>
+                  Return
                 </button>
               </div>
             </div>

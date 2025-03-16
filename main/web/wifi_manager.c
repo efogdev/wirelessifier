@@ -362,7 +362,13 @@ esp_err_t connect_to_wifi(const char* ssid, const char* password) {
 // Disable WiFi and web stack
 void disable_wifi_and_web_stack(void) {
     ESP_LOGI(WIFI_TAG, "Disabling WiFi and web stack...");
-    
+ 
+    is_connected = false;
+
+    // Send confirmation message before stopping services
+    ws_broadcast_json("web_stack_disabled", "{}");
+    vTaskDelay(pdMS_TO_TICKS(100)); // Give time for the message to be sent
+
     // Stop web server and related services (HTTP, WebSocket, OTA, DNS)
     stop_webserver();
     
