@@ -1,44 +1,63 @@
-# Adept Wireless Extension: USB to BLE HID Bridge
+# ESP32-S3 HID Bridge
 
-## ⚠️ DISCLAIMER ⚠️
-**This project is currently in development and does not work yet.** 
+**⚠️ IMPORTANT: This project is currently in development. Functionality is very limited and not complete. ⚠️**
 
 ## Overview
-Adept Wireless Extension creates a bridge between USB HID devices (keyboards, mice) and Bluetooth Low Energy (BLE) HID devices. This allows you to connect USB input devices wirelessly to BLE-capable systems like computers, tablets, and smartphones.
 
-## Features (Planned)
-- USB HID Host support for keyboards and mice
-- BLE HID Device emulation
-- Seamless bridging of HID reports between USB and BLE
-- LED status indicators using WS2812B RGB LEDs
+This project implements a Human Interface Device (HID) bridge using the ESP32-S3 microcontroller. It allows connecting USB HID devices (like keyboards and mice) and forwarding their inputs to other devices via Bluetooth Low Energy (BLE).
 
-## Build and Upload
+## Features
 
-### Prerequisites
-- [PlatformIO](https://platformio.org/) installed
-- The Extension PCB
+- USB HID Host: Connects to USB keyboards and mice
+- BLE HID Device: Emulates Bluetooth keyboard and mouse
+- Power Management: Implements light sleep mode for battery efficiency
+- RGB LED Indicators: Shows connection status
+- Web Configuration Interface: Configure device settings via WiFi
+- OTA Updates: Update firmware over-the-air
 
-### Building the Project
+## Requirements
+
+- ESP-IDF v5.5 (Espressif IoT Development Framework)
+- Compatible USB HID devices (keyboards, mice)
+- The custom PCB
+
+## Building and Flashing
+
+This project uses the ESP-IDF build system. Make sure you have ESP-IDF installed and properly set up.
+
 ```bash
 # Clone the repository
-git clone https://github.com/efogdev/adept-wireless-ext.git
-cd adept-wireless-ext
+git clone https://github.com/yourusername/esp32s3-hid-bridge.git
+cd esp32s3-hid-bridge
 
 # Build the project
-pio run
+idf.py build
+
+# Flash to your ESP32-S3
+idf.py -p (PORT) flash
 ```
 
-### Combined Build, Upload, and Monitor
-```bash
-# Build, upload, and start monitoring in one command
-pio run -t upload -t monitor
-```
+## Usage
 
-## Development Environment
-This project uses PlatformIO with ESP-IDF framework. The configuration in `platformio.ini` enables:
-- USB HID host functionality
-- BLE in BLE-only mode (no classic Bluetooth)
-- GATT Server for HID device emulation
+1. Connect a USB HID device (keyboard or mouse) to the ESP32-S3 USB port
+2. The device will automatically start advertising as a BLE HID device
+3. Pair with the BLE device from your computer or mobile device
+4. Input from the USB device will be forwarded to the connected BLE host
+
+### Web Configuration
+
+To access the web configuration interface:
+1. Hold the SW1 button during boot
+2. Connect to the ESP32-S3 WiFi access point
+3. Navigate to the configuration page in your web browser
+
+## Power Management
+
+The device implements power-saving features:
+- Automatically enters light sleep mode after 30 seconds of inactivity
+- Wakes up on USB HID input
+- BLE stack is paused during inactivity to save power
 
 ## License
-TBD
+
+[License information to be added]
