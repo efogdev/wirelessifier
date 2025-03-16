@@ -23,13 +23,10 @@ This project implements a Human Interface Device (HID) bridge using the ESP32-S3
 
 ## Building and Flashing
 
-This project uses the ESP-IDF build system. Make sure you have ESP-IDF installed and properly set up.
+This project uses the ESP-IDF build system. \
+Make sure you have ESP-IDF installed and properly set up.
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/esp32s3-hid-bridge.git
-cd esp32s3-hid-bridge
-
 # Build the project
 idf.py build
 
