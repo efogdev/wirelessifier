@@ -225,7 +225,7 @@ esp_err_t hid_bridge_start(void)
         return ESP_OK;
     }
 
-    BaseType_t task_created = xTaskCreatePinnedToCore(hid_bridge_task, "hid_bridge", 2600, NULL, 5, &s_hid_bridge_task_handle, 1);
+    BaseType_t task_created = xTaskCreatePinnedToCore(hid_bridge_task, "hid_bridge", 2600, NULL, 14, &s_hid_bridge_task_handle, 1);
     if (task_created != pdTRUE) {
         ESP_LOGE(TAG, "Failed to create HID bridge task");
         return ESP_ERR_NO_MEM;

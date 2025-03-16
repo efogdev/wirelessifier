@@ -28,6 +28,7 @@ esp_err_t temp_sensor_get_temperature(float *temperature)
 {
     if (temp_sensor == NULL) {
         ESP_LOGE(TAG, "Temperature sensor not initialized");
+        temp_sensor_init();
         return ESP_ERR_INVALID_STATE;
     }
 

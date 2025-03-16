@@ -315,5 +315,5 @@ void init_web_services(void)
 {
     ESP_LOGI(HTTP_TAG, "Starting web services task");
     wifi_event_group = xEventGroupCreate();
-    xTaskCreatePinnedToCore(web_services_task, "web_services", 5200, NULL, 5, NULL, 1);
+    xTaskCreatePinnedToCore(web_services_task, "web_services", 5200, NULL, 8, NULL, 1);
 }

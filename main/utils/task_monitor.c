@@ -14,7 +14,6 @@ static const char *TAG = "TaskMonitor";
 
 // USB HID report counter variables
 static uint32_t g_usb_report_counter = 0;
-static uint32_t g_usb_last_report_counter = 0;
 
 #define STATS_TICKS         pdMS_TO_TICKS(1000)
 #define MAX_TASKS           32  // Maximum number of tasks to monitor
@@ -124,30 +123,15 @@ static void monitor_task(void *pvParameter)
         if (print_real_time_stats(STATS_TICKS) != ESP_OK) {
             ESP_LOGE(TAG, "Error getting real time stats");
         }
-        
-        // Print USB HID reports per second
-        uint32_t reports = g_usb_report_counter - g_usb_last_report_counter;
-        g_usb_last_report_counter = g_usb_report_counter;
 
-        uint32_t delay_ms = 10000; 
-        if (hid_bridge_is_ble_paused()) {
-            delay_ms = 120000;
-        } else if (reports > 0) {
-            ESP_LOGI(TAG, "USB HID: %lu rps", reports / 10);
-        }
-
+        const uint32_t delay_ms = 1000;
         vTaskDelay(pdMS_TO_TICKS(delay_ms));
     }
 }
 
 esp_err_t task_monitor_init(void)
 {
-    // Initialize temperature sensor
-    esp_err_t ret = temp_sensor_init();
-    if (ret != ESP_OK) {
-        return ret;
-    }
-
+    temp_sensor_init();
     return ESP_OK;
 }
 

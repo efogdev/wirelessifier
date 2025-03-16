@@ -28,7 +28,7 @@ static const led_pattern_t led_patterns[] = {
     {
         .colors = {NP_RGB(0, 0, 255), 0},
         .type = ANIM_TYPE_RUNNING_LIGHT_BOUNCE,
-        .trail_length = 2,
+        .trail_length = 4,
         .speed = 50, 
         .direction_up = true
     },
@@ -50,9 +50,9 @@ static const led_pattern_t led_patterns[] = {
     },
     // SLEEPING
     {
-        .colors = {NP_RGB(16, 18, 4), 0},
-        .type = ANIM_TYPE_RUNNING_LIGHT_BOUNCE,
-        .trail_length = 6,
+        .colors = {0},
+        .type = ANIM_TYPE_BREATHING,
+        .trail_length = 1,
         .speed = 1,
         .direction_up = true
     }
@@ -142,7 +142,7 @@ void led_control_init(int num_leds, int gpio_pin)
         return;
     }
     
-    xTaskCreatePinnedToCore(led_control_task, "led_control", 1500, NULL, configMAX_PRIORITIES - 1, &s_led_task_handle, 1);
+    xTaskCreatePinnedToCore(led_control_task, "led_control", 1500, NULL, 7, &s_led_task_handle, 1);
 }
 
 void led_control_deinit(void)

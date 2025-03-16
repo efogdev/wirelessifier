@@ -4,7 +4,7 @@
 #include <stdbool.h>
 
 // Maximum number of connection retry attempts
-#define MAX_RETRY 3
+#define MAX_RETRY 5
 
 // NVS keys
 #define NVS_NAMESPACE "wifi_config"

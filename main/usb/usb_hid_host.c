@@ -106,13 +106,13 @@ esp_err_t usb_hid_host_init(QueueHandle_t report_queue) {
 
     ESP_ERROR_CHECK(usb_host_install(&host_config));
 
-    BaseType_t task_created = xTaskCreatePinnedToCore(hid_host_event_task, "hid_events", 2048, NULL, 3, &g_event_task_handle, 1);
+    BaseType_t task_created = xTaskCreatePinnedToCore(hid_host_event_task, "hid_events", 2048, NULL, 13, &g_event_task_handle, 1);
     if (task_created != pdTRUE) {
         vQueueDelete(g_event_queue);
         return ESP_ERR_NO_MEM;
     }
 
-    task_created = xTaskCreatePinnedToCore(usb_lib_task, "usb_events", 2600, NULL, 2, &g_usb_events_task_handle, 1);
+    task_created = xTaskCreatePinnedToCore(usb_lib_task, "usb_events", 2600, NULL, 12, &g_usb_events_task_handle, 1);
     if (task_created != pdTRUE) {
         vTaskDelete(g_event_task_handle);
         vQueueDelete(g_event_queue);

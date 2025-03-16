@@ -17,7 +17,7 @@ static const char *WIFI_TAG = "WIFI_MGR";
 
 // WebSocket ping task parameters
 #define WS_PING_TASK_STACK_SIZE 2600
-#define WS_PING_TASK_PRIORITY 9
+#define WS_PING_TASK_PRIORITY 6
 #define WS_PING_INTERVAL_MS 125
 
 // NVS keys
@@ -449,14 +449,8 @@ void start_ws_ping_task(void) {
     
     // Only create the task if it doesn't already exist
     if (ping_task_handle == NULL) {
-        BaseType_t result = xTaskCreate(
-            ws_ping_task,
-            "ws_ping_task",
-            WS_PING_TASK_STACK_SIZE,
-            NULL,
-            WS_PING_TASK_PRIORITY,
-            &ping_task_handle
-        );
+        BaseType_t result = xTaskCreatePinnedToCore(ws_ping_task,
+            "ws_ping_task", WS_PING_TASK_STACK_SIZE, NULL, WS_PING_TASK_PRIORITY, &ping_task_handle, 1);
         
         if (result != pdPASS) {
             ESP_LOGE(WIFI_TAG, "Failed to create WebSocket ping task");
