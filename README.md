@@ -1,6 +1,6 @@
 # ESP32-S3 HID Bridge
 
-**⚠️ IMPORTANT: This project is currently in development. Functionality is very limited and not complete. ⚠️**
+**⚠️ This project is currently in development. Functionality is very limited and not complete.**
 
 ## Overview
 
