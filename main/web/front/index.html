@@ -400,8 +400,7 @@
         // Check WebSocket activity
         function checkWebSocketActivity() {
             const now = Date.now();
-            if (now - lastMessageTime > 1000) {
-                console.log('WebSocket inactive for more than 1 second, reconnecting...');
+            if (now - lastMessageTime > 2500) {
                 // Show loading screen with reconnecting message
                 loadingContainer.classList.remove('hidden');
                 mainContainer.classList.add('hidden');

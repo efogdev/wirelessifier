@@ -10,6 +10,7 @@
 #include "freertos/semphr.h"
 #include "usb/usb_hid_host.h"
 #include "ble_hid_device.h"
+#include "web/wifi_manager.h"
 
 static const char *TAG = "HID_BRIDGE";
 #define HID_QUEUE_SIZE 4
@@ -52,6 +53,13 @@ static void inactivity_timer_callback(TimerHandle_t xTimer)
     if (!usb_hid_host_device_connected() || !ble_hid_device_connected()) {
         xSemaphoreGive(s_ble_stack_mutex);
         return; // One or both devices not connected
+    }
+    
+    // Don't stop BLE stack if web stack is active (WiFi is connected)
+    if (is_wifi_connected()) {
+        ESP_LOGI(TAG, "Web stack is active, keeping BLE stack running");
+        xSemaphoreGive(s_ble_stack_mutex);
+        return;
     }
     
     ESP_LOGI(TAG, "No USB HID events for a while, stopping BLE stack");
