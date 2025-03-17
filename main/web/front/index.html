@@ -192,6 +192,7 @@
         const maxReconnectAttempts = 125;
         let lastMessageTime = 0;
         let wsCheckInterval = null;
+        let isConnectedToWifi = false;
         
         // Connect to WebSocket
         function connectWebSocket() {
@@ -238,7 +239,8 @@
                     wsCheckInterval = null;
                 }
                 
-                if (reconnectAttempts < maxReconnectAttempts) {
+                // Don't show loading screen or attempt to reconnect if already connected to WiFi
+                if (!isConnectedToWifi && reconnectAttempts < maxReconnectAttempts) {
                     reconnectAttempts++;
                     // Show loading screen during reconnection
                     loadingContainer.classList.remove('hidden');
@@ -354,11 +356,23 @@
             actionSpinner.classList.add('hidden');
             
             if (status.connected) {
-                updateStatus('Successfully connected! Device will restart and connect to the WiFi network.', 'success');
+                isConnectedToWifi = true;
+                updateStatus('Successfully connected! The device is restarting. \n\n You can connect to the regular WiFi network. \n\n You will be automatically redirected to the new (internal) URL in 10 seconds.', 'success');
+                
+                // Disable inactivity watcher when connected
+                if (wsCheckInterval) {
+                    clearInterval(wsCheckInterval);
+                    wsCheckInterval = null;
+                }
+                
+                // Ensure loading container stays hidden
+                loadingContainer.classList.add('hidden');
+                mainContainer.classList.remove('hidden');
+                
                 setTimeout(() => {
                     // Redirect to the new IP after a delay
                     window.location.href = `http://${status.ip}`;
-                }, 3000);
+                }, 10000);
             } else if (status.attempt < 3) {
                 updateStatus(`Connection failed. Retrying...`, 'error');
             } else {
@@ -482,7 +496,7 @@
         // Check WebSocket activity
         function checkWebSocketActivity() {
             const now = Date.now();
-            if (now - lastMessageTime > 3500) {
+            if (!isConnectedToWifi && now - lastMessageTime > 3500) {
                 // Show loading screen with reconnecting message
                 loadingContainer.classList.remove('hidden');
                 mainContainer.classList.add('hidden');

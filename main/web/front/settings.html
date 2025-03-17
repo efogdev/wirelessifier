@@ -42,8 +42,12 @@
         }
 
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
         }
 
         .setting-group {
@@ -57,7 +61,7 @@
         }
 
         .setting-item {
-          margin-bottom: 20px;
+            margin-bottom: 20px;
         }
 
         .setting-title {
@@ -164,7 +168,7 @@
             background-color: #d9edf7;
             color: #31708f;
         }
-        
+
         /* Fullscreen loader styles */
         #loadingContainer {
             position: fixed;
@@ -179,404 +183,537 @@
             align-items: center;
             z-index: 1000;
         }
-        
+
         .hidden {
             display: none !important;
         }
+
+        /* Progress bar styles */
+        .progress-container {
+            width: 100%;
+            background-color: #f1f1f1;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+
+        .progress-bar {
+            height: 20px;
+            background-color: #4CAF50;
+            border-radius: 4px;
+            text-align: center;
+            line-height: 20px;
+            color: white;
+            transition: width 0.3s;
+        }
+
+        /* File input styling */
+        .file-input-container {
+            position: relative;
+            margin: 15px 0;
+        }
+
+        .file-input-container input[type="file"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
     </style>
-    
+
     <script src="/lib/babel.min.js"></script>
     <script src="/lib/react.production.min.js" crossorigin></script>
     <script src="/lib/react-dom.production.min.js" crossorigin></script>
 </head>
 <body>
-    <div id="root"></div>
-    
-    <script type="text/babel">
-        // Main App component
-        const App = () => {
-          const [connected, setConnected] = React.useState(false);
-          const [loading, setLoading] = React.useState(true);
-          const [error, setError] = React.useState(null);
-          const [lastMessageTime, setLastMessageTime] = React.useState(0);
-          const [systemInfo, setSystemInfo] = React.useState({
+<div id="root"></div>
+
+<script type="text/babel">
+    // Main App component
+    const App = () => {
+        const [connected, setConnected] = React.useState(false);
+        const [loading, setLoading] = React.useState(true);
+        const [error, setError] = React.useState(null);
+        const [lastMessageTime, setLastMessageTime] = React.useState(0);
+        const [systemInfo, setSystemInfo] = React.useState({
             freeHeap: 0,
             socTemp: 0
-          });
-          const [settings, setSettings] = React.useState({
+        });
+        const [settings, setSettings] = React.useState({
             deviceInfo: {
-              name: 'TBD',
-              firmwareVersion: 'TBD',
-              hardwareVersion: 'TBD',
-              macAddress: '00:00:00:00:00:00'
+                name: 'TBD',
+                firmwareVersion: 'TBD',
+                hardwareVersion: 'TBD',
+                macAddress: '00:00:00:00:00:00'
             },
             power: {
-              sleepTimeout: 30, // seconds
-              lowPowerMode: false,
-              enableSleep: true
+                sleepTimeout: 30, // seconds
+                lowPowerMode: false,
+                enableSleep: true
             },
             led: {
-              brightness: 80
+                brightness: 80
             },
             connectivity: {
-              bleTxPower: 'low', // low, medium, high, default
-              bleReconnectDelay: 3 // seconds
+                bleTxPower: 'low', // low, medium, high, default
+                bleReconnectDelay: 3 // seconds
             }
-          });
-          const [statusMessage, setStatusMessage] = React.useState(null);
-          const [statusType, setStatusType] = React.useState('info');
-          const socketRef = React.useRef(null);
-          const wsCheckIntervalRef = React.useRef(null);
+        });
+        const [statusMessage, setStatusMessage] = React.useState(null);
+        const [statusType, setStatusType] = React.useState('info');
+        const [otaProgress, setOtaProgress] = React.useState(0);
+        const [otaInProgress, setOtaInProgress] = React.useState(false);
+        const socketRef = React.useRef(null);
+        const wsCheckIntervalRef = React.useRef(null);
+        const fileInputRef = React.useRef(null);
 
-          // Connect to WebSocket and request settings
-          React.useEffect(() => {
+        // Connect to WebSocket and request settings
+        React.useEffect(() => {
             connectWebSocket();
-            
+
             // Start checking for WebSocket inactivity
             wsCheckIntervalRef.current = setInterval(checkWebSocketActivity, 1000);
-            
+
             // Cleanup on unmount
             return () => {
-              if (socketRef.current) {
-                socketRef.current.close();
-              }
-              if (wsCheckIntervalRef.current) {
-                clearInterval(wsCheckIntervalRef.current);
-              }
+                if (socketRef.current) {
+                    socketRef.current.close();
+                }
+                if (wsCheckIntervalRef.current) {
+                    clearInterval(wsCheckIntervalRef.current);
+                }
             };
-          }, []);
-          
-          // Check WebSocket activity
-          const checkWebSocketActivity = () => {
+        }, []);
+
+        // Check WebSocket activity
+        const checkWebSocketActivity = () => {
             const now = Date.now();
             if (lastMessageTime > 0 && now - lastMessageTime > 1500) {
-              setConnected(false);
-              setLoading(true);
-              if (socketRef.current && socketRef.current.readyState !== WebSocket.CLOSED) {
-                try {
-                  socketRef.current.close();
-                } catch (e) {
-                  console.error('Error closing socket:', e);
-                }
-              }
-              // Force reconnection attempt
-              setTimeout(connectWebSocket, 1000);
-            }
-          };
-
-          // Connect to WebSocket
-          const connectWebSocket = () => {
-            setLoading(true);
-            setError(null);
-            
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${window.location.host}/ws`;
-            
-            const socket = new WebSocket(wsUrl);
-            socketRef.current = socket;
-            
-            socket.onopen = () => {
-              console.log('WebSocket connected');
-              setConnected(true);
-              setLoading(false);
-              setLastMessageTime(Date.now());
-              
-              // Request current settings
-              requestSettings();
-            };
-            
-            socket.onclose = () => {
-              console.log('WebSocket disconnected');
-              setConnected(false);
-              setLoading(true);
-              
-              // Try to reconnect after a delay
-              setTimeout(connectWebSocket, 1000);
-            };
-            
-            socket.onerror = (error) => {
-              console.error('WebSocket error:', error);
-              setError('Failed to connect to the device. Please try again later.');
-              setLoading(false);
-            };
-            
-            socket.onmessage = (event) => {
-              handleWebSocketMessage(event.data);
-            };
-          };
-
-          // Handle WebSocket messages
-          const handleWebSocketMessage = (data) => {
-            // Update last message time
-            setLastMessageTime(Date.now());
-            
-            try {
-              const message = JSON.parse(data);
-              
-              switch (message.type) {
-                case 'settings':
-                  // Update settings with data from server
-                  if (message.content) {
-                    setSettings(prevSettings => ({
-                      ...prevSettings,
-                      ...message.content
-                    }));
-                  }
-                  break;
-                case 'settings_update_status':
-                  // Show status message
-                  if (message.content.success) {
-                    showStatus('Settings updated successfully', 'success');
-                  } else {
-                    showStatus(`Failed to update settings: ${message.content.error}`, 'error');
-                  }
-                  break;
-                case 'log':
-                  console.log('Server log:', message.content);
-                  break;
-                case 'ping':
-                  // Update system info from ping message
-                  if (message.content) {
+                setConnected(false);
+                setLoading(true);
+                if (socketRef.current && socketRef.current.readyState !== WebSocket.CLOSED) {
                     try {
-                      const pingData = typeof message.content === 'string' 
-                        ? JSON.parse(message.content) 
-                        : message.content;
-                      
-                      setSystemInfo({
-                        freeHeap: pingData.freeHeap || 0,
-                        socTemp: pingData.socTemp || 0
-                      });
+                        socketRef.current.close();
                     } catch (e) {
-                      console.error('Error parsing ping data:', e);
+                        console.error('Error closing socket:', e);
                     }
-                  }
-                  break;
-                default:
-                  console.log('Unknown message type:', message.type);
-              }
-            } catch (error) {
-              console.error('Error parsing WebSocket message:', error);
+                }
+                // Force reconnection attempt
+                setTimeout(connectWebSocket, 1000);
             }
-          };
-
-          // Request current settings from the server
-          const requestSettings = () => {
-            if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
-              showStatus('WebSocket not connected', 'error');
-              return;
-            }
-            
-            socketRef.current.send(JSON.stringify({
-              type: 'command',
-              command: 'get_settings'
-            }));
-          };
-
-          // Save settings to the server
-          const saveSettings = () => {
-            if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
-              showStatus('WebSocket not connected', 'error');
-              return;
-            }
-            
-            socketRef.current.send(JSON.stringify({
-              type: 'command',
-              command: 'update_settings',
-              content: settings
-            }));
-            
-            showStatus('Saving settings...', 'info');
-          };
-
-          // Update a specific setting
-          const updateSetting = (category, key, value) => {
-            setSettings(prevSettings => ({
-              ...prevSettings,
-              [category]: {
-                ...prevSettings[category],
-                [key]: value
-              }
-            }));
-          };
-
-          // Show status message
-          const showStatus = (message, type) => {
-            setStatusMessage(message);
-            setStatusType(type);
-            
-            // Clear status after 5 seconds
-            setTimeout(() => {
-              setStatusMessage(null);
-            }, 5000);
-          };
-
-          // If loading or not connected, show fullscreen loader
-          if (loading || !connected) {
-            return (
-              <div id="loadingContainer">
-                <div className="spinner"></div>
-                <p>{connected ? 'Loading settings' : 'Waiting for connection...'}</p>
-              </div>
-            );
-          }
-
-          // If error, show error message
-          if (error) {
-            return (
-              <div className="container">
-                <div className="status error">{error}</div>
-                <button onClick={connectWebSocket}>Retry Connection</button>
-              </div>
-            );
-          }
-
-          return (
-            <div>
-              <h1>Device Settings</h1>
-              
-              <div className="container">
-                
-                {statusMessage && (
-                  <div className={`status ${statusType}`}>
-                    {statusMessage}
-                  </div>
-                )}
-                
-                {/* Device Information */}
-                <div className="setting-group">
-                  <h2>Device Information</h2>
-                  
-                  <div className="setting-item">
-                    <div className="setting-title">Device Name</div>
-                    <div>{settings.deviceInfo.name}</div>
-                  </div>
-                  
-                  <div className="setting-item">
-                    <div className="setting-title">Firmware Version</div>
-                    <div>{settings.deviceInfo.firmwareVersion}</div>
-                  </div>
-                  
-                  <div className="setting-item">
-                    <div className="setting-title">Hardware Version</div>
-                    <div>{settings.deviceInfo.hardwareVersion}</div>
-                  </div>
-                  
-                  <div className="setting-item">
-                    <div className="setting-title">MAC Address</div>
-                    <div>{settings.deviceInfo.macAddress}</div>
-                  </div>
-                  
-                  <div className="setting-item">
-                    <div className="setting-title">Free Heap</div>
-                    <div>{(systemInfo.freeHeap / 1000).toFixed(0)} kb</div>
-                  </div>
-                  
-                  <div className="setting-item">
-                    <div className="setting-title">SoC Temperature</div>
-                    <div>{systemInfo.socTemp.toFixed(0)}°C</div>
-                  </div>
-                </div>
-                
-                {/* Power Management */}
-                <div className="setting-group">
-                  <h2>Power Management</h2>
-                  
-                  <div className="setting-item">
-                    <div className="setting-title">Enable Sleep</div>
-                    <div className="setting-description">
-                      Enable device to enter sleep mode and disable Bluetooth when no events received in the time window
-                    </div>
-                    <label className="toggle-switch">
-                      <input
-                        type="checkbox"
-                        checked={settings.power.enableSleep}
-                        onChange={(e) => updateSetting('power', 'enableSleep', e.target.checked)}
-                      />
-                      <span className="slider"></span>
-                    </label>
-                  </div>
-                  
-                  <div className="setting-item">
-                    <div className="setting-title">Sleep Timeout</div>
-                    <div className="setting-description">
-                      Time without USB events in seconds before device enters sleep mode
-                    </div>
-                    <input
-                      type="number"
-                      min="0"
-                      max="3600"
-                      value={settings.power.sleepTimeout}
-                      onChange={(e) => updateSetting('power', 'sleepTimeout', parseInt(e.target.value))}
-                    />
-                  </div>
-                </div>
-                
-                {/* LED Configuration */}
-                <div className="setting-group">
-                  <h2>LED Configuration</h2>
-                  
-                  <div className="setting-item">
-                    <div className="setting-title">Brightness</div>
-                    <div className="setting-description">
-                      Global LED brightness percentage
-                    </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={settings.led.brightness}
-                      onChange={(e) => updateSetting('led', 'brightness', parseInt(e.target.value))}
-                    />
-                  </div>
-                </div>
-                
-                {/* Connectivity Options */}
-                <div className="setting-group">
-                  <h2>Connectivity</h2>
-                  
-                  <div className="setting-item">
-                    <div className="setting-title">BLE TX Power</div>
-                    <div className="setting-description">
-                      Bluetooth transmission power level
-                    </div>
-                    <select
-                      value={settings.connectivity.bleTxPower}
-                      onChange={(e) => updateSetting('connectivity', 'bleTxPower', e.target.value)}
-                    >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                    </select>
-                  </div>
-                  
-                  <div className="setting-item">
-                    <div className="setting-title">Reconnect Delay</div>
-                    <div className="setting-description">
-                      Delay in seconds before attempting to reconnect after Bluetooth disconnect (doesn't affect wake from sleep)
-                    </div>
-                    <input
-                      type="number"
-                      min="1"
-                      max="60"
-                      value={settings.connectivity.bleReconnectDelay}
-                      onChange={(e) => updateSetting('connectivity', 'bleReconnectDelay', parseInt(e.target.value))}
-                    />
-                  </div>
-                </div>
-                
-                <button onClick={saveSettings} disabled={!connected}>
-                  Save
-                </button>
-                <button onClick={() => window.location.href = '/'} style={{marginLeft: '10px'}}>
-                  Return
-                </button>
-              </div>
-            </div>
-          );
         };
 
-        // Render the App component
-        ReactDOM.render(<App />, document.getElementById('root'));
-    </script>
+        // Connect to WebSocket
+        const connectWebSocket = () => {
+            setLoading(true);
+            setError(null);
+
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
+
+            const socket = new WebSocket(wsUrl);
+            socketRef.current = socket;
+
+            socket.onopen = () => {
+                console.log('WebSocket connected');
+                setConnected(true);
+                setLoading(false);
+                setLastMessageTime(Date.now());
+
+                // Request current settings
+                requestSettings();
+            };
+
+            socket.onclose = () => {
+                console.log('WebSocket disconnected');
+                setConnected(false);
+                setLoading(true);
+
+                // Try to reconnect after a delay
+                setTimeout(connectWebSocket, 1000);
+            };
+
+            socket.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                setError('Failed to connect to the device. Please try again later.');
+                setLoading(false);
+            };
+
+            socket.onmessage = (event) => {
+                handleWebSocketMessage(event.data);
+            };
+        };
+
+        // Handle WebSocket messages
+        const handleWebSocketMessage = (data) => {
+            // Update last message time
+            setLastMessageTime(Date.now());
+
+            try {
+                const message = JSON.parse(data);
+
+                switch (message.type) {
+                    case 'ota_progress':
+                        // Update OTA progress
+                        if (message.content && message.content.progress !== undefined) {
+                            const progress = typeof message.content === 'string'
+                                ? JSON.parse(message.content).progress
+                                : message.content.progress;
+
+                            setOtaProgress(progress);
+
+                            if (progress === 100) {
+                                showStatus('OTA update completed successfully! Device will reboot.', 'success');
+                                setTimeout(() => {
+                                    setOtaInProgress(false);
+                                }, 2000);
+                            }
+                        }
+                        break;
+                    case 'settings':
+                        // Update settings with data from server
+                        if (message.content) {
+                            setSettings(prevSettings => ({
+                                ...prevSettings,
+                                ...message.content
+                            }));
+                        }
+                        break;
+                    case 'settings_update_status':
+                        // Show status message
+                        if (message.content.success) {
+                            showStatus('Settings updated successfully', 'success');
+                        } else {
+                            showStatus(`Failed to update settings: ${message.content.error}`, 'error');
+                        }
+                        break;
+                    case 'log':
+                        console.log('Server log:', message.content);
+                        break;
+                    case 'ping':
+                        // Update system info from ping message
+                        if (message.content) {
+                            try {
+                                const pingData = typeof message.content === 'string'
+                                    ? JSON.parse(message.content)
+                                    : message.content;
+
+                                setSystemInfo({
+                                    freeHeap: pingData.freeHeap || 0,
+                                    socTemp: pingData.socTemp || 0
+                                });
+                            } catch (e) {
+                                console.error('Error parsing ping data:', e);
+                            }
+                        }
+                        break;
+                    default:
+                        console.log('Unknown message type:', message.type);
+                }
+            } catch (error) {
+                console.error('Error parsing WebSocket message:', error);
+            }
+        };
+
+        // Request current settings from the server
+        const requestSettings = () => {
+            if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+                showStatus('WebSocket not connected', 'error');
+                return;
+            }
+
+            socketRef.current.send(JSON.stringify({
+                type: 'command',
+                command: 'get_settings'
+            }));
+        };
+
+        // Save settings to the server
+        const saveSettings = () => {
+            if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+                showStatus('WebSocket not connected', 'error');
+                return;
+            }
+
+            socketRef.current.send(JSON.stringify({
+                type: 'command',
+                command: 'update_settings',
+                content: settings
+            }));
+
+            showStatus('Saving settings...', 'info');
+        };
+
+        // Update a specific setting
+        const updateSetting = (category, key, value) => {
+            setSettings(prevSettings => ({
+                ...prevSettings,
+                [category]: {
+                    ...prevSettings[category],
+                    [key]: value
+                }
+            }));
+        };
+
+        // Show status message
+        const showStatus = (message, type) => {
+            setStatusMessage(message);
+            setStatusType(type);
+
+            // Clear status after 5 seconds
+            setTimeout(() => {
+                setStatusMessage(null);
+            }, 5000);
+        };
+
+        // If loading or not connected, show fullscreen loader
+        if (loading || !connected) {
+            return (
+                <div id="loadingContainer">
+                    <div className="spinner"></div>
+                    <p>{connected ? 'Loading settings' : 'Waiting for connection...'}</p>
+                </div>
+            );
+        }
+
+        // If error, show error message
+        if (error) {
+            return (
+                <div className="container">
+                    <div className="status error">{error}</div>
+                    <button onClick={connectWebSocket}>Retry Connection</button>
+                </div>
+            );
+        }
+
+        return (
+            <div>
+                <h1>Device Settings</h1>
+
+                <div className="container">
+
+                    {statusMessage && (
+                        <div className={`status ${statusType}`}>
+                            {statusMessage}
+                        </div>
+                    )}
+
+                    <button onClick={saveSettings} disabled={!connected || otaInProgress}>
+                        Save
+                    </button>
+                    <button onClick={() => window.location.href = '/'} style={{marginLeft: '10px', backgroundColor: '#6c757d'}}
+                            disabled={otaInProgress}>
+                        Return
+                    </button>
+
+                    {/* Device Information */}
+                    <div className="setting-group">
+                        <h2>Device Information</h2>
+
+                        <div className="setting-item">
+                            <div className="setting-title">Device Name</div>
+                            <div>{settings.deviceInfo.name}</div>
+                        </div>
+
+                        <div className="setting-item">
+                            <div className="setting-title">Firmware Version</div>
+                            <div>{settings.deviceInfo.firmwareVersion}</div>
+                        </div>
+
+                        <div className="setting-item">
+                            <div className="setting-title">Hardware Version</div>
+                            <div>{settings.deviceInfo.hardwareVersion}</div>
+                        </div>
+
+                        <div className="setting-item">
+                            <div className="setting-title">MAC Address</div>
+                            <div>{settings.deviceInfo.macAddress}</div>
+                        </div>
+
+                        <div className="setting-item">
+                            <div className="setting-title">Free Heap</div>
+                            <div>{(systemInfo.freeHeap / 1000).toFixed(0)} kb</div>
+                        </div>
+
+                        <div className="setting-item">
+                            <div className="setting-title">SoC Temperature</div>
+                            <div>{systemInfo.socTemp.toFixed(0)}°C</div>
+                        </div>
+                    </div>
+
+                    {/* Power Management */}
+                    <div className="setting-group">
+                        <h2>Power Management</h2>
+
+                        <div className="setting-item">
+                            <div className="setting-title">Enable Sleep</div>
+                            <div className="setting-description">
+                                Enable device to enter sleep mode and disable Bluetooth when no events received in the
+                                time window
+                            </div>
+                            <label className="toggle-switch">
+                                <input
+                                    type="checkbox"
+                                    checked={settings.power.enableSleep}
+                                    onChange={(e) => updateSetting('power', 'enableSleep', e.target.checked)}
+                                />
+                                <span className="slider"></span>
+                            </label>
+                        </div>
+
+                        <div className="setting-item">
+                            <div className="setting-title">Sleep Timeout</div>
+                            <div className="setting-description">
+                                Time without USB events in seconds before device enters sleep mode
+                            </div>
+                            <input
+                                type="number"
+                                min="0"
+                                max="3600"
+                                value={settings.power.sleepTimeout}
+                                onChange={(e) => updateSetting('power', 'sleepTimeout', parseInt(e.target.value))}
+                            />
+                        </div>
+                    </div>
+
+                    {/* LED Configuration */}
+                    <div className="setting-group">
+                        <h2>LED Configuration</h2>
+
+                        <div className="setting-item">
+                            <div className="setting-title">Brightness</div>
+                            <div className="setting-description">
+                                Global LED brightness percentage
+                            </div>
+                            <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                value={settings.led.brightness}
+                                onChange={(e) => updateSetting('led', 'brightness', parseInt(e.target.value))}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Connectivity Options */}
+                    <div className="setting-group">
+                        <h2>Connectivity</h2>
+
+                        <div className="setting-item">
+                            <div className="setting-title">BLE TX Power</div>
+                            <div className="setting-description">
+                                Bluetooth transmission power level
+                            </div>
+                            <select
+                                value={settings.connectivity.bleTxPower}
+                                onChange={(e) => updateSetting('connectivity', 'bleTxPower', e.target.value)}
+                            >
+                                <option value="low">Low</option>
+                                <option value="medium">Medium</option>
+                                <option value="high">High</option>
+                            </select>
+                        </div>
+
+                        <div className="setting-item">
+                            <div className="setting-title">Reconnect Delay</div>
+                            <div className="setting-description">
+                                Delay in seconds before attempting to reconnect after Bluetooth disconnect (doesn't
+                                affect wake from sleep)
+                            </div>
+                            <input
+                                type="number"
+                                min="1"
+                                max="60"
+                                value={settings.connectivity.bleReconnectDelay}
+                                onChange={(e) => updateSetting('connectivity', 'bleReconnectDelay', parseInt(e.target.value))}
+                            />
+                        </div>
+                    </div>
+
+                    {/* OTA Update */}
+                    <div className="setting-group">
+                        <h2>Firmware Update</h2>
+
+                        <div className="setting-item">
+                            <div className="setting-title">OTA Update</div>
+                            <div className="setting-description">
+                                Upload a new firmware file to update the device. The device will reboot after a
+                                successful update.
+                            </div>
+
+                            {otaInProgress ? (
+                                <div>
+                                    <div className="progress-container">
+                                        <div
+                                            className="progress-bar"
+                                            style={{width: `${otaProgress}%`}}
+                                        >
+                                            {otaProgress}%
+                                        </div>
+                                    </div>
+                                    <p>Uploading firmware... Please do not disconnect the device.</p>
+                                </div>
+                            ) : (
+                                <div>
+                                    <div className="file-input-container">
+                                        <input
+                                            type="file"
+                                            ref={fileInputRef}
+                                            accept=".bin"
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            const fileInput = fileInputRef.current;
+                                            if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+                                                showStatus('Please select a firmware file', 'error');
+                                                return;
+                                            }
+
+                                            const file = fileInput.files[0];
+                                            const formData = new FormData();
+                                            formData.append('firmware', file);
+
+                                            // Start upload
+                                            setOtaInProgress(true);
+                                            setOtaProgress(0);
+                                            showStatus('Starting firmware upload...', 'info');
+
+                                            fetch('/upload', {
+                                                method: 'POST',
+                                                body: formData
+                                            })
+                                                .then(response => {
+                                                    if (!response.ok) {
+                                                        throw new Error(`HTTP error ${response.status}`);
+                                                    }
+                                                    return response.text();
+                                                })
+                                                .then(data => {
+                                                    console.log('Upload successful:', data);
+                                                    // Progress updates will come through WebSocket
+                                                })
+                                                .catch(error => {
+                                                    console.error('Upload failed:', error);
+                                                    setOtaInProgress(false);
+                                                    showStatus(`Upload failed: ${error.message}`, 'error');
+                                                });
+                                        }}
+                                        disabled={!connected}
+                                    >
+                                        Upload Firmware
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    // Render the App component
+    ReactDOM.render(<App/>, document.getElementById('root'));
+</script>
 </body>
 </html>
