@@ -4,3 +4,4 @@ managed_components
 build
 .idea
 cmake-build-debug
+**/node_modules
