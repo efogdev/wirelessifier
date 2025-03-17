@@ -8,7 +8,50 @@
 #include <esp_mac.h>
 #include "../const.h"
 
+#define MAX_CACHE_SIZE 32
+#define MAX_PATH_LENGTH 64
+
+typedef enum {
+    CACHE_TYPE_STRING,
+    CACHE_TYPE_INT,
+    CACHE_TYPE_BOOL
+} cache_value_type_t;
+
+typedef struct {
+    char path[MAX_PATH_LENGTH];
+    cache_value_type_t type;
+    union {
+        char str[128];
+        int num;
+        bool flag;
+    } value;
+} cache_entry_t;
+
 static const char *STORAGE_TAG = "STORAGE";
+static cache_entry_t cache[MAX_CACHE_SIZE];
+static int cache_count = 0;
+
+static void cache_clear(void) {
+    cache_count = 0;
+}
+
+static cache_entry_t* cache_find(const char* path) {
+    for(int i = 0; i < cache_count; i++) {
+        if(strcmp(cache[i].path, path) == 0) {
+            return &cache[i];
+        }
+    }
+    return NULL;
+}
+
+static cache_entry_t* cache_add(const char* path) {
+    if(cache_count >= MAX_CACHE_SIZE) {
+        cache_count = 0;
+    }
+    strncpy(cache[cache_count].path, path, MAX_PATH_LENGTH - 1);
+    cache[cache_count].path[MAX_PATH_LENGTH - 1] = '\0';
+    return &cache[cache_count++];
+}
 
 // Default settings JSON
 static const char *default_settings = "{"
@@ -202,12 +245,13 @@ esp_err_t storage_update_settings(const char* settings_json) {
     
     nvs_close(nvs_handle);
     
-    // Update current settings
+    // Update current settings and clear cache
     if (err == ESP_OK) {
         if (current_settings) {
             free(current_settings);
         }
         current_settings = strdup(settings_json);
+        cache_clear();
     }
     
     return err;
@@ -258,10 +302,22 @@ static cJSON* find_json_by_path(const char* path) {
 esp_err_t storage_get_string_setting(const char* path, char* value, size_t max_len) {
     if (!path || !value || max_len == 0) return ESP_ERR_INVALID_ARG;
     
+    cache_entry_t* entry = cache_find(path);
+    if(entry && entry->type == CACHE_TYPE_STRING) {
+        strncpy(value, entry->value.str, max_len - 1);
+        value[max_len - 1] = '\0';
+        return ESP_OK;
+    }
+    
     cJSON *item = find_json_by_path(path);
     if (!item) return ESP_ERR_NOT_FOUND;
     
     if (cJSON_IsString(item)) {
+        entry = cache_add(path);
+        entry->type = CACHE_TYPE_STRING;
+        strncpy(entry->value.str, item->valuestring, sizeof(entry->value.str) - 1);
+        entry->value.str[sizeof(entry->value.str) - 1] = '\0';
+        
         strncpy(value, item->valuestring, max_len - 1);
         value[max_len - 1] = '\0';
         cJSON_Delete(item);
@@ -276,10 +332,20 @@ esp_err_t storage_get_string_setting(const char* path, char* value, size_t max_l
 esp_err_t storage_get_int_setting(const char* path, int* value) {
     if (!path || !value) return ESP_ERR_INVALID_ARG;
     
+    cache_entry_t* entry = cache_find(path);
+    if(entry && entry->type == CACHE_TYPE_INT) {
+        *value = entry->value.num;
+        return ESP_OK;
+    }
+    
     cJSON *item = find_json_by_path(path);
     if (!item) return ESP_ERR_NOT_FOUND;
     
     if (cJSON_IsNumber(item)) {
+        entry = cache_add(path);
+        entry->type = CACHE_TYPE_INT;
+        entry->value.num = item->valueint;
+        
         *value = item->valueint;
         cJSON_Delete(item);
         return ESP_OK;
@@ -293,10 +359,20 @@ esp_err_t storage_get_int_setting(const char* path, int* value) {
 esp_err_t storage_get_bool_setting(const char* path, bool* value) {
     if (!path || !value) return ESP_ERR_INVALID_ARG;
     
+    cache_entry_t* entry = cache_find(path);
+    if(entry && entry->type == CACHE_TYPE_BOOL) {
+        *value = entry->value.flag;
+        return ESP_OK;
+    }
+    
     cJSON *item = find_json_by_path(path);
     if (!item) return ESP_ERR_NOT_FOUND;
     
     if (cJSON_IsBool(item)) {
+        entry = cache_add(path);
+        entry->type = CACHE_TYPE_BOOL;
+        entry->value.flag = cJSON_IsTrue(item);
+        
         *value = cJSON_IsTrue(item);
         cJSON_Delete(item);
         return ESP_OK;
