@@ -16,6 +16,7 @@
 #include "hid_bridge.h"
 #include "rgb/rgb_utils.h"
 #include "utils/task_monitor.h"
+#include "utils/storage.h"
 #include "web/http_server.h"
 
 static const char *TAG = "MAIN";
@@ -44,14 +45,15 @@ void app_main(void) {
     ESP_ERROR_CHECK(ret);
 
     init_variables();
-    init_pm();
     init_gpio();
+    init_global_settings();
+    init_pm();
 
     led_control_init(NUM_LEDS, GPIO_WS2812B_PIN);
     led_update_pattern(usb_hid_host_device_connected(), ble_hid_device_connected(), hid_bridge_is_ble_paused());
 
-    // ESP_ERROR_CHECK(task_monitor_init());
-    // ESP_ERROR_CHECK(task_monitor_start());
+    ESP_ERROR_CHECK(task_monitor_init());
+    ESP_ERROR_CHECK(task_monitor_start());
 
     run_hid_bridge();
     init_web_stack();

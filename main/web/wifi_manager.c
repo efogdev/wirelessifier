@@ -374,7 +374,7 @@ void disable_wifi_and_web_stack(void) {
     stop_webserver();
     
     // Turn off WiFi status LED
-    led_update_status(STATUS_COLOR_OFF, STATUS_MODE_OFF);
+    led_update_wifi_status(false, false);
     
     // Stop WiFi
     esp_wifi_stop();

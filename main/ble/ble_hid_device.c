@@ -1,5 +1,5 @@
 #include "ble_hid_device.h"
-
+#include "../const.h"
 #include <esp_gatt_common_api.h>
 #include <stdio.h>
 #include <string.h>
@@ -12,13 +12,13 @@
 #include "esp_gap_ble_api.h"
 #include "esp_bt_main.h"
 #include "hid_dev.h"
+#include "../utils/storage.h"
 
 static const char *TAG = "BLE_HID";
 
 static uint16_t s_conn_id = 0;
 static bool s_connected = false;
-
-#define HIDD_DEVICE_NAME            "USB-to-BLE HID bridge"
+static int s_reconnect_delay = 3; // Default reconnect delay in seconds
 static uint8_t hidd_service_uuid128[] = {
     /* LSB <--------------------------------------------------------------------------------> MSB */
     // first uuid, 16bit, [12],[13] is the value
@@ -55,7 +55,13 @@ static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *
     switch(event) {
         case ESP_HIDD_EVENT_REG_FINISH: {
             if (param->init_finish.state == ESP_HIDD_INIT_OK) {
-                esp_ble_gap_set_device_name(HIDD_DEVICE_NAME);
+                // Get device name from settings
+                char device_name[32];
+                if (storage_get_string_setting("deviceInfo.name", device_name, sizeof(device_name)) != ESP_OK) {
+                    // Fallback to default name from const.h
+                    strcpy(device_name, DEVICE_NAME);
+                }
+                esp_ble_gap_set_device_name(device_name);
                 esp_ble_gap_config_adv_data(&hidd_adv_data);
             }
             break;
@@ -73,6 +79,9 @@ static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *
         case ESP_HIDD_EVENT_BLE_DISCONNECT: {
             s_connected = false;
             ESP_LOGI(TAG, "ESP_HIDD_EVENT_BLE_DISCONNECT");
+            // Use reconnect delay from settings
+            ESP_LOGI(TAG, "Will reconnect in %d seconds", s_reconnect_delay);
+            vTaskDelay(pdMS_TO_TICKS(s_reconnect_delay * 1000));
             esp_ble_gap_start_advertising(&hidd_adv_params);
             break;
         }
@@ -129,6 +138,16 @@ esp_err_t ble_hid_device_init(void)
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
+    
+    // Initialize settings
+    init_global_settings();
+    
+    // Get BLE reconnect delay from settings
+    int reconnect_delay;
+    if (storage_get_int_setting("connectivity.bleReconnectDelay", &reconnect_delay) == ESP_OK) {
+        s_reconnect_delay = reconnect_delay;
+        ESP_LOGI(TAG, "BLE reconnect delay set to %d seconds", s_reconnect_delay);
+    }
 
     ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
     esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
@@ -175,10 +194,32 @@ esp_err_t ble_hid_device_init(void)
     esp_ble_gap_set_security_param(ESP_BLE_SM_MAX_KEY_SIZE, &key_size, sizeof(uint8_t));
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_INIT_KEY, &init_key, sizeof(uint8_t));
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_RSP_KEY, &rsp_key, sizeof(uint8_t));
-    esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_DEFAULT, ESP_PWR_LVL_P9);
-    esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, ESP_PWR_LVL_N0);
-    esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_SCAN, ESP_PWR_LVL_N0);
-    // esp_ble_gatt_set_local_mtu(250);
+    // Set TX power based on settings
+    char tx_power_str[10];
+    esp_power_level_t power_level = ESP_PWR_LVL_N0;
+    
+    if (storage_get_string_setting("connectivity.bleTxPower", tx_power_str, sizeof(tx_power_str)) == ESP_OK) {
+        ESP_LOGI(TAG, "BLE TX power setting: %s", tx_power_str);
+        if (strcmp(tx_power_str, "n6") == 0) {
+            power_level = ESP_PWR_LVL_N6;
+        } else if (strcmp(tx_power_str, "n3") == 0) {
+            power_level = ESP_PWR_LVL_N3;
+        } else if (strcmp(tx_power_str, "n0") == 0) {
+            power_level = ESP_PWR_LVL_N0;
+        } else if (strcmp(tx_power_str, "p3") == 0) {
+            power_level = ESP_PWR_LVL_P3;
+        } else if (strcmp(tx_power_str, "p6") == 0) {
+            power_level = ESP_PWR_LVL_P6;
+        } else if (strcmp(tx_power_str, "p9") == 0) {
+            power_level = ESP_PWR_LVL_P9;
+        }
+    }
+    
+    ESP_LOGI(TAG, "Setting BLE TX power to level: %d", power_level);
+    esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_DEFAULT, power_level);
+    esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, power_level);
+    esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_SCAN, power_level);
+    esp_ble_gatt_set_local_mtu(64);
     return ESP_OK;
 }
 
@@ -211,7 +252,16 @@ esp_err_t ble_hid_device_deinit(void)
 
 esp_err_t ble_hid_device_start_advertising(void)
 {
-    esp_ble_gap_set_device_name(HIDD_DEVICE_NAME);
+    // Get device name from settings
+    char device_name[32];
+    if (storage_get_string_setting("deviceInfo.name", device_name, sizeof(device_name)) != ESP_OK) {
+        // Fallback to default name from const.h
+        #include "../const.h"
+        strcpy(device_name, DEVICE_NAME);
+    }
+    
+    ESP_LOGI(TAG, "Advertising with device name: %s", device_name);
+    esp_ble_gap_set_device_name(device_name);
     esp_err_t ret = esp_ble_gap_config_adv_data(&hidd_adv_data);
     if (ret) {
         ESP_LOGE(TAG, "config adv data failed, error code = %x", ret);

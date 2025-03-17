@@ -11,6 +11,7 @@
 #include "usb/usb_hid_host.h"
 #include "ble_hid_device.h"
 #include "web/wifi_manager.h"
+#include "utils/storage.h"
 
 static const char *TAG = "HID_BRIDGE";
 #define HID_QUEUE_SIZE 4
@@ -34,7 +35,9 @@ static bool s_ble_stack_active = true;
 static void hid_bridge_task(void *arg);
 static void inactivity_timer_callback(TimerHandle_t xTimer);
 
-#define INACTIVITY_TIMEOUT_MS (30 * 1000) 
+// Default timeout value, will be updated from settings
+static int s_inactivity_timeout_ms = 30 * 1000;
+static bool s_enable_sleep = true;
 
 static void inactivity_timer_callback(TimerHandle_t xTimer)
 {
@@ -58,6 +61,13 @@ static void inactivity_timer_callback(TimerHandle_t xTimer)
     // Don't stop BLE stack if web stack is active (WiFi is connected)
     if (is_wifi_connected()) {
         ESP_LOGI(TAG, "Web stack is active, keeping BLE stack running");
+        xSemaphoreGive(s_ble_stack_mutex);
+        return;
+    }
+    
+    // Check if sleep is enabled in settings
+    if (!s_enable_sleep) {
+        ESP_LOGI(TAG, "Sleep is disabled in settings, keeping BLE stack running");
         xSemaphoreGive(s_ble_stack_mutex);
         return;
     }
@@ -87,6 +97,24 @@ esp_err_t hid_bridge_init(void)
         return ESP_OK;
     }
 
+    // Get sleep timeout from settings
+    int sleep_timeout;
+    if (storage_get_int_setting("power.sleepTimeout", &sleep_timeout) == ESP_OK) {
+        s_inactivity_timeout_ms = sleep_timeout * 1000; // Convert to milliseconds
+        ESP_LOGI(TAG, "Sleep timeout set to %d seconds", sleep_timeout);
+    } else {
+        ESP_LOGW(TAG, "Failed to get sleep timeout from settings, using default");
+    }
+    
+    // Get enable sleep setting
+    bool enable_sleep;
+    if (storage_get_bool_setting("power.enableSleep", &enable_sleep) == ESP_OK) {
+        s_enable_sleep = enable_sleep;
+        ESP_LOGI(TAG, "Sleep %s", enable_sleep ? "enabled" : "disabled");
+    } else {
+        ESP_LOGW(TAG, "Failed to get enable sleep setting, using default (enabled)");
+    }
+
     // Create BLE stack mutex using static allocation
     s_ble_stack_mutex = xSemaphoreCreateMutexStatic(&s_ble_stack_mutex_struct);
     if (s_ble_stack_mutex == NULL) {
@@ -111,7 +139,7 @@ esp_err_t hid_bridge_init(void)
     // Create inactivity timer using static allocation
     s_inactivity_timer = xTimerCreateStatic(
         "inactivity_timer",
-        pdMS_TO_TICKS(INACTIVITY_TIMEOUT_MS),
+        pdMS_TO_TICKS(s_inactivity_timeout_ms),
         pdFALSE,  // Auto-reload disabled
         NULL,
         inactivity_timer_callback,

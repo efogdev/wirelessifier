@@ -10,10 +10,11 @@
 #include "neopixel.h"
 #include <math.h>
 #include "esp_wifi.h"
+#include "../utils/storage.h"
 
 static const char *TAG = "RGB_UTILS";
 #define FPS 120
-uint8_t g_rgb_brightness = 35;
+uint8_t g_rgb_brightness = 35; // Default value, will be updated from settings
 
 // WiFi status LED parameters
 #define WIFI_BLINK_FAST_MS 250  // Fast blink period (ms)
@@ -135,6 +136,19 @@ uint32_t rgb_color(uint8_t r, uint8_t g, uint8_t b)
 
 void led_control_init(int num_leds, int gpio_pin)
 {
+    // Get LED brightness from settings
+    int brightness;
+    if (storage_get_int_setting("led.brightness", &brightness) == ESP_OK) {
+        if (brightness >= 0 && brightness <= 100) {
+            g_rgb_brightness = brightness;
+            ESP_LOGI(TAG, "LED brightness set to %d%%", brightness);
+        } else {
+            ESP_LOGW(TAG, "Invalid brightness value %d, using default", brightness);
+        }
+    } else {
+        ESP_LOGW(TAG, "Failed to get brightness from settings, using default");
+    }
+    
     // Clean up previous resources if any
     if (s_previous_state != NULL) {
         free(s_previous_state);
