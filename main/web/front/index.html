@@ -45,6 +45,8 @@
         }
         input[type="checkbox"] { 
             width: auto;
+            position: relative;
+            top: 2px;
         }
         button {
             background-color: #4CAF50;
@@ -116,6 +118,9 @@
             height: 12px;
             min-height: 12px;
         }
+        input#manualSsidInput {
+            margin-bottom: 2px;
+        }
     </style>
 </head>
 <body>
@@ -137,13 +142,13 @@
         
         <div class="form-group">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                <label for="networkSelect">Available:</label>
+                <label for="networkSelect">Network:</label>
                 <label style="font-weight: normal;">
                     <input type="checkbox" id="manualSsidCheckbox"> Enter SSID
                 </label>
             </div>
             <select id="networkSelect" disabled>
-                <option value="">-- Select a network --</option>
+                <option value="">--- Select a network ---</option>
             </select>
             <input type="text" id="manualSsidInput" placeholder="Enter SSID manually" class="hidden">
         </div>
