@@ -219,7 +219,7 @@ esp_err_t ble_hid_device_init(void)
     esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_DEFAULT, power_level);
     esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, power_level);
     esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_SCAN, power_level);
-    esp_ble_gatt_set_local_mtu(64);
+    esp_ble_gatt_set_local_mtu(120);
     return ESP_OK;
 }
 

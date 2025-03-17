@@ -7,6 +7,7 @@
 #include "hid_device_le_prf.h"
 #include <string.h>
 #include "esp_log.h"
+#include "../utils/storage.h"
 
 /// characteristic presentation information
 struct prf_char_pres_fmt {
@@ -602,13 +603,25 @@ void esp_hidd_prf_cb_hdl(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
                 (hidd_le_env.hidd_cb)(ESP_HIDD_EVENT_BLE_CONNECT, &cb_param);
             }
 
-            esp_ble_conn_update_params_t conn_params;
-            memcpy(conn_params.bda, param->connect.remote_bda, sizeof(esp_bd_addr_t));
+        esp_ble_conn_update_params_t conn_params;
+        memcpy(conn_params.bda, param->connect.remote_bda, sizeof(esp_bd_addr_t));
+        
+        // Check if low power mode is enabled
+        bool low_power_mode = false;
+        storage_get_bool_setting("power.lowPowerMode", &low_power_mode);
+        
+        if (low_power_mode) {
+            conn_params.latency = 0x03; // number of skippable connection events
+            conn_params.min_int = 0x0A; // x 1.25ms
+            conn_params.max_int = 0x0F; // x 1.25ms
+        } else {
+            conn_params.latency = 0x00; // number of skippable connection events
             conn_params.min_int = 0x06; // x 1.25ms
             conn_params.max_int = 0x06; // x 1.25ms
-            conn_params.latency = 0x00; // number of skippable connection events
-            conn_params.timeout = 0xA0; // x 6.25ms
-            esp_ble_gap_update_conn_params(&conn_params);
+        }
+        
+        conn_params.timeout = 0xA0; // x 6.25ms
+        esp_ble_gap_update_conn_params(&conn_params);
             break;
         }
         case ESP_GATTS_DISCONNECT_EVT: {

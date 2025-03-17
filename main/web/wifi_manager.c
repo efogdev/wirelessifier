@@ -365,6 +365,7 @@ void disable_wifi_and_web_stack(void) {
     ESP_LOGI(WIFI_TAG, "Disabling WiFi and web stack...");
  
     is_connected = false;
+    esp_wifi_disconnect();
 
     // Send confirmation message before stopping services
     ws_broadcast_json("web_stack_disabled", "{}");

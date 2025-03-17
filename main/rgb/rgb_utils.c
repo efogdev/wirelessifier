@@ -13,21 +13,22 @@
 #include "../utils/storage.h"
 
 static const char *TAG = "RGB_UTILS";
-#define FPS 120
+#define BASE_FPS 120
+static uint16_t s_current_fps = BASE_FPS;
 uint8_t g_rgb_brightness = 35; // Default value, will be updated from settings
 
-// WiFi status LED parameters
 #define WIFI_BLINK_FAST_MS 250  // Fast blink period (ms)
 #define WIFI_BLINK_SLOW_MS 1000 // Slow blink period (ms)
 
-// WiFi status animation types
 typedef enum {
     WIFI_ANIM_NONE,
-    WIFI_ANIM_APSTA_NOT_CONNECTED,  // Fast blinking blue
-    WIFI_ANIM_APSTA_CONNECTED,      // Slow blinking blue
-    WIFI_ANIM_STA_NOT_CONNECTED,    // Fast blinking green
-    WIFI_ANIM_STA_CONNECTED         // Slow blinking green
-} wifi_animation_type_t;
+    WIFI_ANIM_APSTA_NOT_CONNECTED,
+    WIFI_ANIM_APSTA_CONNECTED,
+    WIFI_ANIM_STA_NOT_CONNECTED,
+    WIFI_ANIM_STA_CONNECTED,
+    BATTERY_CHARGE_LEVEL_WARN,
+    BATTERY_CHARGE_LEVEL_LOW,
+} status_animation_type_t;
 
 // Pattern definitions
 static const led_pattern_t led_patterns[] = {
@@ -99,8 +100,7 @@ static uint8_t s_status_mode = STATUS_MODE_OFF;
 static bool s_status_blink_state = false;
 static bool s_wifi_apsta_mode = false;
 static bool s_wifi_connected = false;
-static uint32_t s_wifi_blink_period_ms = WIFI_BLINK_FAST_MS;
-static wifi_animation_type_t s_wifi_animation = WIFI_ANIM_NONE;
+static status_animation_type_t s_wifi_animation = WIFI_ANIM_NONE;
 static uint32_t s_last_wifi_blink_time = 0;
 
 #define MIN_CYCLE_TIME_MS 200  // Fastest complete animation cycle: 200ms
@@ -124,6 +124,7 @@ static inline float get_animation_progress(uint32_t current_time, uint32_t cycle
 }
 
 static void led_control_task(void *arg);
+static void update_fps_from_settings(void);
 
 uint32_t rgb_color(uint8_t r, uint8_t g, uint8_t b)
 {
@@ -132,6 +133,23 @@ uint32_t rgb_color(uint8_t r, uint8_t g, uint8_t b)
     b = (b * g_rgb_brightness) / 100;
     
     return NP_RGB(r, g, b);
+}
+
+static void update_fps_from_settings(void)
+{
+    bool low_power_mode = false;
+    if (storage_get_bool_setting("power.lowPowerMode", &low_power_mode) == ESP_OK) {
+        if (low_power_mode) {
+            s_current_fps = BASE_FPS / 2; // 2x lower FPS in low power mode
+            ESP_LOGI(TAG, "Low power mode enabled, FPS set to %d", s_current_fps);
+        } else {
+            s_current_fps = BASE_FPS;
+            ESP_LOGI(TAG, "Normal power mode, FPS set to %d", s_current_fps);
+        }
+    } else {
+        s_current_fps = BASE_FPS;
+        ESP_LOGW(TAG, "Failed to get power mode from settings, using default FPS");
+    }
 }
 
 void led_control_init(int num_leds, int gpio_pin)
@@ -148,6 +166,9 @@ void led_control_init(int num_leds, int gpio_pin)
     } else {
         ESP_LOGW(TAG, "Failed to get brightness from settings, using default");
     }
+    
+    // Update FPS based on power mode
+    update_fps_from_settings();
     
     // Clean up previous resources if any
     if (s_previous_state != NULL) {
@@ -551,6 +572,6 @@ static void led_control_task(void *arg)
         }
 
         neopixel_SetPixel(neopixel_ctx, pixels, s_num_leds);
-        vTaskDelay(pdMS_TO_TICKS(1000 / FPS));
+        vTaskDelay(pdMS_TO_TICKS(1000 / s_current_fps));
     }
 }

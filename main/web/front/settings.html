@@ -546,6 +546,23 @@
                         <h2>Power Management</h2>
 
                         <div className="setting-item">
+                            <div className="setting-title">Low Power Mode</div>
+                            <div className="setting-description">
+                                Scarifice performance to improve battery life.
+                                Makes BLE interval to be ~12-20ms instead of 7.5ms.
+                                Makes LED indicators update with 60FPS instead of 120FPS.
+                            </div>
+                            <label className="toggle-switch">
+                                <input
+                                    type="checkbox"
+                                    checked={settings.power.lowPowerMode}
+                                    onChange={(e) => updateSetting('power', 'lowPowerMode', e.target.checked)}
+                                />
+                                <span className="slider"></span>
+                            </label>
+                        </div>
+
+                        <div className="setting-item">
                             <div className="setting-title">Enable Sleep</div>
                             <div className="setting-description">
                                 Enable device to enter sleep mode and disable Bluetooth when no events received in the
