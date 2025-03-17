@@ -124,8 +124,7 @@ static void monitor_task(void *pvParameter)
             ESP_LOGE(TAG, "Error getting real time stats");
         }
 
-        const uint32_t delay_ms = 1000;
-        vTaskDelay(pdMS_TO_TICKS(delay_ms));
+        vTaskDelay(pdMS_TO_TICKS(10000));
     }
 }
 
@@ -141,6 +140,6 @@ esp_err_t task_monitor_start(void)
         return ESP_ERR_INVALID_STATE;
     }
 
-    BaseType_t ret = xTaskCreatePinnedToCore(monitor_task, "monitor", 2048, NULL, STATS_TASK_PRIO, &monitor_task_handle, tskNO_AFFINITY);
+    BaseType_t ret = xTaskCreatePinnedToCore(monitor_task, "monitor", 2048, NULL, STATS_TASK_PRIO, &monitor_task_handle, 1);
     return (ret == pdPASS) ? ESP_OK : ESP_FAIL;
 }

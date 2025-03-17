@@ -70,7 +70,7 @@ static void init_variables() {
 
 static void init_pm() {
     const esp_pm_config_t cfg = {
-        .light_sleep_enable = true,
+        .light_sleep_enable = false,
         .max_freq_mhz = 80,
         .min_freq_mhz = 10,
     };

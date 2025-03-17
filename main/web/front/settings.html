@@ -249,7 +249,8 @@
             power: {
                 sleepTimeout: 30, // seconds
                 lowPowerMode: false,
-                enableSleep: true
+                enableSleep: true,
+                deepSleep: false
             },
             led: {
                 brightness: 80
@@ -573,6 +574,21 @@
                                     type="checkbox"
                                     checked={settings.power.enableSleep}
                                     onChange={(e) => updateSetting('power', 'enableSleep', e.target.checked)}
+                                />
+                                <span className="slider"></span>
+                            </label>
+                        </div>
+
+                        <div className="setting-item">
+                            <div className="setting-title">Deep Sleep</div>
+                            <div className="setting-description">
+                                When enabled, USB device will not be able to wake up the device. You will have to press any button on the device itself.
+                            </div>
+                            <label className="toggle-switch">
+                                <input
+                                    type="checkbox"
+                                    checked={settings.power.deepSleep}
+                                    onChange={(e) => updateSetting('power', 'deepSleep', e.target.checked)}
                                 />
                                 <span className="slider"></span>
                             </label>

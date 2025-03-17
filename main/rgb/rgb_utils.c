@@ -125,6 +125,46 @@ static inline float get_animation_progress(uint32_t current_time, uint32_t cycle
 
 static void led_control_task(void *arg);
 static void update_fps_from_settings(void);
+static bool is_task_suspended = false;
+
+// Function to check if the task should be suspended and handle suspension/resumption
+static void check_and_update_task_suspension(void)
+{
+    // Check conditions for suspension:
+    // 1. Current pattern's only color is {0}
+    // 2. Status LED is in off state (including no active WiFi animation)
+    bool should_suspend = false;
+    
+    if (s_led_pattern >= 0 && s_led_pattern < sizeof(led_patterns)/sizeof(led_patterns[0])) {
+        const led_pattern_t* pattern = &led_patterns[s_led_pattern];
+        bool only_zero_color = (pattern->colors[0] == 0);
+        bool status_led_off = (s_status_mode == STATUS_MODE_OFF) && (s_wifi_animation == WIFI_ANIM_NONE);
+        
+        should_suspend = only_zero_color && status_led_off;
+    }
+    
+    // Handle suspension/resumption
+    if (should_suspend && !is_task_suspended && s_led_task_handle != NULL) {
+        ESP_LOGI(TAG, "Suspending LED task - no color and status LED off");
+        
+        // Set all pixels to black (0,0,0) before suspending
+        if (neopixel_ctx != NULL) {
+            tNeopixel pixels[s_num_leds];
+            for (int i = 0; i < s_num_leds; i++) {
+                pixels[i].index = i;
+                pixels[i].rgb = 0; // Set to black (0,0,0)
+            }
+            neopixel_SetPixel(neopixel_ctx, pixels, s_num_leds);
+        }
+        
+        vTaskSuspend(s_led_task_handle);
+        is_task_suspended = true;
+    } else if (!should_suspend && is_task_suspended && s_led_task_handle != NULL) {
+        ESP_LOGI(TAG, "Resuming LED task - conditions changed");
+        vTaskResume(s_led_task_handle);
+        is_task_suspended = false;
+    }
+}
 
 uint32_t rgb_color(uint8_t r, uint8_t g, uint8_t b)
 {
@@ -275,6 +315,9 @@ void led_update_pattern(bool usb_connected, bool ble_connected, bool ble_paused)
         s_use_secondary_color = false;
         s_direction_up = true;
     }
+    
+    // Check if we need to suspend or resume the task based on new pattern
+    check_and_update_task_suspension();
 }
 
 void led_update_status(uint32_t color, uint8_t mode)
@@ -286,6 +329,9 @@ void led_update_status(uint32_t color, uint8_t mode)
     s_status_mode = mode;
     s_status_blink_state = false;  // Reset blink state when mode changes
     s_last_blink_time = 0;  // Force immediate update
+    
+    // Check if we need to suspend or resume the task based on new status
+    check_and_update_task_suspension();
 }
 
 // New function to update WiFi status LED
@@ -312,6 +358,9 @@ void led_update_wifi_status(bool is_apsta_mode, bool is_connected)
     // Reset blink state
     s_status_blink_state = false;
     s_last_wifi_blink_time = 0;
+    
+    // Check if we need to suspend or resume the task based on new WiFi status
+    check_and_update_task_suspension();
 }
 
 static void update_wifi_status_led(tNeopixel* pixels)

@@ -79,8 +79,6 @@ static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *
         case ESP_HIDD_EVENT_BLE_DISCONNECT: {
             s_connected = false;
             ESP_LOGI(TAG, "ESP_HIDD_EVENT_BLE_DISCONNECT");
-            // Use reconnect delay from settings
-            ESP_LOGI(TAG, "Will reconnect in %d seconds", s_reconnect_delay);
             vTaskDelay(pdMS_TO_TICKS(s_reconnect_delay * 1000));
             esp_ble_gap_start_advertising(&hidd_adv_params);
             break;

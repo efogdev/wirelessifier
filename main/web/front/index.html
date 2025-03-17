@@ -136,7 +136,7 @@
         
         <div class="form-group">
             <button id="settingsBtn" style="background-color: #6c757d;">Settings</button>
-            <button id="disableWebStackBtn" style="background-color: #d5706e;">Disable WiFi</button>
+            <button id="disableWebStackBtn" style="background-color: #d5706e;">WiFi off</button>
             <button id="rebootBtn" style="background-color: #f0ad4e;">Reboot</button>
             <div class="fg-spacer"></div>
         </div>
@@ -344,7 +344,7 @@
                     } else {
                         signalQuality = "bad";
                     }
-                    option.textContent = `${network.ssid} (${network.rssi} dBm: ${signalQuality})`;
+                    option.textContent = `${network.ssid} (${network.rssi} dBm, ${signalQuality})`;
                     networkSelect.appendChild(option);
                 });
                 

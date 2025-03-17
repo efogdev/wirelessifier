@@ -81,9 +81,9 @@ static void inactivity_timer_callback(TimerHandle_t xTimer)
         ESP_LOGE(TAG, "Failed to deinitialize BLE HID device: %s", esp_err_to_name(ret));
         s_ble_stack_active = true;
     } else {
-        ESP_LOGI(TAG, "BLE stack stopped, entering light sleep mode");
+        ESP_LOGI(TAG, "BLE stack stopped");
         xSemaphoreGive(s_ble_stack_mutex);
-        esp_light_sleep_start();
+        // esp_light_sleep_start();
         return;
     }
     
