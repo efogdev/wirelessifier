@@ -217,8 +217,18 @@ esp_err_t ble_hid_device_init(void)
     
     ESP_LOGI(TAG, "Setting BLE TX power to level: %d", power_level);
     esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_DEFAULT, power_level);
-    esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, power_level);
-    esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_SCAN, power_level);
+
+    bool low_power_mode = false;
+    storage_get_bool_setting("power.lowPowerMode", &low_power_mode);
+
+    if (low_power_mode) {
+        esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, ESP_PWR_LVL_N6);
+        esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_SCAN, ESP_PWR_LVL_N6);
+    } else {
+        esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, power_level);
+        esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_SCAN, power_level);
+    }
+
     esp_ble_gatt_set_local_mtu(120);
     return ESP_OK;
 }

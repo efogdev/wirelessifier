@@ -3,6 +3,8 @@
 #include "freertos/FreeRTOS.h"
 #include <cJSON.h>
 #include "../utils/storage.h"
+#include "../ble/ble_hid_device.h"
+#include "esp_gap_ble_api.h"
 
 static const char *WS_TAG = "WS";
 static httpd_handle_t server = NULL;
@@ -256,6 +258,65 @@ esp_err_t init_device_settings(void) {
 }
 
 // Process settings-related WebSocket messages
+// Function to remove all bonded BLE devices
+static void remove_all_bonded_devices(void)
+{
+    int dev_num = esp_ble_get_bond_device_num();
+
+    esp_ble_bond_dev_t *dev_list = (esp_ble_bond_dev_t *)malloc(sizeof(esp_ble_bond_dev_t) * dev_num);
+    esp_ble_get_bond_device_list(&dev_num, dev_list);
+    for (int i = 0; i < dev_num; i++) {
+        esp_ble_remove_bond_device(dev_list[i].bd_addr);
+    }
+
+    free(dev_list);
+}
+
+// Check if lowPowerMode setting has changed
+static bool has_low_power_mode_changed(const char* new_settings_json, bool* new_value) {
+    if (!new_settings_json || !new_value) return false;
+    
+    // Parse the new settings JSON
+    cJSON *root = cJSON_Parse(new_settings_json);
+    if (!root) {
+        ESP_LOGE(WS_TAG, "Error parsing new settings JSON");
+        return false;
+    }
+    
+    // Get the power object
+    cJSON *power_obj = cJSON_GetObjectItem(root, "power");
+    if (!power_obj) {
+        ESP_LOGE(WS_TAG, "power object not found in new settings");
+        cJSON_Delete(root);
+        return false;
+    }
+    
+    // Get the lowPowerMode value
+    cJSON *low_power_mode = cJSON_GetObjectItem(power_obj, "lowPowerMode");
+    if (!low_power_mode || !cJSON_IsBool(low_power_mode)) {
+        ESP_LOGE(WS_TAG, "lowPowerMode not found or not a boolean in new settings");
+        cJSON_Delete(root);
+        return false;
+    }
+    
+    // Get the new value
+    *new_value = cJSON_IsTrue(low_power_mode);
+    
+    // Get the current value
+    bool current_value = false;
+    esp_err_t err = storage_get_bool_setting("power.lowPowerMode", &current_value);
+    
+    cJSON_Delete(root);
+    
+    // If we couldn't get the current value, assume it's changed
+    if (err != ESP_OK) {
+        return true;
+    }
+    
+    // Return true if the value has changed
+    return *new_value != current_value;
+}
+
 static void process_settings_ws_message(const char* message) {
     if (!message) return;
     
@@ -316,6 +377,10 @@ static void process_settings_ws_message(const char* message) {
                 return;
             }
             
+            // Check if lowPowerMode has changed
+            bool new_low_power_mode = false;
+            bool low_power_mode_changed = has_low_power_mode_changed(new_settings, &new_low_power_mode);
+            
             // Save settings using the storage module
             esp_err_t err = storage_update_settings(new_settings);
             
@@ -323,6 +388,22 @@ static void process_settings_ws_message(const char* message) {
             if (err == ESP_OK) {
                 // Send success response
                 ws_broadcast_json("settings_update_status", "{\"success\":true}");
+                
+                // If lowPowerMode has changed, disconnect BLE and unbond all devices
+                if (low_power_mode_changed) {
+                    ESP_LOGI(WS_TAG, "lowPowerMode changed to %s, disconnecting BLE and unbonding devices", 
+                             new_low_power_mode ? "true" : "false");
+                    
+                    // Deinitialize BLE HID device (disconnects)
+                    ble_hid_device_deinit();
+                    
+                    // Remove all bonded devices
+                    remove_all_bonded_devices();
+                    
+                    // Reinitialize BLE HID device
+                    ble_hid_device_init();
+                    ble_hid_device_start_advertising();
+                }
             } else {
                 // Send error response
                 char error_msg[100];
@@ -331,6 +412,9 @@ static void process_settings_ws_message(const char* message) {
             }
             
             free(new_settings);
+            storage_set_boot_with_wifi();
+            vTaskDelay(pdMS_TO_TICKS(100));
+            esp_restart();
         }
     }
     

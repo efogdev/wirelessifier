@@ -304,3 +304,33 @@ esp_err_t storage_get_bool_setting(const char* path, bool* value) {
     cJSON_Delete(item);
     return ESP_ERR_INVALID_ARG;
 }
+
+// Set the one-time boot with WiFi flag
+esp_err_t storage_set_boot_with_wifi(void) {
+    // Open NVS
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_open(WIFI_CONFIG_NAMESPACE, NVS_READWRITE, &nvs_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(STORAGE_TAG, "Error opening NVS for boot_wifi flag: %s", esp_err_to_name(err));
+        return err;
+    }
+    
+    // Set the boot_wifi flag to 1
+    err = nvs_set_u8(nvs_handle, BOOT_WIFI_KEY, 1);
+    if (err != ESP_OK) {
+        ESP_LOGE(STORAGE_TAG, "Error setting boot_wifi flag: %s", esp_err_to_name(err));
+        nvs_close(nvs_handle);
+        return err;
+    }
+    
+    // Commit changes
+    err = nvs_commit(nvs_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(STORAGE_TAG, "Error committing NVS for boot_wifi flag: %s", esp_err_to_name(err));
+    } else {
+        ESP_LOGI(STORAGE_TAG, "Successfully set boot_wifi flag");
+    }
+    
+    nvs_close(nvs_handle);
+    return err;
+}

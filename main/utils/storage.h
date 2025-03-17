@@ -6,6 +6,8 @@
 // Settings namespace and keys for NVS
 #define SETTINGS_NVS_NAMESPACE "device_settings"
 #define SETTINGS_NVS_KEY "settings"
+#define WIFI_CONFIG_NAMESPACE "wifi_config"
+#define BOOT_WIFI_KEY "boot_wifi"
 
 /**
  * @brief Initialize device settings from NVS or defaults
@@ -56,3 +58,10 @@ esp_err_t storage_get_int_setting(const char* path, int* value);
  * @return esp_err_t ESP_OK on success
  */
 esp_err_t storage_get_bool_setting(const char* path, bool* value);
+
+/**
+ * @brief Set the one-time boot with WiFi flag
+ * 
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t storage_set_boot_with_wifi(void);

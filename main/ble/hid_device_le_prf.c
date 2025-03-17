@@ -611,9 +611,9 @@ void esp_hidd_prf_cb_hdl(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
         storage_get_bool_setting("power.lowPowerMode", &low_power_mode);
         
         if (low_power_mode) {
-            conn_params.latency = 0x03; // number of skippable connection events
+            conn_params.latency = 0x02; // number of skippable connection events
             conn_params.min_int = 0x0A; // x 1.25ms
-            conn_params.max_int = 0x0F; // x 1.25ms
+            conn_params.max_int = 0x0C; // x 1.25ms
         } else {
             conn_params.latency = 0x00; // number of skippable connection events
             conn_params.min_int = 0x06; // x 1.25ms

@@ -6,6 +6,8 @@
 #include <esp_netif.h>
 #include <nvs_flash.h>
 #include <nvs.h>
+#include <storage.h>
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
@@ -26,7 +28,6 @@ static const char *WIFI_TAG = "WIFI_MGR";
 #define NVS_NAMESPACE "wifi_config"
 #define NVS_KEY_SSID "ssid"
 #define NVS_KEY_PASS "password"
-#define NVS_KEY_BOOT_WITH_WIFI "boot_wifi"
 
 int s_retry_num = 0;
 static bool connecting = false;
@@ -83,7 +84,7 @@ esp_err_t connect_wifi_with_stored_credentials(void) {
     
     // Wait for connection or failure
     EventBits_t bits = xEventGroupWaitBits(wifi_event_group,
-        WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdFALSE, pdTRUE, portMAX_DELAY);
+        WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdFALSE, pdFALSE, portMAX_DELAY);
 
     if (bits & WIFI_CONNECTED_BIT) {
         ESP_LOGI(WIFI_TAG, "Connected to %s", ssid);
@@ -304,7 +305,7 @@ esp_err_t connect_to_wifi(const char* ssid, const char* password) {
     
     // Wait for connection or failure
     EventBits_t bits = xEventGroupWaitBits(wifi_event_group,
-        WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdFALSE, pdTRUE, 40000 / portTICK_PERIOD_MS);
+        WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdFALSE, pdFALSE, 40000 / portTICK_PERIOD_MS);
     
     connecting = false;
 
@@ -322,15 +323,7 @@ esp_err_t connect_to_wifi(const char* ssid, const char* password) {
         ws_broadcast_json("wifi_connect_status", status_json);
         
         // Set one-time boot flag to start with WiFi regardless of SW4 state
-        nvs_handle_t nvs_handle;
-        esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
-        if (err == ESP_OK) {
-            nvs_set_u8(nvs_handle, NVS_KEY_BOOT_WITH_WIFI, 1);
-            nvs_commit(nvs_handle);
-            nvs_close(nvs_handle);
-            ESP_LOGI(WIFI_TAG, "Set boot with WiFi flag");
-        }
-        
+        storage_set_boot_with_wifi();
         vTaskDelay(pdMS_TO_TICKS(100));
         esp_restart();
 

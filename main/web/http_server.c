@@ -315,7 +315,7 @@ static void web_services_task(void *pvParameters)
         ESP_LOGI(HTTP_TAG, "Found stored WiFi credentials, attempting to connect");
     
         EventBits_t bits = xEventGroupWaitBits(wifi_event_group,
-            WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdFALSE, pdTRUE, 10000 / portTICK_PERIOD_MS);
+            WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdFALSE, pdFALSE, 10000 / portTICK_PERIOD_MS);
 
         if (bits & WIFI_FAIL_BIT) {
             // Set one-time boot flag to start with WiFi and reboot

@@ -382,7 +382,7 @@
                     case 'settings_update_status':
                         // Show status message
                         if (message.content.success) {
-                            showStatus('Settings updated successfully', 'success');
+                            showStatus('Settings updated successfully. The device is restarting.', 'success');
                         } else {
                             showStatus(`Failed to update settings: ${message.content.error}`, 'error');
                         }
@@ -499,7 +499,7 @@
                     )}
 
                     <button onClick={saveSettings} disabled={!connected || otaInProgress}>
-                        Save
+                        Save & Reboot
                     </button>
                     <button onClick={() => window.location.href = '/'} style={{marginLeft: '10px', backgroundColor: '#6c757d'}}
                             disabled={otaInProgress}>
@@ -548,9 +548,9 @@
                         <div className="setting-item">
                             <div className="setting-title">Low Power Mode</div>
                             <div className="setting-description">
-                                Scarifice performance to improve battery life.
-                                Makes BLE interval to be ~12-20ms instead of 7.5ms.
-                                Makes LED indicators update with 60FPS instead of 120FPS.
+                                Sacrifice performance to improve battery life.
+                                Makes BLE interval to be ~12-15ms instead of 7.5ms.
+                                Makes RGB LEDs to update with 60FPS instead of 120FPS.
                             </div>
                             <label className="toggle-switch">
                                 <input
