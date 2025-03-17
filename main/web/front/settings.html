@@ -714,7 +714,7 @@
                                             setOtaInProgress(true);
                                             setOtaProgress(0);
                                             showStatus('Starting firmware upload...', 'info');
-                                            document.body.scrollTo(0, 0);
+                                            window.scrollTo(0, 0);
 
                                             fetch('/upload', {
                                                 method: 'POST',

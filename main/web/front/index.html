@@ -5,18 +5,14 @@
     <meta name="viewport"
           content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>AnyBLE WiFi Setup</title>
-    <link rel="manifest" href="/lib/manifest.json">
+    <title>WiFi Setup</title>
     <meta name="theme-color" content="#4CAF50">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <meta name="apple-mobile-web-app-title" content="AnyBLE">
     <style>
         body {
             font-family: Arial, sans-serif;
             max-width: 600px;
             margin: 0 auto;
-            padding: 20px;
+            padding: 12px;
         }
         h1 {
             text-align: center;
@@ -124,7 +120,7 @@
     </style>
 </head>
 <body>
-    <h1>AnyBLE WiFi Setup</h1>
+    <h1>WiFi Setup</h1>
     
     <div id="loadingContainer" class="loading hidden">
         <div class="spinner"></div>
@@ -136,7 +132,7 @@
         
         <div class="form-group">
             <button id="settingsBtn" style="background-color: #6c757d;">Settings</button>
-            <button id="disableWebStackBtn" style="background-color: #d5706e;">WiFi off</button>
+            <button id="disableWebStackBtn" style="background-color: #d5706e;">Stop WiFi</button>
             <button id="rebootBtn" style="background-color: #f0ad4e;">Reboot</button>
             <div class="fg-spacer"></div>
         </div>
@@ -167,19 +163,6 @@
     </div>
 
     <script>
-        // Register Service Worker for offline support
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/lib/sw.js')
-                    .then(registration => {
-                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
-                    })
-                    .catch(error => {
-                        console.error('ServiceWorker registration failed: ', error);
-                    });
-            });
-        }
-
         // DOM elements
         const loadingContainer = document.getElementById('loadingContainer');
         const mainContainer = document.getElementById('mainContainer');
