@@ -13,6 +13,7 @@
 #include "http_server.h"
 #include "dns_server.h"
 #include "../utils/temp_sensor.h"
+#include "../rgb/rgb_utils.h"
 
 static const char *WIFI_TAG = "WIFI_MGR";
 
@@ -372,6 +373,9 @@ void disable_wifi_and_web_stack(void) {
     // Stop web server and related services (HTTP, WebSocket, OTA, DNS)
     stop_webserver();
     
+    // Turn off WiFi status LED
+    led_update_status(STATUS_COLOR_OFF, STATUS_MODE_OFF);
+    
     // Stop WiFi
     esp_wifi_stop();
     
@@ -443,6 +447,14 @@ void update_wifi_connection_status(bool connected, const char* ip) {
     if (ip) {
         strlcpy(connected_ip, ip, sizeof(connected_ip));
     }
+    
+    // Get current WiFi mode
+    wifi_mode_t mode;
+    esp_wifi_get_mode(&mode);
+    bool is_apsta_mode = (mode == WIFI_MODE_APSTA);
+    
+    // Update WiFi status LED
+    led_update_wifi_status(is_apsta_mode, connected);
 }
 
 // Check if device is connected to WiFi

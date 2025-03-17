@@ -65,6 +65,9 @@ void led_update_pattern(bool usb_connected, bool ble_connected, bool ble_paused)
 // Update status LED (LED 0)
 void led_update_status(uint32_t color, uint8_t mode);
 
+// Update WiFi status LED
+void led_update_wifi_status(bool is_apsta_mode, bool is_connected);
+
 #ifdef __cplusplus
 }
 #endif

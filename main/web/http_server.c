@@ -10,6 +10,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "nvs_flash.h"
+#include "../rgb/rgb_utils.h"
 
 static const char *HTTP_TAG = "HTTP";
 static httpd_handle_t server = NULL;
@@ -213,16 +214,22 @@ void init_wifi_apsta(void)
         },
     };
 
+    bool is_apsta_mode = false;
     if (has_wifi_credentials()) {
         // Use STA mode when credentials exist
         ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
         ESP_LOGI(HTTP_TAG, "WiFi initialized in STA mode.");
+        is_apsta_mode = false;
     } else {
         // Use APSTA mode when no credentials
         ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
         ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
         ESP_LOGI(HTTP_TAG, "WiFi initialized in APSTA mode.");
+        is_apsta_mode = true;
     }
+
+    // Initialize WiFi status LED
+    led_update_wifi_status(is_apsta_mode, false);  // Initially not connected
 
     ESP_ERROR_CHECK(esp_wifi_start());
 }

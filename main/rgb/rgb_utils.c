@@ -9,10 +9,24 @@
 #include "rgb_utils.h"
 #include "neopixel.h"
 #include <math.h>
+#include "esp_wifi.h"
 
 static const char *TAG = "RGB_UTILS";
 #define FPS 120
 uint8_t g_rgb_brightness = 35;
+
+// WiFi status LED parameters
+#define WIFI_BLINK_FAST_MS 250  // Fast blink period (ms)
+#define WIFI_BLINK_SLOW_MS 1000 // Slow blink period (ms)
+
+// WiFi status animation types
+typedef enum {
+    WIFI_ANIM_NONE,
+    WIFI_ANIM_APSTA_NOT_CONNECTED,  // Fast blinking blue
+    WIFI_ANIM_APSTA_CONNECTED,      // Slow blinking blue
+    WIFI_ANIM_STA_NOT_CONNECTED,    // Fast blinking green
+    WIFI_ANIM_STA_CONNECTED         // Slow blinking green
+} wifi_animation_type_t;
 
 // Pattern definitions
 static const led_pattern_t led_patterns[] = {
@@ -82,6 +96,11 @@ static tNeopixel* s_previous_state = NULL;
 static uint32_t s_status_color = STATUS_COLOR_OFF;
 static uint8_t s_status_mode = STATUS_MODE_OFF;
 static bool s_status_blink_state = false;
+static bool s_wifi_apsta_mode = false;
+static bool s_wifi_connected = false;
+static uint32_t s_wifi_blink_period_ms = WIFI_BLINK_FAST_MS;
+static wifi_animation_type_t s_wifi_animation = WIFI_ANIM_NONE;
+static uint32_t s_last_wifi_blink_time = 0;
 
 #define MIN_CYCLE_TIME_MS 200  // Fastest complete animation cycle: 200ms
 #define MAX_CYCLE_TIME_MS 2000 // Slowest complete animation cycle: 2000ms
@@ -90,6 +109,7 @@ static uint32_t s_last_blink_time = 0;
 
 // Function prototypes
 static void update_status_led(tNeopixel* pixels);
+static void update_wifi_status_led(tNeopixel* pixels);
 static inline void apply_pattern(tNeopixel* pixels, const led_pattern_t* pattern);
 
 static inline uint32_t get_cycle_time_ms(uint8_t speed) {
@@ -115,13 +135,6 @@ uint32_t rgb_color(uint8_t r, uint8_t g, uint8_t b)
 
 void led_control_init(int num_leds, int gpio_pin)
 {
-    // Validate number of LEDs (must be at least 2 for the columns plus 1 for status)
-    // and must be odd (even number for columns plus 1 status LED)
-    if (num_leds < 3 || (num_leds - 1) % 2 != 0) {
-        ESP_LOGE(TAG, "Invalid number of LEDs: %d. Must be odd and >= 3 (1 status + even number for columns)", num_leds);
-        return;
-    }
-    
     // Clean up previous resources if any
     if (s_previous_state != NULL) {
         free(s_previous_state);
@@ -231,14 +244,94 @@ void led_update_pattern(bool usb_connected, bool ble_connected, bool ble_paused)
 
 void led_update_status(uint32_t color, uint8_t mode)
 {
+    // Disable WiFi animation when setting a regular status
+    s_wifi_animation = WIFI_ANIM_NONE;
+    
     s_status_color = color;
     s_status_mode = mode;
     s_status_blink_state = false;  // Reset blink state when mode changes
     s_last_blink_time = 0;  // Force immediate update
 }
 
+// New function to update WiFi status LED
+void led_update_wifi_status(bool is_apsta_mode, bool is_connected)
+{
+    s_wifi_apsta_mode = is_apsta_mode;
+    s_wifi_connected = is_connected;
+    
+    // Determine animation type based on mode and connection status
+    if (is_apsta_mode) {
+        if (is_connected) {
+            s_wifi_animation = WIFI_ANIM_APSTA_CONNECTED;
+        } else {
+            s_wifi_animation = WIFI_ANIM_APSTA_NOT_CONNECTED;
+        }
+    } else {
+        if (is_connected) {
+            s_wifi_animation = WIFI_ANIM_STA_CONNECTED;
+        } else {
+            s_wifi_animation = WIFI_ANIM_STA_NOT_CONNECTED;
+        }
+    }
+    
+    // Reset blink state
+    s_status_blink_state = false;
+    s_last_wifi_blink_time = 0;
+}
+
+static void update_wifi_status_led(tNeopixel* pixels)
+{
+    uint32_t current_time = pdTICKS_TO_MS(xTaskGetTickCount());
+    
+    // If no WiFi animation is set, return
+    if (s_wifi_animation == WIFI_ANIM_NONE) {
+        return;
+    }
+    
+    // Determine color and blink period based on animation type
+    uint32_t color = STATUS_COLOR_OFF;
+    uint32_t blink_period = WIFI_BLINK_FAST_MS;
+    
+    switch (s_wifi_animation) {
+        case WIFI_ANIM_APSTA_NOT_CONNECTED:
+            color = STATUS_COLOR_BLUE;
+            blink_period = WIFI_BLINK_FAST_MS;
+            break;
+        case WIFI_ANIM_APSTA_CONNECTED:
+            color = STATUS_COLOR_BLUE;
+            blink_period = WIFI_BLINK_SLOW_MS;
+            break;
+        case WIFI_ANIM_STA_NOT_CONNECTED:
+            color = STATUS_COLOR_GREEN;
+            blink_period = WIFI_BLINK_FAST_MS;
+            break;
+        case WIFI_ANIM_STA_CONNECTED:
+            color = STATUS_COLOR_GREEN;
+            blink_period = WIFI_BLINK_SLOW_MS;
+            break;
+        default:
+            return;
+    }
+    
+    // Update blink state if needed
+    if ((current_time - s_last_wifi_blink_time) >= blink_period) {
+        s_status_blink_state = !s_status_blink_state;
+        s_last_wifi_blink_time = current_time;
+    }
+    
+    // Set status LED color based on blink state
+    pixels[0].index = 0;
+    pixels[0].rgb = s_status_blink_state ? color : STATUS_COLOR_OFF;
+}
+
 static void update_status_led(tNeopixel* pixels)
 {
+    // If WiFi animation is active, use that instead of regular status LED
+    if (s_wifi_animation != WIFI_ANIM_NONE) {
+        update_wifi_status_led(pixels);
+        return;
+    }
+    
     uint32_t current_time = pdTICKS_TO_MS(xTaskGetTickCount());
     
     // Update blink state if needed
