@@ -73,7 +73,7 @@ esp_err_t connect_wifi_with_stored_credentials(void) {
     strlcpy((char*)wifi_config.sta.password, password, sizeof(wifi_config.sta.password));
     
     ESP_LOGI(WIFI_TAG, "Connecting to %s...", ssid);
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     
     // Use esp_err_t to handle the return value instead of ESP_ERROR_CHECK
     esp_err_t connect_err = esp_wifi_connect();
@@ -178,7 +178,7 @@ bool has_wifi_credentials(void) {
 void process_wifi_scan_results(void) {
     // Get scan results
     uint16_t ap_count = 0;
-    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_count));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_scan_get_ap_num(&ap_count));
     
     ESP_LOGI(WIFI_TAG, "WiFi scan completed, found %d networks", ap_count);
     
@@ -196,7 +196,7 @@ void process_wifi_scan_results(void) {
     }
     
     // Get scan results
-    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_count, ap_records));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_scan_get_ap_records(&ap_count, ap_records));
     
     // Build JSON array of results
     char *json_buffer = malloc(ap_count * 128); // Allocate enough space for all APs
@@ -294,7 +294,7 @@ esp_err_t connect_to_wifi(const char* ssid, const char* password) {
     ESP_LOGI(WIFI_TAG, "Connecting to %s...", ssid);
 
     // Set WiFi configuration and start
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     
     // Use esp_err_t to handle the return value instead of ESP_ERROR_CHECK
     esp_err_t connect_err = esp_wifi_connect();
@@ -384,6 +384,35 @@ void disable_wifi_and_web_stack(void) {
     }
 }
 
+// Reboot the device
+void reboot_device(bool keep_wifi) {
+    ESP_LOGI(WIFI_TAG, "Rebooting device, keep_wifi=%d", keep_wifi);
+    
+    // Send confirmation message before rebooting
+    ws_broadcast_json("log", "\"Rebooting device...\"");
+    
+    // Send reboot message to trigger UI update
+    ws_broadcast_json("reboot", "{}");
+    
+    vTaskDelay(pdMS_TO_TICKS(100)); // Give time for the messages to be sent
+    
+    // Set or clear the boot with WiFi flag based on user choice
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
+    if (err == ESP_OK) {
+        nvs_set_u8(nvs_handle, NVS_KEY_BOOT_WITH_WIFI, keep_wifi ? 1 : 0);
+        nvs_commit(nvs_handle);
+        nvs_close(nvs_handle);
+        ESP_LOGI(WIFI_TAG, "%s boot with WiFi flag", keep_wifi ? "Set" : "Cleared");
+    }
+    
+    // Small delay to ensure NVS write completes
+    vTaskDelay(pdMS_TO_TICKS(100));
+    
+    // Reboot
+    esp_restart();
+}
+
 // Process WebSocket messages for WiFi management
 void process_wifi_ws_message(const char* message) {
     // Simple JSON parsing - in a real application, use a proper JSON parser
@@ -395,6 +424,16 @@ void process_wifi_ws_message(const char* message) {
     }
     else if (strstr(message, "\"type\":\"wifi_scan\"")) {
         scan_wifi_networks();
+    }
+    else if (strstr(message, "\"type\":\"reboot\"")) {
+        // Extract keepWifi parameter
+        bool keep_wifi = false;
+        if (strstr(message, "\"keepWifi\":true")) {
+            keep_wifi = true;
+        }
+        
+        // Reboot the device
+        reboot_device(keep_wifi);
     }
     else if (strstr(message, "\"type\":\"disable_web_stack\"")) {
         // Send acknowledgment before disabling

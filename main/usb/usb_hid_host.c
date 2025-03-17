@@ -104,7 +104,7 @@ esp_err_t usb_hid_host_init(QueueHandle_t report_queue) {
         .intr_flags = ESP_INTR_FLAG_LEVEL1,
     };
 
-    ESP_ERROR_CHECK(usb_host_install(&host_config));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(usb_host_install(&host_config));
 
     BaseType_t task_created = xTaskCreatePinnedToCore(hid_host_event_task, "hid_events", 2600, NULL, 13, &g_event_task_handle, 1);
     if (task_created != pdTRUE) {
@@ -486,7 +486,7 @@ static const char *hid_proto_name_str[] = {
 
 static void process_device_event(hid_host_device_handle_t hid_device_handle, const hid_host_driver_event_t event, void *arg) {
     hid_host_dev_params_t dev_params;
-    ESP_ERROR_CHECK(hid_host_device_get_params(hid_device_handle, &dev_params));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(hid_host_device_get_params(hid_device_handle, &dev_params));
 
     if (event == HID_HOST_DRIVER_EVENT_CONNECTED) {
         ESP_LOGI(TAG, "HID Device Connected, proto = %s, subclass = %d", hid_proto_name_str[dev_params.proto], dev_params.sub_class);
@@ -496,10 +496,10 @@ static void process_device_event(hid_host_device_handle_t hid_device_handle, con
             .callback_arg = NULL
         };
 
-        ESP_ERROR_CHECK(hid_host_device_open(hid_device_handle, &dev_config));
-        ESP_ERROR_CHECK(hid_class_request_set_protocol(hid_device_handle, HID_REPORT_PROTOCOL_REPORT));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(hid_host_device_open(hid_device_handle, &dev_config));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(hid_class_request_set_protocol(hid_device_handle, HID_REPORT_PROTOCOL_REPORT));
         if (HID_PROTOCOL_KEYBOARD == dev_params.proto) {
-            ESP_ERROR_CHECK(hid_class_request_set_idle(hid_device_handle, 0, 0));
+            ESP_ERROR_CHECK_WITHOUT_ABORT(hid_class_request_set_idle(hid_device_handle, 0, 0));
         }
 
         // Get and parse report descriptor
@@ -510,7 +510,7 @@ static void process_device_event(hid_host_device_handle_t hid_device_handle, con
             parse_report_descriptor(desc, desc_len, dev_params.iface_num);
         }
 
-        ESP_ERROR_CHECK(hid_host_device_start(hid_device_handle));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(hid_host_device_start(hid_device_handle));
         g_device_connected = true;
     } else {
         ESP_LOGI(TAG, "Unknown device event, subclass = %d, proto = %s, iface = %d",
@@ -523,12 +523,12 @@ static void process_interface_event(hid_host_device_handle_t hid_device_handle, 
     size_t data_length = 0;
     hid_host_dev_params_t dev_params;
 
-    ESP_ERROR_CHECK(hid_host_device_get_params(hid_device_handle, &dev_params));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(hid_host_device_get_params(hid_device_handle, &dev_params));
     // ESP_LOGD(TAG, "Interface 0x%x: HID event received", dev_params.iface_num);
 
     switch (event) {
         case HID_HOST_INTERFACE_EVENT_INPUT_REPORT:
-            ESP_ERROR_CHECK(hid_host_device_get_raw_input_report_data(hid_device_handle, data, sizeof(data), &data_length));
+            ESP_ERROR_CHECK_WITHOUT_ABORT(hid_host_device_get_raw_input_report_data(hid_device_handle, data, sizeof(data), &data_length));
             // ESP_LOGD(TAG, "Raw input report data: length=%d", data_length);
             process_report(hid_device_handle, data, data_length, 0, dev_params.iface_num);
             break;
@@ -536,7 +536,7 @@ static void process_interface_event(hid_host_device_handle_t hid_device_handle, 
         case HID_HOST_INTERFACE_EVENT_DISCONNECTED:
             ESP_LOGI(TAG, "HID Device Disconnected - Interface: %d", dev_params.iface_num);
             g_device_connected = false;
-            ESP_ERROR_CHECK(hid_host_device_close(hid_device_handle));
+            ESP_ERROR_CHECK_WITHOUT_ABORT(hid_host_device_close(hid_device_handle));
             break;
 
         case HID_HOST_INTERFACE_EVENT_TRANSFER_ERROR:
@@ -576,13 +576,13 @@ static void usb_lib_task(void *arg) {
         usb_host_lib_handle_events(portMAX_DELAY, &event_flags);
         if (event_flags & USB_HOST_LIB_EVENT_FLAGS_NO_CLIENTS) {
             ESP_LOGI(TAG, "No more clients, freeing USB devices");
-            ESP_ERROR_CHECK(usb_host_device_free_all());
+            ESP_ERROR_CHECK_WITHOUT_ABORT(usb_host_device_free_all());
             break;
         }
     }
 
     ESP_LOGI(TAG, "USB shutdown");
     vTaskDelay(10);
-    ESP_ERROR_CHECK(usb_host_uninstall());
+    ESP_ERROR_CHECK_WITHOUT_ABORT(usb_host_uninstall());
     vTaskDelete(NULL);
 }

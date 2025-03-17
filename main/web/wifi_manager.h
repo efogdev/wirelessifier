@@ -67,6 +67,20 @@ void process_wifi_scan_results(void);
 esp_err_t connect_to_wifi(const char* ssid, const char* password);
 
 /**
+ * @brief Disable WiFi and web stack
+ * 
+ * This function disables WiFi and web stack, and clears the boot with WiFi flag.
+ */
+void disable_wifi_and_web_stack(void);
+
+/**
+ * @brief Reboot the device
+ * 
+ * @param keep_wifi Whether to keep WiFi and web stack on after reboot
+ */
+void reboot_device(bool keep_wifi);
+
+/**
  * @brief Process WebSocket messages for WiFi management
  * 
  * @param message WebSocket message to process

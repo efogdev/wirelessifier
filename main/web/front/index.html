@@ -137,6 +137,7 @@
         <div class="form-group">
             <button id="settingsBtn" style="background-color: #6c757d;">Settings</button>
             <button id="disableWebStackBtn" style="background-color: #d5706e;">Disable WiFi</button>
+            <button id="rebootBtn" style="background-color: #f0ad4e;">Reboot</button>
             <div class="fg-spacer"></div>
         </div>
         
@@ -297,6 +298,9 @@
                         break;
                     case 'web_stack_disabled':
                         updateStatus('WiFi disabled. You can close this tab.', 'success');
+                        break;
+                    case 'reboot':
+                        updateStatus('Device is rebooting.', 'info');
                         break;
                     default:
                         console.log('Unknown message type:', message.type);
@@ -496,6 +500,23 @@
                     type: 'disable_web_stack'
                 }));
             }
+        });
+        
+        document.getElementById('rebootBtn').addEventListener('click', function() {
+            const keepWifi = confirm('Do you want to keep WiFi and web stack on after reboot?');
+            if (!socket || socket.readyState !== WebSocket.OPEN) {
+                updateStatus('Device not connected. Please refresh the page.', 'error');
+                return;
+            }
+            
+            updateStatus('Rebooting device...', 'info');
+            
+            socket.send(JSON.stringify({
+                type: 'reboot',
+                content: {
+                    keepWifi: keepWifi
+                }
+            }));
         });
         
         // Check WebSocket activity
