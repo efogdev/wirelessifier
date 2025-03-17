@@ -255,32 +255,27 @@ const App = () => {
                     <h2>Device Information</h2>
 
                     <div className="setting-item">
-                        <div className="setting-title">Device Name</div>
-                        <div>{settings.deviceInfo.name}</div>
-                    </div>
-
-                    <div className="setting-item">
-                        <div className="setting-title">Firmware Version</div>
+                        <div className="setting-title">Firmware version</div>
                         <div>{settings.deviceInfo.firmwareVersion}</div>
                     </div>
 
                     <div className="setting-item">
-                        <div className="setting-title">Hardware Version</div>
+                        <div className="setting-title">Hardware revision</div>
                         <div>{settings.deviceInfo.hardwareVersion}</div>
                     </div>
 
                     <div className="setting-item">
-                        <div className="setting-title">MAC Address</div>
+                        <div className="setting-title">MAC address</div>
                         <div>{settings.deviceInfo.macAddress}</div>
                     </div>
 
                     <div className="setting-item">
-                        <div className="setting-title">Free Heap</div>
+                        <div className="setting-title">Free heap</div>
                         <div>{(systemInfo.freeHeap / 1000).toFixed(0)} kb</div>
                     </div>
 
                     <div className="setting-item">
-                        <div className="setting-title">SoC Temperature</div>
+                        <div className="setting-title">SoC temperature</div>
                         <div>{systemInfo.socTemp.toFixed(0)}°C</div>
                     </div>
                 </div>
@@ -289,7 +284,7 @@ const App = () => {
                     <h2>Power Management</h2>
 
                     <div className="setting-item">
-                        <div className="setting-title">Low Power Mode</div>
+                        <div className="setting-title">Low power mode</div>
                         <div className="setting-description">
                             Sacrifice performance to improve battery life.
                             Makes BLE interval to be ~12-15ms instead of 7.5ms.
@@ -306,10 +301,10 @@ const App = () => {
                     </div>
 
                     <div className="setting-item">
-                        <div className="setting-title">Enable Sleep</div>
+                        <div className="setting-title">Enable sleep</div>
                         <div className="setting-description">
                             Enable device to enter sleep mode and disable Bluetooth when no events received in the
-                            time window
+                            time window.
                         </div>
                         <label className="toggle-switch">
                             <input
@@ -322,7 +317,7 @@ const App = () => {
                     </div>
 
                     <div className="setting-item">
-                        <div className="setting-title">Deep Sleep</div>
+                        <div className="setting-title">Deep sleep</div>
                         <div className="setting-description">
                             When enabled, USB device will not be able to wake up the device. You will have to press any button on the device itself.
                         </div>
@@ -337,9 +332,9 @@ const App = () => {
                     </div>
 
                     <div className="setting-item">
-                        <div className="setting-title">Sleep Timeout</div>
+                        <div className="setting-title">Sleep timeout</div>
                         <div className="setting-description">
-                            Time without USB events in seconds before device enters sleep mode
+                            Time without USB events in seconds before device enters sleep mode.
                         </div>
                         <input
                             type="number"
@@ -352,12 +347,12 @@ const App = () => {
                 </div>
 
                 <div className="setting-group">
-                    <h2>LED Configuration</h2>
+                    <h2>Visuals</h2>
 
                     <div className="setting-item">
                         <div className="setting-title">Brightness</div>
                         <div className="setting-description">
-                            Global LED brightness percentage
+                            Global LED brightness percentage.
                         </div>
                         <input
                             type="range"
@@ -373,9 +368,9 @@ const App = () => {
                     <h2>Connectivity</h2>
 
                     <div className="setting-item">
-                        <div className="setting-title">BLE TX Power</div>
+                        <div className="setting-title">BLE TX power</div>
                         <div className="setting-description">
-                            Bluetooth transmission power level
+                            Bluetooth transmission power level.
                         </div>
                         <select
                             value={settings.connectivity.bleTxPower}
@@ -391,10 +386,10 @@ const App = () => {
                     </div>
 
                     <div className="setting-item">
-                        <div className="setting-title">Reconnect Delay</div>
+                        <div className="setting-title">Reconnect delay</div>
                         <div className="setting-description">
-                            Delay in seconds before attempting to reconnect after Bluetooth disconnect (doesn't
-                            affect wake from sleep)
+                            Delay in seconds before attempting to reconnect after Bluetooth disconnect.
+                            Doesn't affect waking up from sleep.
                         </div>
                         <input
                             type="number"
@@ -410,10 +405,9 @@ const App = () => {
                     <h2>Firmware Update</h2>
 
                     <div className="setting-item">
-                        <div className="setting-title">OTA Update</div>
                         <div className="setting-description">
-                            Upload a new firmware file to update the device. The device will reboot after a
-                            successful update.
+                            Upload a new firmware file to update the device. 
+                            The device will reboot after a successful update.
                         </div>
 
                         {otaInProgress ? (
@@ -426,7 +420,7 @@ const App = () => {
                                         {otaProgress}%
                                     </div>
                                 </div>
-                                <p>Uploading firmware... Please do not disconnect the device.</p>
+                                <p>Uploading firmware...</p>
                             </div>
                         ) : (
                             <div>
@@ -475,7 +469,7 @@ const App = () => {
                                     }}
                                     disabled={!connected || !fileInputRef.current?.files?.length}
                                 >
-                                    Upload Firmware
+                                    Flash
                                 </button>
                             </div>
                         )}
