@@ -70,37 +70,13 @@ static esp_err_t lib_get_handler(httpd_req_t *req)
         httpd_resp_set_type(req, "application/javascript");
         httpd_resp_send(req, (const char*)web_front_lib_react_dom_production_min_js_start, js_size);
     }
-    else if (strstr(req_uri, "babel.min.js")) {
-        extern const uint8_t web_front_lib_babel_min_js_start[] asm("_binary_babel_min_js_start");
-        extern const uint8_t web_front_lib_babel_min_js_end[] asm("_binary_babel_min_js_end");
-        const size_t js_size = (web_front_lib_babel_min_js_end - web_front_lib_babel_min_js_start) - 1;
+    else if (strstr(req_uri, "settings.js")) {
+        extern const uint8_t web_front_lib_settings_js_start[] asm("_binary_settings_js_start");
+        extern const uint8_t web_front_lib_settings_js_end[] asm("_binary_settings_js_end");
+        const size_t js_size = (web_front_lib_settings_js_end - web_front_lib_settings_js_start) - 1;
         
         httpd_resp_set_type(req, "application/javascript");
-        httpd_resp_send(req, (const char*)web_front_lib_babel_min_js_start, js_size);
-    }
-    else if (strstr(req_uri, "sw.js")) {
-        extern const uint8_t web_front_sw_js_start[] asm("_binary_sw_js_start");
-        extern const uint8_t web_front_sw_js_end[] asm("_binary_sw_js_end");
-        const size_t js_size = (web_front_sw_js_end - web_front_sw_js_start) - 1;
-        
-        httpd_resp_set_type(req, "application/javascript");
-        httpd_resp_send(req, (const char*)web_front_sw_js_start, js_size);
-    }
-    else if (strstr(req_uri, "offline.html")) {
-        extern const uint8_t web_front_lib_offline_html_start[] asm("_binary_offline_html_start");
-        extern const uint8_t web_front_lib_offline_html_end[] asm("_binary_offline_html_end");
-        const size_t html_size = (web_front_lib_offline_html_end - web_front_lib_offline_html_start) - 1;
-        
-        httpd_resp_set_type(req, "text/html");
-        httpd_resp_send(req, (const char*)web_front_lib_offline_html_start, html_size);
-    }
-    else if (strstr(req_uri, "manifest.json")) {
-        extern const uint8_t web_front_lib_manifest_json_start[] asm("_binary_manifest_json_start");
-        extern const uint8_t web_front_lib_manifest_json_end[] asm("_binary_manifest_json_end");
-        const size_t json_size = (web_front_lib_manifest_json_end - web_front_lib_manifest_json_start) - 1;
-        
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_send(req, (const char*)web_front_lib_manifest_json_start, json_size);
+        httpd_resp_send(req, (const char*)web_front_lib_settings_js_start, js_size);
     }
     else {
         return ESP_ERR_NOT_FOUND;
