@@ -498,7 +498,7 @@ void start_ws_ping_task(void) {
     // Only create the task if it doesn't already exist
     if (ping_task_handle == NULL) {
         BaseType_t result = xTaskCreatePinnedToCore(ws_ping_task,
-            "ws_ping_task", WS_PING_TASK_STACK_SIZE, NULL, WS_PING_TASK_PRIORITY, &ping_task_handle, 1);
+            "ws_ping_task", WS_PING_TASK_STACK_SIZE, NULL, WS_PING_TASK_PRIORITY, &ping_task_handle, 0);
         
         if (result != pdPASS) {
             ESP_LOGE(WIFI_TAG, "Failed to create WebSocket ping task");
