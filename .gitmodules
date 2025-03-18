@@ -1,6 +1,0 @@
-[submodule "components/neopixel"]
-	path = components/neopixel
-	url = https://github.com/zorxx/neopixel
-[submodule "main/deps/libhid-descriptor"]
-	path = main/deps/libhid-descriptor
-	url = https://github.com/bluemner/libhid-descriptor.git
