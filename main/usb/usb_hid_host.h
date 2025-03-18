@@ -41,7 +41,7 @@ static const char* const usage_page_names[] = {
 };
 
 // Map of usage values to their names (Generic Desktop page)
-static const char* const usage_names[] = {
+static const char* const usage_names_gendesk[] = {
     [0x01] = "Pointer",
     [0x02] = "Mouse",
     [0x04] = "Joystick",

@@ -7,7 +7,6 @@
 #include <stdbool.h>
 #include <string.h>
 #include <inttypes.h>
-#include <pthread.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -24,10 +23,19 @@ static QueueHandle_t g_event_queue = NULL;
 static bool g_device_connected = false;
 static TaskHandle_t g_usb_events_task_handle = NULL;
 static TaskHandle_t g_event_task_handle = NULL;
-static pthread_rwlock_t g_report_maps_lock;
+
+// FreeRTOS synchronization primitives
+static portMUX_TYPE g_report_maps_spinlock = portMUX_INITIALIZER_UNLOCKED;
+static SemaphoreHandle_t g_report_maps_mutex;
 
 #define MAX_REPORT_FIELDS 48
 #define MAX_COLLECTION_DEPTH 8
+
+// Double buffering for report processing
+static volatile bool g_isr_buffer_index = 0;
+static usb_hid_report_t g_isr_reports[2];
+static usb_hid_field_t g_isr_fields[2][MAX_REPORT_FIELDS];
+static int g_isr_field_values[2][MAX_REPORT_FIELDS];
 
 typedef struct {
     usb_hid_field_attr_t attr;
@@ -88,10 +96,12 @@ esp_err_t usb_hid_host_init(QueueHandle_t report_queue) {
     }
 
     g_report_queue = report_queue;
-    if (pthread_rwlock_init(&g_report_maps_lock, NULL) != 0) {
-        ESP_LOGE(TAG, "Failed to create report maps rwlock");
+    g_report_maps_mutex = xSemaphoreCreateMutex();
+    if (g_report_maps_mutex == NULL) {
+        ESP_LOGE(TAG, "Failed to create report maps mutex");
         return ESP_ERR_NO_MEM;
     }
+
     g_device_connected = false;
     g_event_queue = xQueueCreate(16, sizeof(hid_event_queue_t));
     if (g_event_queue == NULL) {
@@ -106,7 +116,7 @@ esp_err_t usb_hid_host_init(QueueHandle_t report_queue) {
 
     ESP_ERROR_CHECK_WITHOUT_ABORT(usb_host_install(&host_config));
 
-    BaseType_t task_created = xTaskCreatePinnedToCore(hid_host_event_task, "hid_events", 2600, NULL, 13, &g_event_task_handle, 1);
+    BaseType_t task_created = xTaskCreatePinnedToCore(hid_host_event_task, "hid_events", 3400, NULL, 13, &g_event_task_handle, 1);
     if (task_created != pdTRUE) {
         vQueueDelete(g_event_queue);
         return ESP_ERR_NO_MEM;
@@ -122,8 +132,8 @@ esp_err_t usb_hid_host_init(QueueHandle_t report_queue) {
 
     const hid_host_driver_config_t hid_host_config = {
         .create_background_task = true,
-        .task_priority = 4,
-        .stack_size = 2350,
+        .task_priority = 12,
+        .stack_size = 3200,
         .core_id = 1,
         .callback = hid_host_device_callback,
         .callback_arg = NULL
@@ -136,7 +146,6 @@ esp_err_t usb_hid_host_init(QueueHandle_t report_queue) {
         usb_host_uninstall();
         return ret;
     }
-
 
     ESP_LOGI(TAG, "USB HID Host initialized successfully");
     return ESP_OK;
@@ -158,7 +167,6 @@ esp_err_t usb_hid_host_deinit(void) {
         g_usb_events_task_handle = NULL;
     }
 
-
     ret = usb_host_uninstall();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to uninstall USB host: %d", ret);
@@ -168,7 +176,8 @@ esp_err_t usb_hid_host_deinit(void) {
         vQueueDelete(g_event_queue);
         g_event_queue = NULL;
     }
-    pthread_rwlock_destroy(&g_report_maps_lock);
+
+    vSemaphoreDelete(g_report_maps_mutex);
     g_report_queue = NULL;
     g_device_connected = false;
     
@@ -186,8 +195,8 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
         return;
     }
 
-    if (pthread_rwlock_wrlock(&g_report_maps_lock) != 0) {
-        ESP_LOGE(TAG, "Failed to take report maps write lock");
+    if (xSemaphoreTake(g_report_maps_mutex, portMAX_DELAY) != pdTRUE) {
+        ESP_LOGE(TAG, "Failed to take report maps mutex");
         return;
     }
 
@@ -258,10 +267,8 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
                         break;
                     case 1: // Logical Minimum
                         if (item_size == 1 && (data & 0x80)) {
-                            // Sign extend 8-bit value
                             logical_min = (int8_t)data;
                         } else if (item_size == 2 && (data & 0x8000)) {
-                            // Sign extend 16-bit value
                             logical_min = (int16_t)data;
                         } else {
                             logical_min = (int)data;
@@ -269,10 +276,8 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
                         break;
                     case 2: // Logical Maximum
                         if (item_size == 1 && (data & 0x80)) {
-                            // Sign extend 8-bit value
                             logical_max = (int8_t)data;
                         } else if (item_size == 2 && (data & 0x8000)) {
-                            // Sign extend 16-bit value 
                             logical_max = (int16_t)data;
                         } else {
                             logical_max = (int)data;
@@ -299,39 +304,45 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
                 break;
         }
     }
-
-    // Log comprehensive field information
-    // ESP_LOGI(TAG, "=== Report Descriptor Analysis for Interface %d ===", interface_num);
-    // ESP_LOGI(TAG, "Total Fields: %d", report_map->num_fields);
-    // ESP_LOGI(TAG, "Total Bits: %d", report_map->total_bits);
-    // ESP_LOGI(TAG, "Report ID: %d", report_map->report_id);
-    // ESP_LOGI(TAG, "\n");
-    // ESP_LOGI(TAG, "Field Details:");
-    //
-    // for (int i = 0; i < report_map->num_fields; i++) {
-    //     ESP_LOGI(TAG, "\n");
-    //     ESP_LOGI(TAG, "Field %d:", i + 1);
-    //
-    //     report_field_info_t *field = &report_map->fields[i];
-    //
-    //     const char* usage_page_name = field->attr.usage_page < sizeof(usage_page_names)/sizeof(usage_page_names[0]) &&
-    //         usage_page_names[field->attr.usage_page] ? usage_page_names[field->attr.usage_page] : "Unknown";
-    //     ESP_LOGI(TAG, "  Usage Page: 0x%04X (%s)", field->attr.usage_page, usage_page_name);
-    //
-    //     const char* usage_name = field->attr.usage < sizeof(usage_names)/sizeof(usage_names[0]) &&
-    //         usage_names[field->attr.usage] ? usage_names[field->attr.usage] : "Unknown";
-    //     ESP_LOGI(TAG, "  Usage: 0x%04X (%s)", field->attr.usage, usage_name);
-    //
-    //     ESP_LOGI(TAG, "  Report Size: %d bits", (int) field->attr.report_size);
-    //     ESP_LOGI(TAG, "  Logical Min: %d", field->attr.logical_min);
-    //     ESP_LOGI(TAG, "  Logical Max: %d", field->attr.logical_max);
-    //     ESP_LOGI(TAG, "  Bit Position:");
-    //     ESP_LOGI(TAG, "    - Offset: %d", (int) field->bit_offset);
-    //     ESP_LOGI(TAG, "    - Size: %d", (int) field->bit_size);
-    // }
-    // ESP_LOGI(TAG, "\n=== End of Report Descriptor Analysis ===\n");
              
-    pthread_rwlock_unlock(&g_report_maps_lock);
+    // Log comprehensive field information
+    ESP_LOGI(TAG, "=== Report Descriptor Analysis for Interface %d ===", interface_num);
+    ESP_LOGI(TAG, "");
+    ESP_LOGI(TAG, "Total Fields: %d", report_map->num_fields);
+    ESP_LOGI(TAG, "Total Bits: %d", report_map->total_bits);
+    ESP_LOGI(TAG, "Report ID: %d", report_map->report_id);
+    ESP_LOGI(TAG, "");
+    ESP_LOGI(TAG, "");
+    ESP_LOGI(TAG, "Field Details:");
+
+    for (int i = 0; i < report_map->num_fields; i++) {
+        ESP_LOGI(TAG, "");
+        ESP_LOGI(TAG, "Field %d:", i + 1);
+
+        report_field_info_t *field = &report_map->fields[i];
+
+        const char* usage_page_name = field->attr.usage_page < sizeof(usage_page_names)/sizeof(usage_page_names[0]) &&
+            usage_page_names[field->attr.usage_page] ? usage_page_names[field->attr.usage_page] : "Unknown";
+        ESP_LOGI(TAG, "  Usage Page: 0x%04X (%s)", field->attr.usage_page, usage_page_name);
+
+        if (field->attr.usage_page == HID_USAGE_PAGE_GENERIC_DESKTOP) {
+            const char* usage_name = field->attr.usage < sizeof(usage_names_gendesk)/sizeof(usage_names_gendesk[0]) &&
+               usage_names_gendesk[field->attr.usage] ? usage_names_gendesk[field->attr.usage] : "Unknown";
+            ESP_LOGI(TAG, "  Usage: 0x%04X (%s)", field->attr.usage, usage_name);
+        } else {
+            ESP_LOGI(TAG, "  Usage: 0x%04X", field->attr.usage);
+        }
+
+        ESP_LOGI(TAG, "  Report Size: %d bits", (int) field->attr.report_size);
+        ESP_LOGI(TAG, "  Logical Min: %d", field->attr.logical_min);
+        ESP_LOGI(TAG, "  Logical Max: %d", field->attr.logical_max);
+    }
+
+    ESP_LOGI(TAG, "");
+    ESP_LOGI(TAG, "=== End of Report Descriptor Analysis ===");
+    ESP_LOGI(TAG, "");
+
+    xSemaphoreGive(g_report_maps_mutex);
 }
 
 static int extract_field_value(const uint8_t *data, uint16_t bit_offset, uint16_t bit_size) {
@@ -360,7 +371,6 @@ static int extract_field_value(const uint8_t *data, uint16_t bit_offset, uint16_
         uint8_t mask = ((1 << bits_to_read) - 1);
         int byte_value = (current_byte >> bit_shift) & mask;
         
-        // Shift into the correct position in the result
         uint8_t shift_amount = bit_size - bits_remaining;
         value |= (byte_value << shift_amount);
         
@@ -377,67 +387,65 @@ static int extract_field_value(const uint8_t *data, uint16_t bit_offset, uint16_
     return value;
 }
 
-
-// Static allocations for process_report function
-static usb_hid_report_t g_report;
-static int g_field_values[MAX_REPORT_FIELDS];
-static usb_hid_field_t g_fields[MAX_REPORT_FIELDS];
-
 static void process_report(hid_host_device_handle_t hid_device_handle, const uint8_t *data, size_t length, uint8_t report_id, uint8_t interface_num) {
     task_monitor_increment_usb_report_counter();
 
-    // Combined validation for better performance
     if (!data || !g_report_queue || length == 0 || length > 64 || interface_num >= USB_HOST_MAX_INTERFACES) {
         ESP_LOGE(TAG, "Invalid parameters: data=%p, queue=%p, len=%d, iface=%u", data, g_report_queue, length, interface_num);
         return;
     }
 
-    if (pthread_rwlock_rdlock(&g_report_maps_lock) != 0) {
-        ESP_LOGE(TAG, "Failed to take report maps read lock");
-        return;
-    }
+    // Enter critical section for ISR-safe operation
+    portENTER_CRITICAL_ISR(&g_report_maps_spinlock);
+
+    // Get current ISR buffer
+    const uint8_t current_buffer = g_isr_buffer_index;
+    usb_hid_report_t *report = &g_isr_reports[current_buffer];
+    usb_hid_field_t *fields = g_isr_fields[current_buffer];
+    int *field_values = g_isr_field_values[current_buffer];
 
     report_map_t *report_map = &g_interface_report_maps[interface_num];
     
     // Initialize report structure
-    g_report.report_id = report_id;
-    g_report.type = USB_HID_FIELD_TYPE_INPUT;
-    g_report.num_fields = report_map->num_fields;
-    g_report.raw_len = MIN(length, sizeof(g_report.raw));
-    g_report.fields = g_fields;
+    report->report_id = report_id;
+    report->type = USB_HID_FIELD_TYPE_INPUT;
+    report->num_fields = report_map->num_fields;
+    report->raw_len = MIN(length, sizeof(report->raw));
+    report->fields = fields;
 
     // Batch process fields for better cache utilization
-    const report_field_info_t *field_info = report_map->fields;
+    const report_field_info_t * volatile field_info = report_map->fields;
     for (uint8_t i = 0; i < report_map->num_fields; i++, field_info++) {
-        g_field_values[i] = extract_field_value(data, field_info->bit_offset, field_info->bit_size);
-        g_fields[i].attr = field_info->attr;
-        g_fields[i].values = &g_field_values[i];
-
-        // ESP_LOGI(TAG, "Field %d: usage_page=0x%04x, usage=0x%04x, value=%d", 
-        //         i, field_info->attr.usage_page, field_info->attr.usage, field_values[i]);
+        field_values[i] = extract_field_value(data, field_info->bit_offset, field_info->bit_size);
+        fields[i].attr = field_info->attr;
+        fields[i].values = &field_values[i];
     }
 
-    memcpy(g_report.raw, data, g_report.raw_len);
+    memcpy(report->raw, data, report->raw_len);
+
+    // Switch buffers atomically
+    g_isr_buffer_index = !g_isr_buffer_index;
+    
+    // Exit critical section before queue operations
+    portEXIT_CRITICAL_ISR(&g_report_maps_spinlock);
 
     // Try sending to queue with initial timeout
-    if (xQueueSend(g_report_queue, &g_report, pdMS_TO_TICKS(100)) != pdTRUE) {
+    if (xQueueSend(g_report_queue, report, pdMS_TO_TICKS(100)) != pdTRUE) {
         // If initial send failed, wait and track time
         TickType_t start_tick = xTaskGetTickCount();
-        while (xQueueSend(g_report_queue, &g_report, pdMS_TO_TICKS(50)) != pdTRUE) {
+        while (xQueueSend(g_report_queue, report, pdMS_TO_TICKS(50)) != pdTRUE) {
             if ((xTaskGetTickCount() - start_tick) > pdMS_TO_TICKS(250)) {
                 // Queue has been full for >250ms, clear it
                 xQueueReset(g_report_queue);
                 ESP_LOGW(TAG, "Queue full for >250ms, cleared");
                 // Try sending one more time
-                if (xQueueSend(g_report_queue, &g_report, 0) != pdTRUE) {
+                if (xQueueSend(g_report_queue, report, 0) != pdTRUE) {
                     ESP_LOGE(TAG, "Queue send failed even after clear");
                 }
                 break;
             }
         }
     }
-
-    pthread_rwlock_unlock(&g_report_maps_lock);
 }
 
 // Static allocation for event handling
@@ -483,10 +491,9 @@ static const char *hid_proto_name_str[] = {
     "MOUSE"
 };
 
-
 static void process_device_event(hid_host_device_handle_t hid_device_handle, const hid_host_driver_event_t event, void *arg) {
     hid_host_dev_params_t dev_params;
-    ESP_ERROR_CHECK_WITHOUT_ABORT(hid_host_device_get_params(hid_device_handle, &dev_params));
+    ESP_ERROR_CHECK(hid_host_device_get_params(hid_device_handle, &dev_params));
 
     if (event == HID_HOST_DRIVER_EVENT_CONNECTED) {
         ESP_LOGI(TAG, "HID Device Connected, proto = %s, subclass = %d", hid_proto_name_str[dev_params.proto], dev_params.sub_class);
@@ -496,10 +503,10 @@ static void process_device_event(hid_host_device_handle_t hid_device_handle, con
             .callback_arg = NULL
         };
 
-        ESP_ERROR_CHECK_WITHOUT_ABORT(hid_host_device_open(hid_device_handle, &dev_config));
-        ESP_ERROR_CHECK_WITHOUT_ABORT(hid_class_request_set_protocol(hid_device_handle, HID_REPORT_PROTOCOL_REPORT));
+        ESP_ERROR_CHECK(hid_host_device_open(hid_device_handle, &dev_config));
+        ESP_ERROR_CHECK(hid_class_request_set_protocol(hid_device_handle, HID_REPORT_PROTOCOL_REPORT));
         if (HID_PROTOCOL_KEYBOARD == dev_params.proto) {
-            ESP_ERROR_CHECK_WITHOUT_ABORT(hid_class_request_set_idle(hid_device_handle, 0, 0));
+            ESP_ERROR_CHECK(hid_class_request_set_idle(hid_device_handle, 0, 0));
         }
 
         // Get and parse report descriptor
@@ -510,7 +517,7 @@ static void process_device_event(hid_host_device_handle_t hid_device_handle, con
             parse_report_descriptor(desc, desc_len, dev_params.iface_num);
         }
 
-        ESP_ERROR_CHECK_WITHOUT_ABORT(hid_host_device_start(hid_device_handle));
+        ESP_ERROR_CHECK(hid_host_device_start(hid_device_handle));
         g_device_connected = true;
     } else {
         ESP_LOGI(TAG, "Unknown device event, subclass = %d, proto = %s, iface = %d",
@@ -518,8 +525,9 @@ static void process_device_event(hid_host_device_handle_t hid_device_handle, con
     }
 }
 
+static uint8_t cur_if_evt_data[512] = {0};
+
 static void process_interface_event(hid_host_device_handle_t hid_device_handle, const hid_host_interface_event_t event, void *arg) {
-    uint8_t data[64] = {0};
     size_t data_length = 0;
     hid_host_dev_params_t dev_params;
 
@@ -528,9 +536,9 @@ static void process_interface_event(hid_host_device_handle_t hid_device_handle, 
 
     switch (event) {
         case HID_HOST_INTERFACE_EVENT_INPUT_REPORT:
-            ESP_ERROR_CHECK_WITHOUT_ABORT(hid_host_device_get_raw_input_report_data(hid_device_handle, data, sizeof(data), &data_length));
+            ESP_ERROR_CHECK_WITHOUT_ABORT(hid_host_device_get_raw_input_report_data(hid_device_handle, cur_if_evt_data, sizeof(cur_if_evt_data), &data_length));
             // ESP_LOGD(TAG, "Raw input report data: length=%d", data_length);
-            process_report(hid_device_handle, data, data_length, 0, dev_params.iface_num);
+            process_report(hid_device_handle, cur_if_evt_data, data_length, 0, dev_params.iface_num);
             break;
 
         case HID_HOST_INTERFACE_EVENT_DISCONNECTED:
@@ -553,6 +561,10 @@ static void hid_host_event_task(void *arg) {
     hid_event_queue_t evt;
 
     while (1) {
+        if (g_event_queue == NULL) {
+            vTaskDelay(pdMS_TO_TICKS(50));
+        }
+
         if (xQueueReceive(g_event_queue, &evt, portMAX_DELAY)) {
             switch (evt.event_group) {
                 case APP_EVENT_HID_DEVICE:
