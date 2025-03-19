@@ -54,6 +54,9 @@
             font-size: 16px;
             margin-right: 6px;
         }
+        .secondary {
+            background-color: #6c757d;
+        }
         button:hover {
             background-color: #45a049;
         }
@@ -131,7 +134,7 @@
         <div id="status" class="status info"></div>
         
         <div class="form-group">
-            <button id="settingsBtn" style="background-color: #6c757d;">Settings</button>
+            <button id="settingsBtn" class="secondary">Settings</button>
             <button id="disableWebStackBtn" style="background-color: #d5706e;">Stop WiFi</button>
             <button id="rebootBtn" style="background-color: #d5706e;">Reboot</button>
             <div class="fg-spacer"></div>
@@ -156,8 +159,8 @@
         </div>
         
         <div class="form-group">
-            <button id="scanBtn">Scan</button>
             <button id="connectBtn" disabled>Connect</button>
+            <button id="scanBtn" class="secondary">Scan</button>
             <span id="actionSpinner" class="spinner hidden"></span>
         </div>
     </div>
@@ -349,7 +352,7 @@
             
             if (status.connected) {
                 isConnectedToWifi = true;
-                updateStatus('Successfully connected! The device is restarting. \n\n You can connect to the regular WiFi network. \n\n You will be automatically redirected to the new (internal) URL in 10 seconds.', 'success');
+                updateStatus('Successfully connected! The device is restarting. \n\n You can connect to the regular WiFi network. \n\n You will be automatically redirected to the new address soon.', 'success');
                 
                 // Disable inactivity watcher when connected
                 if (wsCheckInterval) {
@@ -364,7 +367,7 @@
                 setTimeout(() => {
                     // Redirect to the new IP after a delay
                     window.location.href = `http://${status.ip}`;
-                }, 10000);
+                }, 15000);
             } else if (status.attempt < 3) {
                 updateStatus(`Connection failed. Retrying...`, 'error');
             } else {

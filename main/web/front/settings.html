@@ -190,6 +190,21 @@
             display: none !important;
         }
 
+        .animate-hidden {
+            opacity: 0;
+            max-height: 0;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+            transition: all 200ms ease-out;
+        }
+
+        .animate-visible {
+            opacity: 1;
+            max-height: 1000px;
+            transition: all 200ms ease-in;
+        }
+
         /* Progress bar styles */
         .progress-container {
             width: 100%;

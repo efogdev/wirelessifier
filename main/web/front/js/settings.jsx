@@ -4,31 +4,36 @@ const App = () => {
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState(null);
     const [lastMessageTime, setLastMessageTime] = React.useState(0);
+    
     const [systemInfo, setSystemInfo] = React.useState({
         freeHeap: 0,
-        socTemp: 0
+        socTemp: 0,
     });
+
     const [settings, setSettings] = React.useState({
         deviceInfo: {
             name: 'TBD',
             firmwareVersion: 'TBD',
             hardwareVersion: 'TBD',
-            macAddress: '00:00:00:00:00:00'
+            macAddress: '00:00:00:00:00:00',
         },
         power: {
-            sleepTimeout: 30,
+            sleepTimeout: 60,
+            deepSleepTimeout: 180,
             lowPowerMode: false,
             enableSleep: true,
-            deepSleep: false
+            deepSleep: true,
+            separateSleepTimeouts: true,
         },
         led: {
-            brightness: 80
+            brightness: 80,
         },
         connectivity: {
             bleTxPower: 'low',
-            bleReconnectDelay: 3
+            bleReconnectDelay: 3,
         }
     });
+
     const [statusMessage, setStatusMessage] = React.useState(null);
     const [statusType, setStatusType] = React.useState('info');
     const [otaProgress, setOtaProgress] = React.useState(0);
@@ -37,19 +42,6 @@ const App = () => {
     const wsCheckIntervalRef = React.useRef(null);
     const fileInputRef = React.useRef(null);
     const initialSettingsRef = React.useRef(null);
-
-    React.useEffect(() => {
-        connectWebSocket();
-        wsCheckIntervalRef.current = setInterval(checkWebSocketActivity, 1000);
-        return () => {
-            if (socketRef.current) {
-                socketRef.current.close();
-            }
-            if (wsCheckIntervalRef.current) {
-                clearInterval(wsCheckIntervalRef.current);
-            }
-        };
-    }, []);
 
     const checkWebSocketActivity = () => {
         const now = Date.now();
@@ -66,6 +58,19 @@ const App = () => {
             setTimeout(connectWebSocket, 1000);
         }
     };
+
+    React.useEffect(() => {
+        connectWebSocket();
+        wsCheckIntervalRef.current = setInterval(checkWebSocketActivity, 1000);
+        return () => {
+            if (socketRef.current) {
+                socketRef.current.close();
+            }
+            if (wsCheckIntervalRef.current) {
+                clearInterval(wsCheckIntervalRef.current);
+            }
+        };
+    }, []);
 
     const connectWebSocket = () => {
         setLoading(true);
@@ -171,7 +176,7 @@ const App = () => {
 
     const requestSettings = () => {
         if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
-            showStatus('WebSocket not connected', 'error');
+            showStatus('WebSocket not connected.', 'error');
             return;
         }
 
@@ -183,7 +188,7 @@ const App = () => {
 
     const saveSettings = () => {
         if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
-            showStatus('WebSocket not connected', 'error');
+            showStatus('WebSocket not connected.', 'error');
             return;
         }
 
@@ -197,21 +202,43 @@ const App = () => {
     };
 
     const updateSetting = (category, key, value) => {
-        setSettings(prevSettings => ({
-            ...prevSettings,
-            [category]: {
-                ...prevSettings[category],
-                [key]: value
+        setSettings(prevSettings => {
+            if (category === 'power') {
+                if (key === 'sleepTimeout') {
+                    if (value < 20 || value > 1800) {
+                        showStatus('Sleep timeout must be between 20 and 1800 seconds.', 'error');
+                        return prevSettings;
+                    }
+                }
+                if (key === 'deepSleepTimeout') {
+                    if (value < 20 || value > 99999) {
+                        showStatus('Deep sleep timeout must be between 20 and 99999 seconds.', 'error');
+                        return prevSettings;
+                    }
+                    if (prevSettings.power.separateSleepTimeouts && value <= prevSettings.power.sleepTimeout) {
+                        showStatus('Deep sleep timeout must be greater than sleep timeout.', 'error');
+                        return prevSettings;
+                    }
+                }
             }
-        }));
+            return {
+                ...prevSettings,
+                [category]: {
+                    ...prevSettings[category],
+                    [key]: value
+                }
+            };
+        });
     };
 
     const showStatus = (message, type) => {
         setStatusMessage(message);
         setStatusType(type);
+        window.scrollTo(0, 0);
+
         setTimeout(() => {
             setStatusMessage(null);
-        }, 5000);
+        }, 15000);
     };
 
     if (loading || !connected) {
@@ -316,33 +343,70 @@ const App = () => {
                         </label>
                     </div>
 
-                    <div className="setting-item">
-                        <div className="setting-title">Deep sleep</div>
-                        <div className="setting-description">
-                            When enabled, USB device will not be able to wake up the device. You will have to press any button on the device itself.
+                    <div className={settings.power.enableSleep ? 'animate-visible' : 'animate-hidden'}>
+                        <div className="setting-item">
+                            <div className="setting-title">Deep sleep</div>
+                            <div className="setting-description">
+                                When enabled, USB device will not be able to wake up the device. You will have to press any button on the device itself.
+                            </div>
+                            <label className="toggle-switch">
+                                <input
+                                    type="checkbox"
+                                    checked={settings.power.deepSleep}
+                                    onChange={(e) => updateSetting('power', 'deepSleep', e.target.checked)}
+                                />
+                                <span className="slider"></span>
+                            </label>
                         </div>
-                        <label className="toggle-switch">
-                            <input
-                                type="checkbox"
-                                checked={settings.power.deepSleep}
-                                onChange={(e) => updateSetting('power', 'deepSleep', e.target.checked)}
-                            />
-                            <span className="slider"></span>
-                        </label>
-                    </div>
 
-                    <div className="setting-item">
-                        <div className="setting-title">Sleep timeout</div>
-                        <div className="setting-description">
-                            Time without USB events in seconds before device enters sleep mode.
+                        <div className="setting-item">
+                            <div className="setting-title">Separate sleep timeouts</div>
+                            <div className="setting-description">
+                                If disabled, the device will go into the deep sleep immediately after entering light sleep.
+                            </div>
+                            <label className="toggle-switch">
+                                <input
+                                    type="checkbox"
+                                    checked={settings.power.separateSleepTimeouts}
+                                    onChange={(e) => updateSetting('power', 'separateSleepTimeouts', e.target.checked)}
+                                />
+                                <span className="slider"></span>
+                            </label>
                         </div>
-                        <input
-                            type="number"
-                            min="0"
-                            max="3600"
-                            value={settings.power.sleepTimeout}
-                            onChange={(e) => updateSetting('power', 'sleepTimeout', parseInt(e.target.value))}
-                        />
+
+                        <div className="setting-item">
+                            <div className="setting-title">
+                                {settings.power.separateSleepTimeouts 
+                                    ? 'Light sleep timeout'
+                                    : 'Sleep timeout'}
+                            </div>
+                            <div className="setting-description">
+                                Time without USB events in seconds before device enters light sleep mode. 
+                                In light sleep, Bluetooth is turned off but the device still awaits for USB events to turn it on immediately.
+                            </div>
+                            <input
+                                type="number"
+                                min="0"
+                                max="3600"
+                                value={settings.power.sleepTimeout}
+                                onChange={(e) => updateSetting('power', 'sleepTimeout', parseInt(e.target.value))}
+                            />
+                        </div>
+
+                        <div className={`setting-item ${settings.power.separateSleepTimeouts && settings.power.deepSleep ? 'animate-visible' : 'animate-hidden'}`}>
+                            <div className="setting-title">Deep sleep timeout</div>
+                            <div className="setting-description">
+                                Time without USB events in seconds before device enters deep sleep mode.
+                                In deep sleep, the device will do nothing and only wake up when you press any button on the bridge device itself.
+                            </div>
+                            <input
+                                type="number"
+                                min="0"
+                                max="3600"
+                                value={settings.power.deepSleepTimeout}
+                                onChange={(e) => updateSetting('power', 'deepSleepTimeout', parseInt(e.target.value))}
+                            />
+                        </div>
                     </div>
                 </div>
 

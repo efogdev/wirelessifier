@@ -31,6 +31,7 @@ static const char *WIFI_TAG = "WIFI_MGR";
 
 int s_retry_num = 0;
 static bool connecting = false;
+static bool s_web_stack_disabled = false;
 
 // WiFi connection status
 static bool is_connected = false;
@@ -357,9 +358,10 @@ esp_err_t connect_to_wifi(const char* ssid, const char* password) {
 void disable_wifi_and_web_stack(void) {
     ESP_LOGI(WIFI_TAG, "Disabling WiFi and web stack...");
  
+    s_web_stack_disabled = true;
     is_connected = false;
-    esp_wifi_disconnect();
-
+    s_retry_num = MAX_RETRY; // Prevent further reconnection attempts
+    
     // Send confirmation message before stopping services
     ws_broadcast_json("web_stack_disabled", "{}");
     vTaskDelay(pdMS_TO_TICKS(100)); // Give time for the message to be sent
@@ -367,11 +369,11 @@ void disable_wifi_and_web_stack(void) {
     // Stop web server and related services (HTTP, WebSocket, OTA, DNS)
     stop_webserver();
     
-    // Turn off WiFi status LED
-    led_update_wifi_status(false, false);
-    
     // Stop WiFi
+    esp_wifi_disconnect();
     esp_wifi_stop();
+
+    led_update_status(0, 0);
     
     // Clear one-time boot flag to prevent auto-starting WiFi on next boot
     nvs_handle_t nvs_handle;
@@ -394,7 +396,7 @@ void reboot_device(bool keep_wifi) {
     // Send reboot message to trigger UI update
     ws_broadcast_json("reboot", "{}");
     
-    vTaskDelay(pdMS_TO_TICKS(100)); // Give time for the messages to be sent
+    vTaskDelay(pdMS_TO_TICKS(20)); // Give time for the messages to be sent
     
     // Set or clear the boot with WiFi flag based on user choice
     nvs_handle_t nvs_handle;
@@ -407,7 +409,7 @@ void reboot_device(bool keep_wifi) {
     }
     
     // Small delay to ensure NVS write completes
-    vTaskDelay(pdMS_TO_TICKS(100));
+    vTaskDelay(pdMS_TO_TICKS(20));
     
     // Reboot
     esp_restart();
@@ -476,6 +478,11 @@ void process_wifi_ws_message(const char* message) {
 
 // Update connection status based on events
 void update_wifi_connection_status(bool connected, const char* ip) {
+    if (s_web_stack_disabled) {
+        led_update_status(0, 0);
+        return;
+    }
+
     is_connected = connected;
     if (ip) {
         strlcpy(connected_ip, ip, sizeof(connected_ip));

@@ -138,15 +138,20 @@ static void event_handler(void* arg, esp_event_base_t event_base,
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
         ESP_LOGI(HTTP_TAG, "WIFI_EVENT_STA_DISCONNECTED");
         
-        // Increment retry counter
-        s_retry_num++;
+        wifi_mode_t mode;
+        esp_wifi_get_mode(&mode);
         
-        if (s_retry_num < MAX_RETRY) {
-            ESP_LOGI(HTTP_TAG, "Retry to connect to the AP, attempt %d/%d", s_retry_num, MAX_RETRY);
-            esp_wifi_connect();
-        } else {
-            ESP_LOGI(HTTP_TAG, "Failed to connect after %d attempts", MAX_RETRY);
-            xEventGroupSetBits(wifi_event_group, WIFI_FAIL_BIT);
+        // Only attempt reconnection if WiFi is still enabled (not in AP mode)
+        if (mode == WIFI_MODE_STA || mode == WIFI_MODE_APSTA) {
+            s_retry_num++;
+            
+            if (s_retry_num < MAX_RETRY) {
+                ESP_LOGI(HTTP_TAG, "Retry to connect to the AP, attempt %d/%d", s_retry_num, MAX_RETRY);
+                esp_wifi_connect();
+            } else {
+                ESP_LOGI(HTTP_TAG, "Failed to connect after %d attempts", MAX_RETRY);
+                xEventGroupSetBits(wifi_event_group, WIFI_FAIL_BIT);
+            }
         }
         
         xEventGroupClearBits(wifi_event_group, WIFI_CONNECTED_BIT);
@@ -155,6 +160,8 @@ static void event_handler(void* arg, esp_event_base_t event_base,
         ESP_LOGI(HTTP_TAG, "WIFI_EVENT_SCAN_DONE");
         process_wifi_scan_results();
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+        s_retry_num = 0;
+        
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
         char ip_str[16];
         snprintf(ip_str, sizeof(ip_str), IPSTR, IP2STR(&event->ip_info.ip));

@@ -305,44 +305,44 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
         }
     }
              
-    // Log comprehensive field information
-    ESP_LOGI(TAG, "=== Report Descriptor Analysis for Interface %d ===", interface_num);
-    ESP_LOGI(TAG, "");
-    ESP_LOGI(TAG, "Total Fields: %d", report_map->num_fields);
-    ESP_LOGI(TAG, "Total Bits: %d", report_map->total_bits);
-    ESP_LOGI(TAG, "Report ID: %d", report_map->report_id);
-    ESP_LOGI(TAG, "");
-    ESP_LOGI(TAG, "");
-    ESP_LOGI(TAG, "Field Details:");
-
-    for (int i = 0; i < report_map->num_fields; i++) {
-        ESP_LOGI(TAG, "");
-        ESP_LOGI(TAG, "Field %d:", i + 1);
-
-        report_field_info_t *field = &report_map->fields[i];
-
-        const char* usage_page_name = field->attr.usage_page < sizeof(usage_page_names)/sizeof(usage_page_names[0]) &&
-            usage_page_names[field->attr.usage_page] ? usage_page_names[field->attr.usage_page] : "Unknown";
-        ESP_LOGI(TAG, "  Usage Page: 0x%04X (%s)", field->attr.usage_page, usage_page_name);
-
-        if (field->attr.usage_page == HID_USAGE_PAGE_GENERIC_DESKTOP) {
-            const char* usage_name = field->attr.usage < sizeof(usage_names_gendesk)/sizeof(usage_names_gendesk[0]) &&
-               usage_names_gendesk[field->attr.usage] ? usage_names_gendesk[field->attr.usage] : "Unknown";
-            ESP_LOGI(TAG, "  Usage: 0x%04X (%s)", field->attr.usage, usage_name);
-        } else {
-            ESP_LOGI(TAG, "  Usage: 0x%04X", field->attr.usage);
-        }
-
-        ESP_LOGI(TAG, "  Report Size: %d bits", (int) field->attr.report_size);
-        ESP_LOGI(TAG, "  Logical Min: %d", field->attr.logical_min);
-        ESP_LOGI(TAG, "  Logical Max: %d", field->attr.logical_max);
-    }
-
-    ESP_LOGI(TAG, "");
-    ESP_LOGI(TAG, "=== End of Report Descriptor Analysis ===");
-    ESP_LOGI(TAG, "");
-
     xSemaphoreGive(g_report_maps_mutex);
+
+    // Log comprehensive field information
+    // ESP_LOGI(TAG, "=== Report Descriptor Analysis for Interface %d ===", interface_num);
+    // ESP_LOGI(TAG, "");
+    // ESP_LOGI(TAG, "Total Fields: %d", report_map->num_fields);
+    // ESP_LOGI(TAG, "Total Bits: %d", report_map->total_bits);
+    // ESP_LOGI(TAG, "Report ID: %d", report_map->report_id);
+    // ESP_LOGI(TAG, "");
+    // ESP_LOGI(TAG, "");
+    // ESP_LOGI(TAG, "Field Details:");
+
+    // for (int i = 0; i < report_map->num_fields; i++) {
+    //     ESP_LOGI(TAG, "");
+    //     ESP_LOGI(TAG, "Field %d:", i + 1);
+
+    //     report_field_info_t *field = &report_map->fields[i];
+
+    //     const char* usage_page_name = field->attr.usage_page < sizeof(usage_page_names)/sizeof(usage_page_names[0]) &&
+    //         usage_page_names[field->attr.usage_page] ? usage_page_names[field->attr.usage_page] : "Unknown";
+    //     ESP_LOGI(TAG, "  Usage Page: 0x%04X (%s)", field->attr.usage_page, usage_page_name);
+
+    //     if (field->attr.usage_page == HID_USAGE_PAGE_GENERIC_DESKTOP) {
+    //         const char* usage_name = field->attr.usage < sizeof(usage_names_gendesk)/sizeof(usage_names_gendesk[0]) &&
+    //            usage_names_gendesk[field->attr.usage] ? usage_names_gendesk[field->attr.usage] : "Unknown";
+    //         ESP_LOGI(TAG, "  Usage: 0x%04X (%s)", field->attr.usage, usage_name);
+    //     } else {
+    //         ESP_LOGI(TAG, "  Usage: 0x%04X", field->attr.usage);
+    //     }
+
+    //     ESP_LOGI(TAG, "  Report Size: %d bits", (int) field->attr.report_size);
+    //     ESP_LOGI(TAG, "  Logical Min: %d", field->attr.logical_min);
+    //     ESP_LOGI(TAG, "  Logical Max: %d", field->attr.logical_max);
+    // }
+
+    // ESP_LOGI(TAG, "");
+    // ESP_LOGI(TAG, "=== End of Report Descriptor Analysis ===");
+    // ESP_LOGI(TAG, "");
 }
 
 static int extract_field_value(const uint8_t *data, uint16_t bit_offset, uint16_t bit_size) {
