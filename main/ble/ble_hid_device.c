@@ -188,8 +188,8 @@ esp_err_t ble_hid_device_init(void)
     switch(s_high_speed_submode) {
         case SPEED_MODE_FAST:
             s_is_fast_mode = true;
-            s_batch_size = 4;
-            acc_window = pdMS_TO_TICKS(6);
+            s_batch_size = 5;
+            acc_window = pdMS_TO_TICKS(7);
             break;
         case SPEED_MODE_VERYFAST:
             s_is_fast_mode = true;
