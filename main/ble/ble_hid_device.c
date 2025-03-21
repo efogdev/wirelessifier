@@ -23,7 +23,7 @@ static int s_reconnect_delay = 3; // Default reconnect delay in seconds
 // Mouse report accumulation
 static mouse_report_t s_accumulated_report = {0};
 static int64_t s_last_report_time = 0;
-static const int REPORT_INTERVAL_MS = 8;
+static const int REPORT_INTERVAL_MS = 10;
 static uint8_t hidd_service_uuid128[] = {
     /* LSB <--------------------------------------------------------------------------------> MSB */
     // first uuid, 16bit, [12],[13] is the value
