@@ -52,8 +52,8 @@ void app_main(void) {
     led_control_init(NUM_LEDS, GPIO_WS2812B_PIN);
     led_update_pattern(usb_hid_host_device_connected(), ble_hid_device_connected(), hid_bridge_is_ble_paused());
 
-    // ESP_ERROR_CHECK(task_monitor_init());
-    // ESP_ERROR_CHECK(task_monitor_start());
+    ESP_ERROR_CHECK(task_monitor_init());
+    ESP_ERROR_CHECK(task_monitor_start());
 
     run_hid_bridge();
     init_web_stack();

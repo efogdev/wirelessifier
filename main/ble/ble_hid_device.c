@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
+#include "freertos/timers.h"
+#include "freertos/task.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "esp_bt.h"
@@ -13,9 +15,11 @@
 #include "esp_bt_main.h"
 #include "hid_dev.h"
 #include "../utils/storage.h"
+#include "../const.h"
 
 #define HIGH_SPEED_DEVICE_THRESHOLD_MS 6
 #define HIGH_SPEED_DEVICE_THRESHOLD_EVENTS 5
+#define HIGH_SPEED_BATCH_SIZE 3
 
 static const char *TAG = "BLE_HID";
 static uint16_t s_conn_id = 0;
@@ -24,6 +28,14 @@ static bool s_is_high_speed = false;
 static int s_reconnect_delay = 3; // Default reconnect delay in seconds
 static int64_t s_last_event_time = 0;
 static int s_fast_events_count = 0;
+static int s_batch_count = 0;
+static bool s_is_fast_mode = false;
+static TimerHandle_t s_accumulator_timer = NULL;
+static int16_t s_acc_x = 0;
+static int16_t s_acc_y = 0;
+static int8_t s_acc_wheel = 0;
+static int8_t s_acc_pan = 0;
+static uint8_t s_acc_buttons = 0;
 static uint8_t hidd_service_uuid128[] = {
     /* LSB <--------------------------------------------------------------------------------> MSB */
     // first uuid, 16bit, [12],[13] is the value
@@ -130,6 +142,16 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param
         break;
     default:
         break;
+    }
+}
+
+static void accumulator_timer_callback(TimerHandle_t timer) {
+    if (s_acc_x != 0 || s_acc_y != 0 || s_acc_wheel != 0 || s_acc_pan != 0 || s_acc_buttons != 0) {
+        esp_hidd_send_mouse_value(s_conn_id, s_acc_buttons, s_acc_x, s_acc_y, s_acc_wheel, s_acc_pan);
+        s_acc_x = 0;
+        s_acc_y = 0;
+        s_acc_wheel = 0;
+        s_acc_pan = 0;
     }
 }
 
@@ -268,8 +290,6 @@ esp_err_t ble_hid_device_start_advertising(void)
     // Get device name from settings
     char device_name[32];
     if (storage_get_string_setting("deviceInfo.name", device_name, sizeof(device_name)) != ESP_OK) {
-        // Fallback to default name from const.h
-        #include "../const.h"
         strcpy(device_name, DEVICE_NAME);
     }
     
@@ -290,12 +310,17 @@ bool ble_hid_device_connected(void)
 }
 
 static void check_high_speed_device() {
+    if (s_is_high_speed == true) {
+        return;
+    }
+
     int64_t current_time = esp_timer_get_time() / 1000; 
     if (s_last_event_time > 0) {
         int64_t delay = current_time - s_last_event_time;
         if (delay < HIGH_SPEED_DEVICE_THRESHOLD_MS) {
             s_fast_events_count++;
             if (s_fast_events_count >= HIGH_SPEED_DEVICE_THRESHOLD_EVENTS) {
+                ESP_LOGI(TAG, "High speed device detected");
                 s_is_high_speed = true;
             }
         } else {
@@ -327,7 +352,65 @@ esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report)
         return ESP_ERR_INVALID_STATE;
     }
     
-    esp_hidd_send_mouse_value(s_conn_id, report->buttons, report->x, report->y, report->wheel, report->pan);
     check_high_speed_device();
+    
+    static char submode[8];
+    const int period_ms = 6;
+    if (s_is_high_speed) {
+        if (s_accumulator_timer == NULL) {
+            s_is_fast_mode = false;
+            if (storage_get_string_setting("power.highSpeedSubmode", submode, sizeof(submode)) == ESP_OK) {
+                if (strcmp(submode, "fast") == 0) {
+                    s_is_fast_mode = true;
+                }
+            }
+            s_accumulator_timer = xTimerCreate("acc_timer", pdMS_TO_TICKS(period_ms), pdTRUE, NULL, accumulator_timer_callback);
+            xTimerStart(s_accumulator_timer, 0);
+        }
+
+        if (s_is_fast_mode) {
+            s_acc_x += report->x;
+            s_acc_y += report->y;
+            s_acc_wheel += report->wheel;
+            s_acc_pan += report->pan;
+            s_batch_count++;
+
+            if (s_acc_buttons != report->buttons || s_batch_count >= HIGH_SPEED_BATCH_SIZE) {
+                esp_hidd_send_mouse_value(s_conn_id, 
+                    report->buttons, s_acc_x, s_acc_y, s_acc_wheel, s_acc_pan);
+                s_acc_x = 0;
+                s_acc_y = 0;
+                s_acc_wheel = 0;
+                s_acc_pan = 0;
+                s_batch_count = 0;
+            }
+        } else {
+            if (s_acc_buttons != report->buttons) {
+                esp_hidd_send_mouse_value(s_conn_id, 
+                    report->buttons, s_acc_x + report->x, s_acc_y + report->y, s_acc_wheel + report->wheel, s_acc_pan + report->pan);
+                s_acc_x = 0;
+                s_acc_y = 0;
+                s_acc_wheel = 0;
+                s_acc_pan = 0;
+            } else {
+                s_acc_x += report->x;
+                s_acc_y += report->y;
+                s_acc_wheel += report->wheel;
+                s_acc_pan += report->pan;
+            }
+        }
+        s_acc_buttons = report->buttons;
+    } else {
+        esp_hidd_send_mouse_value(s_conn_id, report->buttons, report->x, report->y, report->wheel, report->pan);
+        if (s_accumulator_timer != NULL) {
+            xTimerDelete(s_accumulator_timer, 0);
+            s_accumulator_timer = NULL;
+            s_acc_x = 0;
+            s_acc_y = 0;
+            s_acc_wheel = 0;
+            s_acc_pan = 0;
+        }
+    }
+    
     return ESP_OK;
 }

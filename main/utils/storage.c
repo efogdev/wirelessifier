@@ -198,6 +198,7 @@ esp_err_t init_global_settings(void) {
     }
     
     nvs_close(nvs_handle);
+    ESP_LOGI(STORAGE_TAG, "Current settings: %s", current_settings);
     return ESP_OK;
 }
 

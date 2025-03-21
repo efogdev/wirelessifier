@@ -23,6 +23,10 @@ static QueueHandle_t g_event_queue = NULL;
 static bool g_device_connected = false;
 static TaskHandle_t g_usb_events_task_handle = NULL;
 static TaskHandle_t g_event_task_handle = NULL;
+static TaskHandle_t g_stats_task_handle = NULL;
+static uint32_t s_current_rps = 0;
+
+#define USB_STATS_INTERVAL_SEC 3
 
 // FreeRTOS synchronization primitives
 static portMUX_TYPE g_report_maps_spinlock = portMUX_INITIALIZER_UNLOCKED;
@@ -83,6 +87,7 @@ typedef struct {
 
 static void usb_lib_task(void *arg);
 static void hid_host_event_task(void *arg);
+static void usb_stats_task(void *arg);
 static void hid_host_device_callback(hid_host_device_handle_t hid_device_handle, hid_host_driver_event_t event, void *arg);
 static void hid_host_interface_callback(hid_host_device_handle_t hid_device_handle, hid_host_interface_event_t event, void *arg);
 static void process_device_event(hid_host_device_handle_t hid_device_handle, hid_host_driver_event_t event, void *arg);
@@ -130,6 +135,15 @@ esp_err_t usb_hid_host_init(QueueHandle_t report_queue) {
         return ESP_ERR_NO_MEM;
     }
 
+    task_created = xTaskCreatePinnedToCore(usb_stats_task, "usb_stats", 2048, NULL, 5, &g_stats_task_handle, 1);
+    if (task_created != pdTRUE) {
+        vTaskDelete(g_event_task_handle);
+        vTaskDelete(g_usb_events_task_handle);
+        vQueueDelete(g_event_queue);
+        usb_host_uninstall();
+        return ESP_ERR_NO_MEM;
+    }
+
     const hid_host_driver_config_t hid_host_config = {
         .create_background_task = true,
         .task_priority = 12,
@@ -165,6 +179,11 @@ esp_err_t usb_hid_host_deinit(void) {
     if (g_usb_events_task_handle != NULL) {
         vTaskDelete(g_usb_events_task_handle);
         g_usb_events_task_handle = NULL;
+    }
+
+    if (g_stats_task_handle != NULL) {
+        vTaskDelete(g_stats_task_handle);
+        g_stats_task_handle = NULL;
     }
 
     ret = usb_host_uninstall();
@@ -495,7 +514,7 @@ static int extract_field_value(const uint8_t *data, uint16_t bit_offset, uint16_
 }
 
 static void process_report(hid_host_device_handle_t hid_device_handle, const uint8_t *data, size_t length, uint8_t report_id, uint8_t interface_num) {
-    task_monitor_increment_usb_report_counter();
+    s_current_rps++;
 
     if (!data || !g_report_queue || length == 0 || length > 64 || interface_num >= USB_HOST_MAX_INTERFACES) {
         ESP_LOGE(TAG, "Invalid parameters: data=%p, queue=%p, len=%d, iface=%u", data, g_report_queue, length, interface_num);
@@ -638,7 +657,7 @@ static void process_device_event(hid_host_device_handle_t hid_device_handle, con
     }
 }
 
-static uint8_t cur_if_evt_data[512] = {0};
+static uint8_t cur_if_evt_data[64] = {0};
 
 static void process_interface_event(hid_host_device_handle_t hid_device_handle, const hid_host_interface_event_t event, void *arg) {
     size_t data_length = 0;
@@ -711,4 +730,18 @@ static void usb_lib_task(void *arg) {
     vTaskDelay(10);
     ESP_ERROR_CHECK(usb_host_uninstall());
     vTaskDelete(NULL);
+}
+
+static void usb_stats_task(void *arg) {
+    uint32_t prev_count = 0;
+    TickType_t last_wake_time = xTaskGetTickCount();
+
+    while (1) {
+        uint32_t reports_per_sec = (s_current_rps - prev_count) / USB_STATS_INTERVAL_SEC;
+        
+        ESP_LOGI(TAG, "USB Reports/sec: %lu", reports_per_sec);
+        
+        prev_count = s_current_rps;
+        vTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(USB_STATS_INTERVAL_SEC * 1000));
+    }
 }
