@@ -310,22 +310,22 @@ const App = () => {
                 <div className="setting-group">
                     <h2>Power Management</h2>
 
-                    <div className="setting-item">
-                        <div className="setting-title">Low power mode</div>
-                        <div className="setting-description">
-                            Sacrifice performance to improve battery life.
-                            Makes BLE interval to be ~12-15ms instead of 7.5ms.
-                            Makes RGB LEDs to update with 60FPS instead of 120FPS.
-                        </div>
-                        <label className="toggle-switch">
-                            <input
-                                type="checkbox"
-                                checked={settings.power.lowPowerMode}
-                                onChange={(e) => updateSetting('power', 'lowPowerMode', e.target.checked)}
-                            />
-                            <span className="slider"></span>
-                        </label>
-                    </div>
+                    {/*<div className="setting-item">*/}
+                    {/*    <div className="setting-title">Low power mode</div>*/}
+                    {/*    <div className="setting-description">*/}
+                    {/*        Sacrifice performance to improve battery life.*/}
+                    {/*        Makes BLE interval to be ~12-15ms instead of 7.5ms.*/}
+                    {/*        Makes RGB LEDs to update with 60FPS instead of 120FPS.*/}
+                    {/*    </div>*/}
+                    {/*    <label className="toggle-switch">*/}
+                    {/*        <input*/}
+                    {/*            type="checkbox"*/}
+                    {/*            checked={settings.power.lowPowerMode}*/}
+                    {/*            onChange={(e) => updateSetting('power', 'lowPowerMode', e.target.checked)}*/}
+                    {/*        />*/}
+                    {/*        <span className="slider"></span>*/}
+                    {/*    </label>*/}
+                    {/*</div>*/}
 
                     <div className="setting-item">
                         <div className="setting-title">BLE report rate</div>

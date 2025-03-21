@@ -525,8 +525,6 @@ static void process_report(hid_host_device_handle_t hid_device_handle, const uin
         length--;
     }
 
-    // portENTER_CRITICAL_ISR(&g_report_maps_spinlock);
-
     const uint8_t current_buffer = g_isr_buffer_index;
     usb_hid_report_t *report = &g_isr_reports[current_buffer];
     usb_hid_field_t *fields = g_isr_fields[current_buffer];
@@ -548,7 +546,7 @@ static void process_report(hid_host_device_handle_t hid_device_handle, const uin
 
     memcpy(report->raw, data, report->raw_len);
     g_isr_buffer_index = !g_isr_buffer_index;
-    // portEXIT_CRITICAL_ISR(&g_report_maps_spinlock);
+
     xQueueSend(g_report_queue, report, pdMS_TO_TICKS(100));
 }
 
@@ -590,7 +588,7 @@ static void hid_host_device_callback(hid_host_device_handle_t hid_device_handle,
 }
 
 static const char *hid_proto_name_str[] = {
-    "NONE",
+    "UNKNOWN",
     "KEYBOARD",
     "MOUSE"
 };
@@ -632,12 +630,10 @@ static void process_device_event(hid_host_device_handle_t hid_device_handle, con
 static uint8_t cur_if_evt_data[64] = {0};
 
 static void process_interface_event(hid_host_device_handle_t hid_device_handle, const hid_host_interface_event_t event, void *arg) {
-    size_t data_length = 0;
-    hid_host_dev_params_t dev_params;
+    static size_t data_length = 0;
+    static hid_host_dev_params_t dev_params;
 
     ESP_ERROR_CHECK(hid_host_device_get_params(hid_device_handle, &dev_params));
-    // ESP_LOGD(TAG, "Interface 0x%x: HID event received", dev_params.iface_num);
-
     switch (event) {
         case HID_HOST_INTERFACE_EVENT_INPUT_REPORT:
             ESP_ERROR_CHECK(hid_host_device_get_raw_input_report_data(hid_device_handle, cur_if_evt_data, sizeof(cur_if_evt_data), &data_length));
