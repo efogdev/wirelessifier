@@ -210,11 +210,14 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
     uint16_t usage_minimum = 0;
     uint16_t usage_maximum = 0;
     bool has_usage_range = false;
+    uint8_t current_report_id = 0;
+    bool is_relative = false;
     
     report_map->num_fields = 0;
     report_map->total_bits = 0;
     report_map->usage_stack_pos = 0;
     report_map->collection_depth = 0;
+    report_map->report_id = 0;
 
     for (size_t i = 0; i < length;) {
         uint8_t item = desc[i++];
@@ -233,20 +236,25 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
             case 0: // Main
                 switch (item_tag) {
                     case 8: // Input
+                    case 9: // Output
                         if (report_map->num_fields < MAX_REPORT_FIELDS) {
-                            // Check if this is a padding/constant field
                             bool is_constant = (data & 0x01) != 0;
                             bool is_variable = (data & 0x02) != 0;
-                            bool is_relative = (data & 0x04) != 0;
+                            is_relative = (data & 0x04) != 0;
                             bool is_array = !is_variable;
-                            
+
+                            // Update report ID if one is set
+                            if (current_report_id != 0) {
+                                report_map->report_id = current_report_id;
+                            }
+
                             if (is_constant) {
-                                // Handle padding/constant field
+                                // Handle constant/padding field
                                 report_field_info_t *field = &report_map->fields[report_map->num_fields];
                                 field->attr.usage_page = current_usage_page;
-                                field->attr.usage = 0;  // Padding has no usage
-                                field->attr.report_size = report_size * report_count;
-                                field->attr.report_count = 1;
+                                field->attr.usage = 0;
+                                field->attr.report_size = report_size;
+                                field->attr.report_count = report_count;
                                 field->attr.logical_min = 0;
                                 field->attr.logical_max = 0;
                                 field->attr.constant = true;
@@ -257,28 +265,26 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
                                 report_map->total_bits += report_size * report_count;
                                 report_map->num_fields++;
                             } else if (is_array && has_usage_range) {
-                                // Handle array with usage range (e.g. keyboard keys array)
+                                // Handle array with usage range
                                 report_field_info_t *field = &report_map->fields[report_map->num_fields];
                                 field->attr.usage_page = current_usage_page;
-                                field->attr.usage = usage_minimum;  // Store minimum usage
-                                field->attr.usage_maximum = usage_maximum;  // Store maximum usage
+                                field->attr.usage = usage_minimum;
+                                field->attr.usage_maximum = usage_maximum;
                                 field->attr.report_size = report_size;
                                 field->attr.report_count = report_count;
                                 field->attr.logical_min = logical_min;
                                 field->attr.logical_max = logical_max;
                                 field->attr.constant = false;
-                                field->attr.variable = false;  // Array
-                                field->attr.relative = false;
+                                field->attr.variable = false;
+                                field->attr.relative = is_relative;
                                 field->bit_offset = report_map->total_bits;
                                 field->bit_size = report_size * report_count;
                                 report_map->total_bits += report_size * report_count;
                                 report_map->num_fields++;
-                            } else if (has_usage_range) {
-                                // Handle variable items with usage range (e.g. mouse buttons)
+                            } else if (has_usage_range && is_variable) {
+                                // Handle variable items with usage range
                                 uint16_t range_size = usage_maximum - usage_minimum + 1;
-                                for (uint8_t j = 0; j < report_count && j < range_size; j++) {
-                                    if (report_map->num_fields >= MAX_REPORT_FIELDS) break;
-                                    
+                                for (uint8_t j = 0; j < report_count && j < range_size && report_map->num_fields < MAX_REPORT_FIELDS; j++) {
                                     report_field_info_t *field = &report_map->fields[report_map->num_fields];
                                     field->attr.usage_page = current_usage_page;
                                     field->attr.usage = usage_minimum + j;
@@ -296,11 +302,10 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
                                 }
                             } else {
                                 // Handle individual usages
-                                for (uint8_t j = 0; j < report_count; j++) {
-                                    if (report_map->num_fields >= MAX_REPORT_FIELDS) break;
-                                    
+                                for (uint8_t j = 0; j < report_count && report_map->num_fields < MAX_REPORT_FIELDS; j++) {
                                     report_field_info_t *field = &report_map->fields[report_map->num_fields];
                                     field->attr.usage_page = current_usage_page;
+                                    
                                     if (report_map->usage_stack_pos > j) {
                                         field->attr.usage = report_map->usage_stack[j];
                                     } else if (report_map->usage_stack_pos > 0) {
@@ -308,12 +313,13 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
                                     } else {
                                         field->attr.usage = current_usage;
                                     }
+                                    
                                     field->attr.report_size = report_size;
                                     field->attr.report_count = 1;
                                     field->attr.logical_min = logical_min;
                                     field->attr.logical_max = logical_max;
                                     field->attr.constant = false;
-                                    field->attr.variable = true;
+                                    field->attr.variable = is_variable;
                                     field->attr.relative = is_relative;
                                     field->bit_offset = report_map->total_bits;
                                     field->bit_size = report_size;
@@ -321,8 +327,8 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
                                     report_map->num_fields++;
                                 }
                             }
-                            
-                            // Clear usage stack and range after processing
+
+                            // Reset usage tracking after field processing
                             report_map->usage_stack_pos = 0;
                             has_usage_range = false;
                             usage_minimum = 0;
@@ -367,6 +373,9 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
                         break;
                     case 7: // Report Size
                         report_size = data;
+                        break;
+                    case 8: // Report ID
+                        current_report_id = data;
                         break;
                     case 9: // Report Count
                         report_count = data;
@@ -492,6 +501,12 @@ static void process_report(hid_host_device_handle_t hid_device_handle, const uin
     if (!data || !g_report_queue || length == 0 || length > 64 || interface_num >= USB_HOST_MAX_INTERFACES) {
         ESP_LOGE(TAG, "Invalid parameters: data=%p, queue=%p, len=%d, iface=%u", data, g_report_queue, length, interface_num);
         return;
+    }
+
+    // Skip report ID byte if present in data
+    if (report_id != 0) {
+        data++;
+        length--;
     }
 
     // Enter critical section for ISR-safe operation
@@ -637,7 +652,8 @@ static void process_interface_event(hid_host_device_handle_t hid_device_handle, 
         case HID_HOST_INTERFACE_EVENT_INPUT_REPORT:
             ESP_ERROR_CHECK(hid_host_device_get_raw_input_report_data(hid_device_handle, cur_if_evt_data, sizeof(cur_if_evt_data), &data_length));
             // ESP_LOGD(TAG, "Raw input report data: length=%d", data_length);
-            process_report(hid_device_handle, cur_if_evt_data, data_length, 0, dev_params.iface_num);
+            uint8_t report_id = (data_length > 0) ? cur_if_evt_data[0] : 0;
+            process_report(hid_device_handle, cur_if_evt_data, data_length, report_id, dev_params.iface_num);
             break;
 
         case HID_HOST_INTERFACE_EVENT_DISCONNECTED:
