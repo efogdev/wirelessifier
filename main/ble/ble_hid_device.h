@@ -16,6 +16,7 @@ typedef struct {
     uint16_t x;        // X movement
     uint16_t y;        // Y movement
     int8_t wheel;      // Wheel movement
+    int8_t pan;      // Wheel movement
 } mouse_report_t;
 
 /**
