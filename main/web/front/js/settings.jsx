@@ -1,4 +1,3 @@
-// Main App component
 const App = () => {
     const [connected, setConnected] = React.useState(false);
     const [loading, setLoading] = React.useState(true);
@@ -332,15 +331,17 @@ const App = () => {
                         <div className="setting-title">BLE report rate</div>
                         <div className="setting-description">
                             For high speed (polling rate) devices, it is possible to choose higher BLE report rate. 
-                            Please note that 250 rps is not supported by the BLE standard and it may or may not work in your case.
+                            Please note that it is not supported by the BLE standard and may or may not work in your case.
                             This option will not affect normal speed (125 rps) devices in any way.
+                            Values are calculated for a 1000 Hz USB device.
                         </div>
                         <select
                             value={settings.power.highSpeedSubmode}
                             onChange={(e) => updateSetting('power', 'highSpeedSubmode', e.target.value)}
                         >
-                            <option value="slow">125 rps</option>
-                            <option value="fast">250 rps</option>
+                            <option value="slow">±190 rps</option>
+                            <option value="fast">±240 rps</option>
+                            <option value="veryfast">±315 rps</option>
                         </select>
                     </div>
 

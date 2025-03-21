@@ -19,7 +19,6 @@
 
 #define HIGH_SPEED_DEVICE_THRESHOLD_MS 6
 #define HIGH_SPEED_DEVICE_THRESHOLD_EVENTS 5
-#define HIGH_SPEED_BATCH_SIZE 3
 
 static const char *TAG = "BLE_HID";
 static uint16_t s_conn_id = 0;
@@ -36,6 +35,7 @@ static int16_t s_acc_y = 0;
 static int8_t s_acc_wheel = 0;
 static int8_t s_acc_pan = 0;
 static uint8_t s_acc_buttons = 0;
+static uint8_t s_batch_size = 3; // for veryfast profile
 static uint8_t hidd_service_uuid128[] = {
     /* LSB <--------------------------------------------------------------------------------> MSB */
     // first uuid, 16bit, [12],[13] is the value
@@ -351,57 +351,52 @@ esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report)
     if (!s_connected) {
         return ESP_ERR_INVALID_STATE;
     }
-    
+
     check_high_speed_device();
     
-    static char submode[8];
-    const int period_ms = 6;
+    static char submode[16];
     if (s_is_high_speed) {
         if (s_accumulator_timer == NULL) {
             s_is_fast_mode = false;
             if (storage_get_string_setting("power.highSpeedSubmode", submode, sizeof(submode)) == ESP_OK) {
                 if (strcmp(submode, "fast") == 0) {
                     s_is_fast_mode = true;
+                    s_batch_size = 4;
+                } else if (strcmp(submode, "veryfast") == 0) {
+                    s_is_fast_mode = true;
+                    s_batch_size = 3;
                 }
             }
-            s_accumulator_timer = xTimerCreate("acc_timer", pdMS_TO_TICKS(period_ms), pdTRUE, NULL, accumulator_timer_callback);
+
+            TickType_t acc_window = s_is_fast_mode ? pdMS_TO_TICKS(6) : pdMS_TO_TICKS(8);
+            s_accumulator_timer = xTimerCreate("acc_timer", acc_window, pdTRUE, NULL, accumulator_timer_callback);
             xTimerStart(s_accumulator_timer, 0);
         }
 
-        if (s_is_fast_mode) {
-            s_acc_x += report->x;
-            s_acc_y += report->y;
-            s_acc_wheel += report->wheel;
-            s_acc_pan += report->pan;
-            s_batch_count++;
+        if (s_acc_buttons != report->buttons || (s_is_fast_mode && s_batch_count >= s_batch_size)) {
+            esp_hidd_send_mouse_value(s_conn_id, 
+                report->buttons, s_acc_x, s_acc_y, s_acc_wheel, s_acc_pan);
+            s_acc_x = 0;
+            s_acc_y = 0;
+            s_acc_wheel = 0;
+            s_acc_pan = 0;
+            s_batch_count = 0;
 
-            if (s_acc_buttons != report->buttons || s_batch_count >= HIGH_SPEED_BATCH_SIZE) {
-                esp_hidd_send_mouse_value(s_conn_id, 
-                    report->buttons, s_acc_x, s_acc_y, s_acc_wheel, s_acc_pan);
-                s_acc_x = 0;
-                s_acc_y = 0;
-                s_acc_wheel = 0;
-                s_acc_pan = 0;
-                s_batch_count = 0;
-            }
-        } else {
-            if (s_acc_buttons != report->buttons) {
-                esp_hidd_send_mouse_value(s_conn_id, 
-                    report->buttons, s_acc_x + report->x, s_acc_y + report->y, s_acc_wheel + report->wheel, s_acc_pan + report->pan);
-                s_acc_x = 0;
-                s_acc_y = 0;
-                s_acc_wheel = 0;
-                s_acc_pan = 0;
-            } else {
-                s_acc_x += report->x;
-                s_acc_y += report->y;
-                s_acc_wheel += report->wheel;
-                s_acc_pan += report->pan;
-            }
+            return ESP_OK;
         }
+
         s_acc_buttons = report->buttons;
+        s_acc_x += report->x;
+        s_acc_y += report->y;
+        s_acc_wheel += report->wheel;
+        s_acc_pan += report->pan;
+
+        if (s_is_fast_mode) {
+            s_batch_count++;
+        }
     } else {
         esp_hidd_send_mouse_value(s_conn_id, report->buttons, report->x, report->y, report->wheel, report->pan);
+
         if (s_accumulator_timer != NULL) {
             xTimerDelete(s_accumulator_timer, 0);
             s_accumulator_timer = NULL;
@@ -409,8 +404,10 @@ esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report)
             s_acc_y = 0;
             s_acc_wheel = 0;
             s_acc_pan = 0;
+            
+            return ESP_OK;
         }
     }
-    
+
     return ESP_OK;
 }

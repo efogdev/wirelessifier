@@ -26,7 +26,7 @@ static TaskHandle_t g_event_task_handle = NULL;
 static TaskHandle_t g_stats_task_handle = NULL;
 static uint32_t s_current_rps = 0;
 
-#define USB_STATS_INTERVAL_SEC 3
+#define USB_STATS_INTERVAL_SEC 2
 
 // FreeRTOS synchronization primitives
 static portMUX_TYPE g_report_maps_spinlock = portMUX_INITIALIZER_UNLOCKED;
@@ -515,37 +515,30 @@ static int extract_field_value(const uint8_t *data, uint16_t bit_offset, uint16_
 
 static void process_report(hid_host_device_handle_t hid_device_handle, const uint8_t *data, size_t length, uint8_t report_id, uint8_t interface_num) {
     s_current_rps++;
-
     if (!data || !g_report_queue || length == 0 || length > 64 || interface_num >= USB_HOST_MAX_INTERFACES) {
         ESP_LOGE(TAG, "Invalid parameters: data=%p, queue=%p, len=%d, iface=%u", data, g_report_queue, length, interface_num);
         return;
     }
 
-    // Skip report ID byte if present in data
     if (report_id != 0) {
         data++;
         length--;
     }
 
-    // Enter critical section for ISR-safe operation
-    portENTER_CRITICAL_ISR(&g_report_maps_spinlock);
+    // portENTER_CRITICAL_ISR(&g_report_maps_spinlock);
 
-    // Get current ISR buffer
     const uint8_t current_buffer = g_isr_buffer_index;
     usb_hid_report_t *report = &g_isr_reports[current_buffer];
     usb_hid_field_t *fields = g_isr_fields[current_buffer];
     int *field_values = g_isr_field_values[current_buffer];
 
     report_map_t *report_map = &g_interface_report_maps[interface_num];
-    
-    // Initialize report structure
     report->report_id = report_id;
     report->type = USB_HID_FIELD_TYPE_INPUT;
     report->num_fields = report_map->num_fields;
     report->raw_len = MIN(length, sizeof(report->raw));
     report->fields = fields;
 
-    // Batch process fields for better cache utilization
     const report_field_info_t * volatile field_info = report_map->fields;
     for (uint8_t i = 0; i < report_map->num_fields; i++, field_info++) {
         field_values[i] = extract_field_value(data, field_info->bit_offset, field_info->bit_size);
@@ -554,30 +547,9 @@ static void process_report(hid_host_device_handle_t hid_device_handle, const uin
     }
 
     memcpy(report->raw, data, report->raw_len);
-
-    // Switch buffers atomically
     g_isr_buffer_index = !g_isr_buffer_index;
-    
-    // Exit critical section before queue operations
-    portEXIT_CRITICAL_ISR(&g_report_maps_spinlock);
-
-    // Try sending to queue with initial timeout
-    if (xQueueSend(g_report_queue, report, pdMS_TO_TICKS(100)) != pdTRUE) {
-        // If initial send failed, wait and track time
-        TickType_t start_tick = xTaskGetTickCount();
-        while (xQueueSend(g_report_queue, report, pdMS_TO_TICKS(50)) != pdTRUE) {
-            if ((xTaskGetTickCount() - start_tick) > pdMS_TO_TICKS(250)) {
-                // Queue has been full for >250ms, clear it
-                xQueueReset(g_report_queue);
-                ESP_LOGW(TAG, "Queue full for >250ms, cleared");
-                // Try sending one more time
-                if (xQueueSend(g_report_queue, report, 0) != pdTRUE) {
-                    ESP_LOGE(TAG, "Queue send failed even after clear");
-                }
-                break;
-            }
-        }
-    }
+    // portEXIT_CRITICAL_ISR(&g_report_maps_spinlock);
+    xQueueSend(g_report_queue, report, pdMS_TO_TICKS(100));
 }
 
 // Static allocation for event handling
@@ -739,7 +711,7 @@ static void usb_stats_task(void *arg) {
     while (1) {
         uint32_t reports_per_sec = (s_current_rps - prev_count) / USB_STATS_INTERVAL_SEC;
         
-        ESP_LOGI(TAG, "USB Reports/sec: %lu", reports_per_sec);
+        ESP_LOGI(TAG, "USB: %lu rps", reports_per_sec);
         
         prev_count = s_current_rps;
         vTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(USB_STATS_INTERVAL_SEC * 1000));
