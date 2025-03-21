@@ -24,6 +24,7 @@ const App = () => {
             enableSleep: true,
             deepSleep: true,
             separateSleepTimeouts: true,
+            highSpeedSubmode: 'slow',
         },
         led: {
             brightness: 80,
@@ -325,6 +326,22 @@ const App = () => {
                             />
                             <span className="slider"></span>
                         </label>
+                    </div>
+
+                    <div className="setting-item">
+                        <div className="setting-title">BLE report rate</div>
+                        <div className="setting-description">
+                            For high speed (polling rate) devices, it is possible to choose higher BLE report rate. 
+                            Please note that 250 rps is not supported by the BLE standard and it may or may not work in your case.
+                            This option will not affect normal speed (125 rps) devices in any way.
+                        </div>
+                        <select
+                            value={settings.power.highSpeedSubmode}
+                            onChange={(e) => updateSetting('power', 'highSpeedSubmode', e.target.value)}
+                        >
+                            <option value="slow">125 rps</option>
+                            <option value="fast">250 rps</option>
+                        </select>
                     </div>
 
                     <div className="setting-item">

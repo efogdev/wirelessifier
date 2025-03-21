@@ -14,11 +14,16 @@
 #include "hid_dev.h"
 #include "../utils/storage.h"
 
-static const char *TAG = "BLE_HID";
+#define HIGH_SPEED_DEVICE_THRESHOLD_MS 6
+#define HIGH_SPEED_DEVICE_THRESHOLD_EVENTS 5
 
+static const char *TAG = "BLE_HID";
 static uint16_t s_conn_id = 0;
 static bool s_connected = false;
+static bool s_is_high_speed = false;
 static int s_reconnect_delay = 3; // Default reconnect delay in seconds
+static int64_t s_last_event_time = 0;
+static int s_fast_events_count = 0;
 static uint8_t hidd_service_uuid128[] = {
     /* LSB <--------------------------------------------------------------------------------> MSB */
     // first uuid, 16bit, [12],[13] is the value
@@ -284,12 +289,29 @@ bool ble_hid_device_connected(void)
     return s_connected;
 }
 
+static void check_high_speed_device() {
+    int64_t current_time = esp_timer_get_time() / 1000; 
+    if (s_last_event_time > 0) {
+        int64_t delay = current_time - s_last_event_time;
+        if (delay < HIGH_SPEED_DEVICE_THRESHOLD_MS) {
+            s_fast_events_count++;
+            if (s_fast_events_count >= HIGH_SPEED_DEVICE_THRESHOLD_EVENTS) {
+                s_is_high_speed = true;
+            }
+        } else {
+            s_fast_events_count = 0;
+        }
+    }
+    s_last_event_time = current_time;
+}
+
 esp_err_t ble_hid_device_send_keyboard_report(const keyboard_report_t *report)
 {
     if (!s_connected) {
         return ESP_ERR_INVALID_STATE;
     }
-
+    
+    check_high_speed_device();
     uint8_t buffer[8];
     buffer[0] = report->modifier;
     buffer[1] = report->reserved;
@@ -304,7 +326,8 @@ esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report)
     if (!s_connected) {
         return ESP_ERR_INVALID_STATE;
     }
-
-    esp_hidd_send_mouse_value(s_conn_id, report->buttons, report->x, report->y, report->wheel);
+    
+    esp_hidd_send_mouse_value(s_conn_id, report->buttons, report->x, report->y, report->wheel, report->pan);
+    check_high_speed_device();
     return ESP_OK;
 }
