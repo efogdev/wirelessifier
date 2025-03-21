@@ -161,6 +161,8 @@ static void accumulator_timer_callback(TimerHandle_t timer) {
     }
 }
 
+static TickType_t acc_window = pdMS_TO_TICKS(8);
+
 esp_err_t ble_hid_device_init(void)
 {
     esp_err_t ret = nvs_flash_init();
@@ -169,18 +171,35 @@ esp_err_t ble_hid_device_init(void)
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
-    
-    // Initialize settings
-    init_global_settings();
-    
-    // Cache high speed submode
-    char mode_str[16] = "slow";
-    storage_get_string_setting("power.highSpeedSubmode", mode_str, sizeof(mode_str));
-    s_high_speed_submode = mode_str[0] == 'f' ? SPEED_MODE_FAST : 
-                          mode_str[0] == 'v' ? SPEED_MODE_VERYFAST : 
-                          SPEED_MODE_SLOW;
 
-    // Get BLE reconnect delay from settings
+    init_global_settings();
+
+    char mode_str[16] = {0};
+    storage_get_string_setting("power.highSpeedSubmode", mode_str, sizeof(mode_str));
+    if (mode_str[0] == 'f') {
+        s_high_speed_submode = SPEED_MODE_FAST;
+    } else if (mode_str[0] == 'v') {
+        s_high_speed_submode = SPEED_MODE_VERYFAST;
+    } else {
+        s_high_speed_submode = SPEED_MODE_SLOW;
+    }
+
+    s_is_fast_mode = false;
+    switch(s_high_speed_submode) {
+        case SPEED_MODE_FAST:
+            s_is_fast_mode = true;
+            s_batch_size = 4;
+            acc_window = pdMS_TO_TICKS(6);
+            break;
+        case SPEED_MODE_VERYFAST:
+            s_is_fast_mode = true;
+            s_batch_size = 3;
+            acc_window = pdMS_TO_TICKS(4);
+            break;
+        default:
+            break;
+    }
+
     int reconnect_delay;
     if (storage_get_int_setting("connectivity.bleReconnectDelay", &reconnect_delay) == ESP_OK) {
         s_reconnect_delay = reconnect_delay;
@@ -252,21 +271,10 @@ esp_err_t ble_hid_device_init(void)
             power_level = ESP_PWR_LVL_P9;
         }
     }
-    
-    ESP_LOGI(TAG, "Setting BLE TX power to level: %d", power_level);
+
     esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_DEFAULT, power_level);
-
-    bool low_power_mode = false;
-    storage_get_bool_setting("power.lowPowerMode", &low_power_mode);
-
-    if (low_power_mode) {
-        esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, ESP_PWR_LVL_N6);
-        esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_SCAN, ESP_PWR_LVL_N6);
-    } else {
-        esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, power_level);
-        esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_SCAN, power_level);
-    }
-
+    esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, power_level);
+    esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_SCAN, power_level);
     esp_ble_gatt_set_local_mtu(120);
     return ESP_OK;
 }
@@ -369,24 +377,6 @@ esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report)
     check_high_speed_device();
     if (s_is_high_speed) {
         if (s_accumulator_timer == NULL) {
-            static TickType_t acc_window = pdMS_TO_TICKS(8);
-            s_is_fast_mode = false;
-
-            switch(s_high_speed_submode) {
-                case SPEED_MODE_FAST:
-                    s_is_fast_mode = true;
-                    s_batch_size = 4;
-                    acc_window = pdMS_TO_TICKS(5);
-                    break;
-                case SPEED_MODE_VERYFAST:
-                    s_is_fast_mode = true;
-                    s_batch_size = 3;
-                    acc_window = pdMS_TO_TICKS(5);
-                    break;
-                default:
-                    break;
-            }
-
             s_accumulator_timer = xTimerCreate("acc_timer", acc_window, pdTRUE, NULL, accumulator_timer_callback);
             xTimerStart(s_accumulator_timer, 0);
         }
@@ -401,8 +391,8 @@ esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report)
             s_acc_wheel = 0;
             s_acc_pan = 0;
             s_batch_count = 0;
+
             xTimerReset(s_accumulator_timer, 0);
-            s_accumulator_timer = NULL;
             return ESP_OK;
         }
 
@@ -433,4 +423,3 @@ esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report)
 
     return ESP_OK;
 }
-
