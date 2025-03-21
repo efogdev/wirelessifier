@@ -114,7 +114,7 @@ esp_err_t usb_hid_host_init(QueueHandle_t report_queue) {
         .intr_flags = ESP_INTR_FLAG_LEVEL1,
     };
 
-    ESP_ERROR_CHECK_WITHOUT_ABORT(usb_host_install(&host_config));
+    ESP_ERROR_CHECK(usb_host_install(&host_config));
 
     BaseType_t task_created = xTaskCreatePinnedToCore(hid_host_event_task, "hid_events", 3400, NULL, 13, &g_event_task_handle, 1);
     if (task_created != pdTRUE) {
@@ -207,6 +207,9 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
     int logical_min = 0;
     int logical_max = 0;
     uint16_t current_usage = 0;
+    uint16_t usage_minimum = 0;
+    uint16_t usage_maximum = 0;
+    bool has_usage_range = false;
     
     report_map->num_fields = 0;
     report_map->total_bits = 0;
@@ -231,30 +234,109 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
                 switch (item_tag) {
                     case 8: // Input
                         if (report_map->num_fields < MAX_REPORT_FIELDS) {
-                            for (uint8_t j = 0; j < report_count; j++) {
+                            // Check if this is a padding/constant field
+                            bool is_constant = (data & 0x01) != 0;
+                            bool is_variable = (data & 0x02) != 0;
+                            bool is_relative = (data & 0x04) != 0;
+                            bool is_array = !is_variable;
+                            
+                            if (is_constant) {
+                                // Handle padding/constant field
                                 report_field_info_t *field = &report_map->fields[report_map->num_fields];
                                 field->attr.usage_page = current_usage_page;
-                                // Use the stacked usage if available, otherwise use current_usage
-                                if (report_map->usage_stack_pos > j) {
-                                    field->attr.usage = report_map->usage_stack[j];
-                                } else if (report_map->usage_stack_pos > 0) {
-                                    field->attr.usage = report_map->usage_stack[report_map->usage_stack_pos - 1];
-                                } else {
-                                    field->attr.usage = current_usage;
-                                }
-                                field->attr.report_size = report_size;
+                                field->attr.usage = 0;  // Padding has no usage
+                                field->attr.report_size = report_size * report_count;
                                 field->attr.report_count = 1;
+                                field->attr.logical_min = 0;
+                                field->attr.logical_max = 0;
+                                field->attr.constant = true;
+                                field->attr.variable = false;
+                                field->attr.relative = false;
+                                field->bit_offset = report_map->total_bits;
+                                field->bit_size = report_size * report_count;
+                                report_map->total_bits += report_size * report_count;
+                                report_map->num_fields++;
+                            } else if (is_array && has_usage_range) {
+                                // Handle array with usage range (e.g. keyboard keys array)
+                                report_field_info_t *field = &report_map->fields[report_map->num_fields];
+                                field->attr.usage_page = current_usage_page;
+                                field->attr.usage = usage_minimum;  // Store minimum usage
+                                field->attr.usage_maximum = usage_maximum;  // Store maximum usage
+                                field->attr.report_size = report_size;
+                                field->attr.report_count = report_count;
                                 field->attr.logical_min = logical_min;
                                 field->attr.logical_max = logical_max;
-                                field->attr.constant = (data & 0x01) != 0;
-                                field->attr.variable = (data & 0x02) != 0;
-                                field->attr.relative = (data & 0x04) != 0;
+                                field->attr.constant = false;
+                                field->attr.variable = false;  // Array
+                                field->attr.relative = false;
                                 field->bit_offset = report_map->total_bits;
-                                field->bit_size = report_size;
-                                report_map->total_bits += report_size;
+                                field->bit_size = report_size * report_count;
+                                report_map->total_bits += report_size * report_count;
                                 report_map->num_fields++;
+                            } else if (has_usage_range) {
+                                // Handle variable items with usage range (e.g. mouse buttons)
+                                uint16_t range_size = usage_maximum - usage_minimum + 1;
+                                for (uint8_t j = 0; j < report_count && j < range_size; j++) {
+                                    if (report_map->num_fields >= MAX_REPORT_FIELDS) break;
+                                    
+                                    report_field_info_t *field = &report_map->fields[report_map->num_fields];
+                                    field->attr.usage_page = current_usage_page;
+                                    field->attr.usage = usage_minimum + j;
+                                    field->attr.report_size = report_size;
+                                    field->attr.report_count = 1;
+                                    field->attr.logical_min = logical_min;
+                                    field->attr.logical_max = logical_max;
+                                    field->attr.constant = false;
+                                    field->attr.variable = true;
+                                    field->attr.relative = is_relative;
+                                    field->bit_offset = report_map->total_bits;
+                                    field->bit_size = report_size;
+                                    report_map->total_bits += report_size;
+                                    report_map->num_fields++;
+                                }
+                            } else {
+                                // Handle individual usages
+                                for (uint8_t j = 0; j < report_count; j++) {
+                                    if (report_map->num_fields >= MAX_REPORT_FIELDS) break;
+                                    
+                                    report_field_info_t *field = &report_map->fields[report_map->num_fields];
+                                    field->attr.usage_page = current_usage_page;
+                                    if (report_map->usage_stack_pos > j) {
+                                        field->attr.usage = report_map->usage_stack[j];
+                                    } else if (report_map->usage_stack_pos > 0) {
+                                        field->attr.usage = report_map->usage_stack[report_map->usage_stack_pos - 1];
+                                    } else {
+                                        field->attr.usage = current_usage;
+                                    }
+                                    field->attr.report_size = report_size;
+                                    field->attr.report_count = 1;
+                                    field->attr.logical_min = logical_min;
+                                    field->attr.logical_max = logical_max;
+                                    field->attr.constant = false;
+                                    field->attr.variable = true;
+                                    field->attr.relative = is_relative;
+                                    field->bit_offset = report_map->total_bits;
+                                    field->bit_size = report_size;
+                                    report_map->total_bits += report_size;
+                                    report_map->num_fields++;
+                                }
                             }
-                            report_map->usage_stack_pos = 0; // Clear usage stack after creating fields
+                            
+                            // Clear usage stack and range after processing
+                            report_map->usage_stack_pos = 0;
+                            has_usage_range = false;
+                            usage_minimum = 0;
+                            usage_maximum = 0;
+                        }
+                        break;
+                    case 10: // Collection
+                        if (report_map->collection_depth < MAX_COLLECTION_DEPTH) {
+                            report_map->collection_stack[report_map->collection_depth++] = data;
+                        }
+                        break;
+                    case 12: // End Collection
+                        if (report_map->collection_depth > 0) {
+                            report_map->collection_depth--;
                         }
                         break;
                 }
@@ -300,6 +382,14 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
                         }
                         current_usage = data;
                         break;
+                    case 1: // Usage Minimum
+                        usage_minimum = data;
+                        has_usage_range = true;
+                        break;
+                    case 2: // Usage Maximum
+                        usage_maximum = data;
+                        has_usage_range = true;
+                        break;
                 }
                 break;
         }
@@ -308,41 +398,50 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
     xSemaphoreGive(g_report_maps_mutex);
 
     // Log comprehensive field information
-    // ESP_LOGI(TAG, "=== Report Descriptor Analysis for Interface %d ===", interface_num);
-    // ESP_LOGI(TAG, "");
-    // ESP_LOGI(TAG, "Total Fields: %d", report_map->num_fields);
-    // ESP_LOGI(TAG, "Total Bits: %d", report_map->total_bits);
-    // ESP_LOGI(TAG, "Report ID: %d", report_map->report_id);
-    // ESP_LOGI(TAG, "");
-    // ESP_LOGI(TAG, "");
-    // ESP_LOGI(TAG, "Field Details:");
+    ESP_LOGI(TAG, "=== Report Descriptor Analysis for Interface %d ===", interface_num);
+    ESP_LOGI(TAG, "");
+    ESP_LOGI(TAG, "Total Fields: %d", report_map->num_fields);
+    ESP_LOGI(TAG, "Total Bits: %d", report_map->total_bits);
+    ESP_LOGI(TAG, "Report ID: %d", report_map->report_id);
+    ESP_LOGI(TAG, "");
+    ESP_LOGI(TAG, "");
+    ESP_LOGI(TAG, "Field Details:");
 
-    // for (int i = 0; i < report_map->num_fields; i++) {
-    //     ESP_LOGI(TAG, "");
-    //     ESP_LOGI(TAG, "Field %d:", i + 1);
+    for (int i = 0; i < report_map->num_fields; i++) {
+        ESP_LOGI(TAG, "");
+        ESP_LOGI(TAG, "Field %d:", i + 1);
 
-    //     report_field_info_t *field = &report_map->fields[i];
+        report_field_info_t *field = &report_map->fields[i];
 
-    //     const char* usage_page_name = field->attr.usage_page < sizeof(usage_page_names)/sizeof(usage_page_names[0]) &&
-    //         usage_page_names[field->attr.usage_page] ? usage_page_names[field->attr.usage_page] : "Unknown";
-    //     ESP_LOGI(TAG, "  Usage Page: 0x%04X (%s)", field->attr.usage_page, usage_page_name);
+        const char* usage_page_name = field->attr.usage_page < sizeof(usage_page_names)/sizeof(usage_page_names[0]) &&
+            usage_page_names[field->attr.usage_page] ? usage_page_names[field->attr.usage_page] : "Unknown";
+        ESP_LOGI(TAG, "  Usage Page: 0x%04X (%s)", field->attr.usage_page, usage_page_name);
 
-    //     if (field->attr.usage_page == HID_USAGE_PAGE_GENERIC_DESKTOP) {
-    //         const char* usage_name = field->attr.usage < sizeof(usage_names_gendesk)/sizeof(usage_names_gendesk[0]) &&
-    //            usage_names_gendesk[field->attr.usage] ? usage_names_gendesk[field->attr.usage] : "Unknown";
-    //         ESP_LOGI(TAG, "  Usage: 0x%04X (%s)", field->attr.usage, usage_name);
-    //     } else {
-    //         ESP_LOGI(TAG, "  Usage: 0x%04X", field->attr.usage);
-    //     }
+        if (!field->attr.variable && field->attr.usage_maximum > 0) {
+            // Array field with usage range
+            ESP_LOGI(TAG, "  Usage Range: 0x%04X-0x%04X", field->attr.usage, field->attr.usage_maximum);
+            ESP_LOGI(TAG, "  Array Size: %d", field->attr.report_count);
+        } else {
+            // Regular field
+            if (field->attr.usage_page == HID_USAGE_PAGE_GENERIC_DESKTOP) {
+                const char* usage_name = field->attr.usage < sizeof(usage_names_gendesk)/sizeof(usage_names_gendesk[0]) &&
+                   usage_names_gendesk[field->attr.usage] ? usage_names_gendesk[field->attr.usage] : "Unknown";
+                ESP_LOGI(TAG, "  Usage: 0x%04X (%s)", field->attr.usage, usage_name);
+            } else {
+                ESP_LOGI(TAG, "  Usage: 0x%04X", field->attr.usage);
+            }
+        }
 
-    //     ESP_LOGI(TAG, "  Report Size: %d bits", (int) field->attr.report_size);
-    //     ESP_LOGI(TAG, "  Logical Min: %d", field->attr.logical_min);
-    //     ESP_LOGI(TAG, "  Logical Max: %d", field->attr.logical_max);
-    // }
+        ESP_LOGI(TAG, "  Report Size: %d bits", (int) field->attr.report_size);
+        ESP_LOGI(TAG, "  Variable: %s", field->attr.variable ? "Yes" : "No");
+        ESP_LOGI(TAG, "  Constant: %s", field->attr.constant ? "Yes" : "No");
+        ESP_LOGI(TAG, "  Logical Min: %d", field->attr.logical_min);
+        ESP_LOGI(TAG, "  Logical Max: %d", field->attr.logical_max);
+    }
 
-    // ESP_LOGI(TAG, "");
-    // ESP_LOGI(TAG, "=== End of Report Descriptor Analysis ===");
-    // ESP_LOGI(TAG, "");
+    ESP_LOGI(TAG, "");
+    ESP_LOGI(TAG, "=== End of Report Descriptor Analysis ===");
+    ESP_LOGI(TAG, "");
 }
 
 static int extract_field_value(const uint8_t *data, uint16_t bit_offset, uint16_t bit_size) {
@@ -531,12 +630,12 @@ static void process_interface_event(hid_host_device_handle_t hid_device_handle, 
     size_t data_length = 0;
     hid_host_dev_params_t dev_params;
 
-    ESP_ERROR_CHECK_WITHOUT_ABORT(hid_host_device_get_params(hid_device_handle, &dev_params));
+    ESP_ERROR_CHECK(hid_host_device_get_params(hid_device_handle, &dev_params));
     // ESP_LOGD(TAG, "Interface 0x%x: HID event received", dev_params.iface_num);
 
     switch (event) {
         case HID_HOST_INTERFACE_EVENT_INPUT_REPORT:
-            ESP_ERROR_CHECK_WITHOUT_ABORT(hid_host_device_get_raw_input_report_data(hid_device_handle, cur_if_evt_data, sizeof(cur_if_evt_data), &data_length));
+            ESP_ERROR_CHECK(hid_host_device_get_raw_input_report_data(hid_device_handle, cur_if_evt_data, sizeof(cur_if_evt_data), &data_length));
             // ESP_LOGD(TAG, "Raw input report data: length=%d", data_length);
             process_report(hid_device_handle, cur_if_evt_data, data_length, 0, dev_params.iface_num);
             break;
@@ -544,7 +643,7 @@ static void process_interface_event(hid_host_device_handle_t hid_device_handle, 
         case HID_HOST_INTERFACE_EVENT_DISCONNECTED:
             ESP_LOGI(TAG, "HID Device Disconnected - Interface: %d", dev_params.iface_num);
             g_device_connected = false;
-            ESP_ERROR_CHECK_WITHOUT_ABORT(hid_host_device_close(hid_device_handle));
+            ESP_ERROR_CHECK(hid_host_device_close(hid_device_handle));
             break;
 
         case HID_HOST_INTERFACE_EVENT_TRANSFER_ERROR:
@@ -588,13 +687,13 @@ static void usb_lib_task(void *arg) {
         usb_host_lib_handle_events(portMAX_DELAY, &event_flags);
         if (event_flags & USB_HOST_LIB_EVENT_FLAGS_NO_CLIENTS) {
             ESP_LOGI(TAG, "No more clients, freeing USB devices");
-            ESP_ERROR_CHECK_WITHOUT_ABORT(usb_host_device_free_all());
+            ESP_ERROR_CHECK(usb_host_device_free_all());
             break;
         }
     }
 
     ESP_LOGI(TAG, "USB shutdown");
     vTaskDelay(10);
-    ESP_ERROR_CHECK_WITHOUT_ABORT(usb_host_uninstall());
+    ESP_ERROR_CHECK(usb_host_uninstall());
     vTaskDelete(NULL);
 }

@@ -132,10 +132,10 @@ esp_err_t ble_hid_device_init(void)
 {
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_flash_erase());
+        ESP_ERROR_CHECK(nvs_flash_erase());
         ret = nvs_flash_init();
     }
-    ESP_ERROR_CHECK_WITHOUT_ABORT(ret);
+    ESP_ERROR_CHECK(ret);
     
     // Initialize settings
     init_global_settings();
@@ -147,7 +147,7 @@ esp_err_t ble_hid_device_init(void)
         ESP_LOGI(TAG, "BLE reconnect delay set to %d seconds", s_reconnect_delay);
     }
 
-    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
+    ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
     esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
     ret = esp_bt_controller_init(&bt_cfg);
     if (ret) {

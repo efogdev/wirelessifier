@@ -121,6 +121,7 @@ typedef enum {
 typedef struct {
     uint16_t usage_page;
     uint16_t usage;
+    uint16_t usage_maximum;  // For array fields with usage range
     uint8_t report_size;    // Size in bits
     uint8_t report_count;   // Number of data fields
     int logical_min;

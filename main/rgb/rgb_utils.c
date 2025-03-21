@@ -145,7 +145,7 @@ static void check_and_update_task_suspension(void)
     
     // Handle suspension/resumption
     if (should_suspend && !is_task_suspended && s_led_task_handle != NULL) {
-        ESP_LOGI(TAG, "Suspending LED task - no color and status LED off");
+        ESP_LOGD(TAG, "Suspending LED task - no color and status LED off");
         
         // Set all pixels to black (0,0,0) before suspending
         if (neopixel_ctx != NULL) {
@@ -160,7 +160,7 @@ static void check_and_update_task_suspension(void)
         vTaskSuspend(s_led_task_handle);
         is_task_suspended = true;
     } else if (!should_suspend && is_task_suspended && s_led_task_handle != NULL) {
-        ESP_LOGI(TAG, "Resuming LED task - conditions changed");
+        ESP_LOGD(TAG, "Resuming LED task - conditions changed");
         vTaskResume(s_led_task_handle);
         is_task_suspended = false;
     }

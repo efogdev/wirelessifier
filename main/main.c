@@ -39,10 +39,10 @@ void app_main(void) {
     
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_flash_erase());
+        ESP_ERROR_CHECK(nvs_flash_erase());
         ret = nvs_flash_init();
     }
-    ESP_ERROR_CHECK_WITHOUT_ABORT(ret);
+    ESP_ERROR_CHECK(ret);
 
     init_variables();
     init_gpio();
@@ -52,8 +52,8 @@ void app_main(void) {
     led_control_init(NUM_LEDS, GPIO_WS2812B_PIN);
     led_update_pattern(usb_hid_host_device_connected(), ble_hid_device_connected(), hid_bridge_is_ble_paused());
 
-    ESP_ERROR_CHECK_WITHOUT_ABORT(task_monitor_init());
-    ESP_ERROR_CHECK_WITHOUT_ABORT(task_monitor_start());
+    // ESP_ERROR_CHECK(task_monitor_init());
+    // ESP_ERROR_CHECK(task_monitor_start());
 
     run_hid_bridge();
     init_web_stack();
@@ -74,7 +74,7 @@ static void init_pm() {
         .max_freq_mhz = 80,
         .min_freq_mhz = 10,
     };
-    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_pm_configure(&cfg));
+    ESP_ERROR_CHECK(esp_pm_configure(&cfg));
 }
 
 static void run_hid_bridge() {
@@ -171,6 +171,6 @@ static void init_gpio(void) {
         .duty           = 32, // low brightness but visible
         .hpoint         = 0
     };
-    ESP_ERROR_CHECK_WITHOUT_ABORT(ledc_timer_config(&ledc_timer));
-    ESP_ERROR_CHECK_WITHOUT_ABORT(ledc_channel_config(&ledc_channel));
+    ESP_ERROR_CHECK(ledc_timer_config(&ledc_timer));
+    ESP_ERROR_CHECK(ledc_channel_config(&ledc_channel));
 }

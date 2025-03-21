@@ -74,7 +74,7 @@ esp_err_t connect_wifi_with_stored_credentials(void) {
     strlcpy((char*)wifi_config.sta.password, password, sizeof(wifi_config.sta.password));
     
     ESP_LOGI(WIFI_TAG, "Connecting to %s...", ssid);
-    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     
     // Use esp_err_t to handle the return value instead of ESP_ERROR_CHECK
     esp_err_t connect_err = esp_wifi_connect();
@@ -179,7 +179,7 @@ bool has_wifi_credentials(void) {
 void process_wifi_scan_results(void) {
     // Get scan results
     uint16_t ap_count = 0;
-    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_scan_get_ap_num(&ap_count));
+    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_count));
     
     ESP_LOGI(WIFI_TAG, "WiFi scan completed, found %d networks", ap_count);
     
@@ -197,7 +197,7 @@ void process_wifi_scan_results(void) {
     }
     
     // Get scan results
-    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_scan_get_ap_records(&ap_count, ap_records));
+    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_count, ap_records));
     
     // Build JSON array of results
     char *json_buffer = malloc(ap_count * 128); // Allocate enough space for all APs
@@ -295,7 +295,7 @@ esp_err_t connect_to_wifi(const char* ssid, const char* password) {
     ESP_LOGI(WIFI_TAG, "Connecting to %s...", ssid);
 
     // Set WiFi configuration and start
-    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     
     // Use esp_err_t to handle the return value instead of ESP_ERROR_CHECK
     esp_err_t connect_err = esp_wifi_connect();
