@@ -402,6 +402,7 @@ esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report)
             s_acc_pan = 0;
             s_batch_count = 0;
             xTimerReset(s_accumulator_timer, 0);
+            s_accumulator_timer = NULL;
             return ESP_OK;
         }
 
