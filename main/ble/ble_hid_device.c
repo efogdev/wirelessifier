@@ -36,6 +36,12 @@ static int8_t s_acc_wheel = 0;
 static int8_t s_acc_pan = 0;
 static uint8_t s_acc_buttons = 0;
 static uint8_t s_batch_size = 3; // for veryfast profile
+typedef enum {
+    SPEED_MODE_SLOW = 0,
+    SPEED_MODE_FAST,
+    SPEED_MODE_VERYFAST
+} speed_mode_t;
+static speed_mode_t s_high_speed_submode = SPEED_MODE_SLOW;
 static uint8_t hidd_service_uuid128[] = {
     /* LSB <--------------------------------------------------------------------------------> MSB */
     // first uuid, 16bit, [12],[13] is the value
@@ -167,6 +173,13 @@ esp_err_t ble_hid_device_init(void)
     // Initialize settings
     init_global_settings();
     
+    // Cache high speed submode
+    char mode_str[16] = "slow";
+    storage_get_string_setting("power.highSpeedSubmode", mode_str, sizeof(mode_str));
+    s_high_speed_submode = mode_str[0] == 'f' ? SPEED_MODE_FAST : 
+                          mode_str[0] == 'v' ? SPEED_MODE_VERYFAST : 
+                          SPEED_MODE_SLOW;
+
     // Get BLE reconnect delay from settings
     int reconnect_delay;
     if (storage_get_int_setting("connectivity.bleReconnectDelay", &reconnect_delay) == ESP_OK) {
@@ -346,6 +359,7 @@ esp_err_t ble_hid_device_send_keyboard_report(const keyboard_report_t *report)
     return ESP_OK;
 }
 
+// goal is to map any high (up to 1000hz) report rate to lower BLE report rate
 esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report)
 {
     if (!s_connected) {
@@ -353,22 +367,26 @@ esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report)
     }
 
     check_high_speed_device();
-    
-    static char submode[16];
     if (s_is_high_speed) {
         if (s_accumulator_timer == NULL) {
+            static TickType_t acc_window = pdMS_TO_TICKS(8);
             s_is_fast_mode = false;
-            if (storage_get_string_setting("power.highSpeedSubmode", submode, sizeof(submode)) == ESP_OK) {
-                if (strcmp(submode, "fast") == 0) {
+
+            switch(s_high_speed_submode) {
+                case SPEED_MODE_FAST:
                     s_is_fast_mode = true;
                     s_batch_size = 4;
-                } else if (strcmp(submode, "veryfast") == 0) {
+                    acc_window = pdMS_TO_TICKS(5);
+                    break;
+                case SPEED_MODE_VERYFAST:
                     s_is_fast_mode = true;
                     s_batch_size = 3;
-                }
+                    acc_window = pdMS_TO_TICKS(5);
+                    break;
+                default:
+                    break;
             }
 
-            TickType_t acc_window = s_is_fast_mode ? pdMS_TO_TICKS(6) : pdMS_TO_TICKS(8);
             s_accumulator_timer = xTimerCreate("acc_timer", acc_window, pdTRUE, NULL, accumulator_timer_callback);
             xTimerStart(s_accumulator_timer, 0);
         }
@@ -376,12 +394,14 @@ esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report)
         if (s_acc_buttons != report->buttons || (s_is_fast_mode && s_batch_count >= s_batch_size)) {
             esp_hidd_send_mouse_value(s_conn_id, 
                 report->buttons, s_acc_x, s_acc_y, s_acc_wheel, s_acc_pan);
+
+            s_acc_buttons = 0;
             s_acc_x = 0;
             s_acc_y = 0;
             s_acc_wheel = 0;
             s_acc_pan = 0;
             s_batch_count = 0;
-
+            xTimerReset(s_accumulator_timer, 0);
             return ESP_OK;
         }
 
@@ -400,6 +420,7 @@ esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report)
         if (s_accumulator_timer != NULL) {
             xTimerDelete(s_accumulator_timer, 0);
             s_accumulator_timer = NULL;
+            s_acc_buttons = 0;
             s_acc_x = 0;
             s_acc_y = 0;
             s_acc_wheel = 0;
@@ -411,3 +432,4 @@ esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report)
 
     return ESP_OK;
 }
+

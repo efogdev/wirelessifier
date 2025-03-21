@@ -308,29 +308,12 @@ const App = () => {
                 </div>
 
                 <div className="setting-group">
-                    <h2>Power Management</h2>
-
-                    {/*<div className="setting-item">*/}
-                    {/*    <div className="setting-title">Low power mode</div>*/}
-                    {/*    <div className="setting-description">*/}
-                    {/*        Sacrifice performance to improve battery life.*/}
-                    {/*        Makes BLE interval to be ~12-15ms instead of 7.5ms.*/}
-                    {/*        Makes RGB LEDs to update with 60FPS instead of 120FPS.*/}
-                    {/*    </div>*/}
-                    {/*    <label className="toggle-switch">*/}
-                    {/*        <input*/}
-                    {/*            type="checkbox"*/}
-                    {/*            checked={settings.power.lowPowerMode}*/}
-                    {/*            onChange={(e) => updateSetting('power', 'lowPowerMode', e.target.checked)}*/}
-                    {/*        />*/}
-                    {/*        <span className="slider"></span>*/}
-                    {/*    </label>*/}
-                    {/*</div>*/}
+                    <h2>Connectivity</h2>
 
                     <div className="setting-item">
                         <div className="setting-title">BLE report rate</div>
                         <div className="setting-description">
-                            For high speed (polling rate) devices, it is possible to choose higher BLE report rate. 
+                            For high speed (polling rate) devices, it is possible to choose higher BLE report rate.
                             Please note that it is not supported by the BLE standard and may or may not work in your case.
                             This option will not affect normal speed (125 rps) devices in any way.
                             Values are calculated for a 1000 Hz USB device.
@@ -339,11 +322,48 @@ const App = () => {
                             value={settings.power.highSpeedSubmode}
                             onChange={(e) => updateSetting('power', 'highSpeedSubmode', e.target.value)}
                         >
-                            <option value="slow">±190 rps</option>
+                            <option value="slow">±135 rps</option>
                             <option value="fast">±240 rps</option>
                             <option value="veryfast">±315 rps</option>
                         </select>
                     </div>
+
+                    <div className="setting-item">
+                        <div className="setting-title">BLE TX power</div>
+                        <div className="setting-description">
+                            Bluetooth transmission power level.
+                        </div>
+                        <select
+                            value={settings.connectivity.bleTxPower}
+                            onChange={(e) => updateSetting('connectivity', 'bleTxPower', e.target.value)}
+                        >
+                            <option value="n6">-6 dB</option>
+                            <option value="n3">-3 dB</option>
+                            <option value="n0">0 dB</option>
+                            <option value="p3">+3 dB</option>
+                            <option value="p6">+6 dB</option>
+                            <option value="p9">+9 dB</option>
+                        </select>
+                    </div>
+
+                    <div className="setting-item">
+                        <div className="setting-title">Reconnect delay</div>
+                        <div className="setting-description">
+                            Delay in seconds before attempting to reconnect after Bluetooth disconnect.
+                            Doesn't affect waking up from sleep.
+                        </div>
+                        <input
+                            type="number"
+                            min="1"
+                            max="60"
+                            value={settings.connectivity.bleReconnectDelay}
+                            onChange={(e) => updateSetting('connectivity', 'bleReconnectDelay', parseInt(e.target.value))}
+                        />
+                    </div>
+                </div>
+
+                <div className="setting-group">
+                    <h2>Power</h2>
 
                     <div className="setting-item">
                         <div className="setting-title">Enable sleep</div>
@@ -442,43 +462,6 @@ const App = () => {
                             max="100"
                             value={settings.led.brightness}
                             onChange={(e) => updateSetting('led', 'brightness', parseInt(e.target.value))}
-                        />
-                    </div>
-                </div>
-
-                <div className="setting-group">
-                    <h2>Connectivity</h2>
-
-                    <div className="setting-item">
-                        <div className="setting-title">BLE TX power</div>
-                        <div className="setting-description">
-                            Bluetooth transmission power level.
-                        </div>
-                        <select
-                            value={settings.connectivity.bleTxPower}
-                            onChange={(e) => updateSetting('connectivity', 'bleTxPower', e.target.value)}
-                        >
-                            <option value="n6">-6 dB</option>
-                            <option value="n3">-3 dB</option>
-                            <option value="n0">0 dB</option>
-                            <option value="p3">+3 dB</option>
-                            <option value="p6">+6 dB</option>
-                            <option value="p9">+9 dB</option>
-                        </select>
-                    </div>
-
-                    <div className="setting-item">
-                        <div className="setting-title">Reconnect delay</div>
-                        <div className="setting-description">
-                            Delay in seconds before attempting to reconnect after Bluetooth disconnect.
-                            Doesn't affect waking up from sleep.
-                        </div>
-                        <input
-                            type="number"
-                            min="1"
-                            max="60"
-                            value={settings.connectivity.bleReconnectDelay}
-                            onChange={(e) => updateSetting('connectivity', 'bleReconnectDelay', parseInt(e.target.value))}
                         />
                     </div>
                 </div>

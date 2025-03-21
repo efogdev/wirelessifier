@@ -17,6 +17,10 @@
 #include "usb_hid_host.h"
 #include "../utils/task_monitor.h"
 
+#define USB_STATS_INTERVAL_SEC 2
+#define MAX_REPORT_FIELDS 48
+#define MAX_COLLECTION_DEPTH 8
+
 static const char *TAG = "usb_hid_host";
 static QueueHandle_t g_report_queue = NULL;
 static QueueHandle_t g_event_queue = NULL;
@@ -25,21 +29,11 @@ static TaskHandle_t g_usb_events_task_handle = NULL;
 static TaskHandle_t g_event_task_handle = NULL;
 static TaskHandle_t g_stats_task_handle = NULL;
 static uint32_t s_current_rps = 0;
-
-#define USB_STATS_INTERVAL_SEC 2
-
-// FreeRTOS synchronization primitives
-static portMUX_TYPE g_report_maps_spinlock = portMUX_INITIALIZER_UNLOCKED;
 static SemaphoreHandle_t g_report_maps_mutex;
 
-#define MAX_REPORT_FIELDS 48
-#define MAX_COLLECTION_DEPTH 8
-
-// Double buffering for report processing
-static volatile bool g_isr_buffer_index = 0;
-static usb_hid_report_t g_isr_reports[2];
-static usb_hid_field_t g_isr_fields[2][MAX_REPORT_FIELDS];
-static int g_isr_field_values[2][MAX_REPORT_FIELDS];
+static usb_hid_report_t g_report;
+static usb_hid_field_t g_fields[MAX_REPORT_FIELDS];
+static int g_field_values[MAX_REPORT_FIELDS];
 
 typedef struct {
     usb_hid_field_attr_t attr;
@@ -513,7 +507,7 @@ static int extract_field_value(const uint8_t *data, uint16_t bit_offset, uint16_
     return value;
 }
 
-static void process_report(hid_host_device_handle_t hid_device_handle, const uint8_t *data, size_t length, uint8_t report_id, uint8_t interface_num) {
+static void process_report(const uint8_t *data, size_t length, uint8_t report_id, uint8_t interface_num) {
     s_current_rps++;
     if (!data || !g_report_queue || length == 0 || length > 64 || interface_num >= USB_HOST_MAX_INTERFACES) {
         ESP_LOGE(TAG, "Invalid parameters: data=%p, queue=%p, len=%d, iface=%u", data, g_report_queue, length, interface_num);
@@ -525,32 +519,24 @@ static void process_report(hid_host_device_handle_t hid_device_handle, const uin
         length--;
     }
 
-    const uint8_t current_buffer = g_isr_buffer_index;
-    usb_hid_report_t *report = &g_isr_reports[current_buffer];
-    usb_hid_field_t *fields = g_isr_fields[current_buffer];
-    int *field_values = g_isr_field_values[current_buffer];
-
     report_map_t *report_map = &g_interface_report_maps[interface_num];
-    report->report_id = report_id;
-    report->type = USB_HID_FIELD_TYPE_INPUT;
-    report->num_fields = report_map->num_fields;
-    report->raw_len = MIN(length, sizeof(report->raw));
-    report->fields = fields;
+    g_report.report_id = report_id;
+    g_report.type = USB_HID_FIELD_TYPE_INPUT;
+    g_report.num_fields = report_map->num_fields;
+    g_report.raw_len = MIN(length, sizeof(g_report.raw));
+    g_report.fields = g_fields;
 
     const report_field_info_t * volatile field_info = report_map->fields;
     for (uint8_t i = 0; i < report_map->num_fields; i++, field_info++) {
-        field_values[i] = extract_field_value(data, field_info->bit_offset, field_info->bit_size);
-        fields[i].attr = field_info->attr;
-        fields[i].values = &field_values[i];
+        g_field_values[i] = extract_field_value(data, field_info->bit_offset, field_info->bit_size);
+        g_fields[i].attr = field_info->attr;
+        g_fields[i].values = &g_field_values[i];
     }
 
-    memcpy(report->raw, data, report->raw_len);
-    g_isr_buffer_index = !g_isr_buffer_index;
-
-    xQueueSend(g_report_queue, report, pdMS_TO_TICKS(100));
+    memcpy(g_report.raw, data, g_report.raw_len);
+    xQueueSend(g_report_queue, &g_report, pdMS_TO_TICKS(100));
 }
 
-// Static allocation for event handling
 static hid_event_queue_t g_interface_event = {
     .event_group = APP_EVENT_INTERFACE
 };
@@ -639,7 +625,7 @@ static void process_interface_event(hid_host_device_handle_t hid_device_handle, 
             ESP_ERROR_CHECK(hid_host_device_get_raw_input_report_data(hid_device_handle, cur_if_evt_data, sizeof(cur_if_evt_data), &data_length));
             // ESP_LOGD(TAG, "Raw input report data: length=%d", data_length);
             uint8_t report_id = (data_length > 0) ? cur_if_evt_data[0] : 0;
-            process_report(hid_device_handle, cur_if_evt_data, data_length, report_id, dev_params.iface_num);
+            process_report(cur_if_evt_data, data_length, report_id, dev_params.iface_num);
             break;
 
         case HID_HOST_INTERFACE_EVENT_DISCONNECTED:
@@ -663,7 +649,7 @@ static void hid_host_event_task(void *arg) {
 
     while (1) {
         if (g_event_queue == NULL) {
-            vTaskDelay(pdMS_TO_TICKS(50));
+            vTaskDelay(pdMS_TO_TICKS(10));
         }
 
         if (xQueueReceive(g_event_queue, &evt, portMAX_DELAY)) {
@@ -706,7 +692,6 @@ static void usb_stats_task(void *arg) {
 
     while (1) {
         uint32_t reports_per_sec = (s_current_rps - prev_count) / USB_STATS_INTERVAL_SEC;
-        
         ESP_LOGI(TAG, "USB: %lu rps", reports_per_sec);
         
         prev_count = s_current_rps;

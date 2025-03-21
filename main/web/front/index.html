@@ -489,7 +489,7 @@
         });
         
         document.getElementById('rebootBtn').addEventListener('click', function() {
-            const keepWifi = confirm('Do you want to keep WiFi and web stack on after reboot?');
+            const keepWifi = confirm('Do you want to keep WiFi and web stack on after reboot? Press "Ok" to keep it enabled.');
             if (!socket || socket.readyState !== WebSocket.OPEN) {
                 updateStatus('Device not connected. Please refresh the page.', 'error');
                 return;
