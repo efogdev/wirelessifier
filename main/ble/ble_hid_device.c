@@ -19,6 +19,11 @@ static const char *TAG = "BLE_HID";
 static uint16_t s_conn_id = 0;
 static bool s_connected = false;
 static int s_reconnect_delay = 3; // Default reconnect delay in seconds
+
+// Mouse report accumulation
+static mouse_report_t s_accumulated_report = {0};
+static int64_t s_last_report_time = 0;
+static const int REPORT_INTERVAL_MS = 8;
 static uint8_t hidd_service_uuid128[] = {
     /* LSB <--------------------------------------------------------------------------------> MSB */
     // first uuid, 16bit, [12],[13] is the value
@@ -305,6 +310,39 @@ esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report)
         return ESP_ERR_INVALID_STATE;
     }
 
-    esp_hidd_send_mouse_value(s_conn_id, report->buttons, report->x, report->y, report->wheel);
+    int64_t current_time = esp_timer_get_time() / 1000; // Convert to milliseconds
+    
+    // If buttons changed, send accumulated data first
+    if (s_accumulated_report.buttons != report->buttons && 
+        (s_accumulated_report.x != 0 || s_accumulated_report.y != 0 || s_accumulated_report.wheel != 0 || s_accumulated_report.pan != 0)) {
+        esp_hidd_send_mouse_value(s_conn_id, 
+            s_accumulated_report.buttons,
+            s_accumulated_report.x,
+            s_accumulated_report.y,
+            s_accumulated_report.wheel,
+            s_accumulated_report.pan);
+        memset(&s_accumulated_report, 0, sizeof(mouse_report_t));
+        s_last_report_time = current_time;
+    }
+
+    // Accumulate movements
+    s_accumulated_report.buttons = report->buttons;
+    s_accumulated_report.x += report->x;
+    s_accumulated_report.y += report->y;
+    s_accumulated_report.wheel += report->wheel;
+    s_accumulated_report.pan += report->pan;
+
+    // Send if enough time passed
+    if (current_time - s_last_report_time >= REPORT_INTERVAL_MS) {
+        esp_hidd_send_mouse_value(s_conn_id, 
+            s_accumulated_report.buttons,
+            s_accumulated_report.x,
+            s_accumulated_report.y,
+            s_accumulated_report.wheel,
+            s_accumulated_report.pan);
+        memset(&s_accumulated_report, 0, sizeof(mouse_report_t));
+        s_last_report_time = current_time;
+    }
+
     return ESP_OK;
 }
