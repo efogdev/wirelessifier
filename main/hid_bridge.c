@@ -80,7 +80,7 @@ static void inactivity_timer_callback(TimerHandle_t xTimer)
     xSemaphoreGive(s_ble_stack_mutex);
 }
 
-esp_err_t hid_bridge_init(void)
+esp_err_t hid_bridge_init(const bool verbose)
 {
     if (s_hid_bridge_initialized) {
         ESP_LOGW(TAG, "HID bridge already initialized");
@@ -137,7 +137,7 @@ esp_err_t hid_bridge_init(void)
         return ESP_ERR_NO_MEM;
     }
 
-    esp_err_t ret = usb_hid_host_init(s_hid_report_queue);
+    esp_err_t ret = usb_hid_host_init(s_hid_report_queue, verbose);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize USB HID host: %s", esp_err_to_name(ret));
         xTimerDelete(s_inactivity_timer, 0);
@@ -274,7 +274,7 @@ static esp_err_t process_keyboard_report(const usb_hid_report_t *report) {
         const usb_hid_field_t *field = &report->fields[i];
         const int value = field->values[0];
 
-        if (field->attr.usage_page == HID_USAGE_PAGE_KEYBOARD) {
+        if (field->attr.usage_page == HID_USAGE_KEYPAD) {
             if (field->attr.usage >= 0xE0 && field->attr.usage <= 0xE7 && value) {
                 ble_kb_report.modifier |= (1 << (field->attr.usage - 0xE0));
             } else if (field->attr.usage <= 0xA4 && value) {
@@ -288,7 +288,6 @@ static esp_err_t process_keyboard_report(const usb_hid_report_t *report) {
 
 static esp_err_t process_mouse_report(const usb_hid_report_t *report) {
     mouse_report_t ble_mouse_report = {0};
-    uint8_t btn_index = 0;
 
     for (int i = 0; i < report->num_fields; i++) {
         const usb_hid_field_t *field = &report->fields[i];
@@ -329,13 +328,13 @@ esp_err_t hid_bridge_process_report(const usb_hid_report_t *report)
     //     const usb_hid_field_t *field = &report->fields[i];
     //     const char *usage_page_desc = "";
     //     const char *usage_desc = "";
-        
+    //
     //     switch (field->attr.usage_page) {
     //         case HID_USAGE_PAGE_GENERIC_DESKTOP:
     //             usage_page_desc = "Generic Desktop";
     //             switch (field->attr.usage) {
     //                 case HID_USAGE_MOUSE: usage_desc = "Mouse"; break;
-    //                 case HID_USAGE_KEYBOARD: usage_desc = "Keyboard"; break;
+    //                 case HID_USAGE_KEYBOARD: usage_desc = "Buttons"; break;
     //                 case HID_USAGE_X: usage_desc = "X"; break;
     //                 case HID_USAGE_Y: usage_desc = "Y"; break;
     //                 case HID_USAGE_WHEEL: usage_desc = "Wheel"; break;
@@ -343,7 +342,7 @@ esp_err_t hid_bridge_process_report(const usb_hid_report_t *report)
     //                 default: usage_desc = "Unknown"; break;
     //             }
     //             break;
-    //         case HID_USAGE_PAGE_KEYBOARD:
+    //         case HID_USAGE_KEYPAD:
     //             usage_page_desc = "Keyboard";
     //             if (field->attr.usage >= 0xE0 && field->attr.usage <= 0xE7) {
     //                 usage_desc = "Modifier";
@@ -358,9 +357,9 @@ esp_err_t hid_bridge_process_report(const usb_hid_report_t *report)
     //             usage_desc = "Unknown";
     //             break;
     //     }
-        
+    //
     //     ESP_LOGI(TAG, "Field %d: usage_page=%s (0x%x), usage=%s (0x%x), value=%d, logical_min=%d, logical_max=%d",
-    //         i, usage_page_desc, field->attr.usage_page, usage_desc, field->attr.usage, field->values[0], 
+    //         i, usage_page_desc, field->attr.usage_page, usage_desc, field->attr.usage, field->values[0],
     //         field->attr.logical_min, field->attr.logical_max);
     // }
 
@@ -429,14 +428,16 @@ esp_err_t hid_bridge_process_report(const usb_hid_report_t *report)
                     is_keyboard = true;
                     break;
             }
-        } else if (field->attr.usage_page == HID_USAGE_PAGE_BUTTONS || field->attr.usage_page == HID_USAGE_PAGE_KEYBOARD) {
+        } else if (field->attr.usage_page == HID_USAGE_PAGE_BUTTONS || field->attr.usage_page == HID_USAGE_KEYPAD) {
             is_keyboard = true;
         }
     }
 
     if (is_mouse) {
         ret = process_mouse_report(report);
-    } else if (is_keyboard) {
+    }
+    
+    if (is_keyboard) {
         ret = process_keyboard_report(report);
     }
 

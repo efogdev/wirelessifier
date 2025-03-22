@@ -15,17 +15,16 @@
 #include "ble_hid_device.h"
 #include "hid_bridge.h"
 #include "rgb/rgb_utils.h"
-#include "utils/task_monitor.h"
 #include "utils/storage.h"
 #include "web/http_server.h"
 
-static const char *TAG = "MAIN";
-
+#define VERBOSE 0
 #define GPIO_RESET_PIN GPIO_NUM_16
 #define GPIO_WS2812B_PIN GPIO_NUM_38
 #define GPIO_BUTTON_SW4 GPIO_NUM_13
 #define NUM_LEDS 17
 
+static const char *TAG = "MAIN";
 static QueueHandle_t intrQueue = NULL;
 
 static void init_variables(void);
@@ -51,9 +50,6 @@ void app_main(void) {
 
     led_control_init(NUM_LEDS, GPIO_WS2812B_PIN);
     led_update_pattern(usb_hid_host_device_connected(), ble_hid_device_connected(), hid_bridge_is_ble_paused());
-
-    ESP_ERROR_CHECK(task_monitor_init());
-    ESP_ERROR_CHECK(task_monitor_start());
 
     run_hid_bridge();
     init_web_stack();
@@ -81,7 +77,7 @@ static void run_hid_bridge() {
     gpio_set_level(GPIO_NUM_34, 0);
     gpio_set_level(GPIO_NUM_33, 0);
 
-    esp_err_t ret = hid_bridge_init();
+    esp_err_t ret = hid_bridge_init(VERBOSE);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize HID bridge: %s", esp_err_to_name(ret));
         return;

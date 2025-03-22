@@ -15,6 +15,7 @@
 #include "usb/usb_host.h"
 #include "usb/hid_host.h"
 #include "usb_hid_host.h"
+#include <task_monitor.h>
 #include "descriptor_parser.h"
 
 #define USB_STATS_INTERVAL_SEC 2
@@ -36,6 +37,7 @@ static usb_hid_report_t g_report;
 static usb_hid_field_t g_fields[MAX_REPORT_FIELDS];
 static int g_field_values[MAX_REPORT_FIELDS];
 static report_map_t g_interface_report_maps[USB_HOST_MAX_INTERFACES] = {0};
+static bool g_verbose = false;
 
 static void usb_lib_task(void *arg);
 static void hid_host_event_task(void *arg);
@@ -45,13 +47,21 @@ static void hid_host_interface_callback(hid_host_device_handle_t hid_device_hand
 static void process_device_event(hid_host_device_handle_t hid_device_handle, hid_host_driver_event_t event, void *arg);
 static void process_interface_event(hid_host_device_handle_t hid_device_handle, hid_host_interface_event_t event, void *arg);
 
-esp_err_t usb_hid_host_init(QueueHandle_t report_queue) {
+esp_err_t usb_hid_host_init(const QueueHandle_t report_queue, const bool verbose) {
     ESP_LOGI(TAG, "Initializing USB HID Host");
     if (report_queue == NULL) {
         ESP_LOGE(TAG, "Invalid report queue parameter");
         return ESP_ERR_INVALID_ARG;
     }
 
+    if (verbose) {
+        ESP_ERROR_CHECK(task_monitor_init());
+        ESP_ERROR_CHECK(task_monitor_start());
+
+        xTaskCreatePinnedToCore(usb_stats_task, "usb_stats", 2048, NULL, 5, &g_stats_task_handle, 1);
+    }
+
+    g_verbose = verbose;
     g_report_queue = report_queue;
     g_report_maps_mutex = xSemaphoreCreateMutexStatic(&g_report_maps_mutex_buffer);
 
@@ -74,15 +84,6 @@ esp_err_t usb_hid_host_init(QueueHandle_t report_queue) {
     task_created = xTaskCreatePinnedToCore(usb_lib_task, "usb_events", 2600, NULL, 12, &g_usb_events_task_handle, 1);
     if (task_created != pdTRUE) {
         vTaskDelete(g_event_task_handle);
-        vQueueDelete(g_event_queue);
-        usb_host_uninstall();
-        return ESP_ERR_NO_MEM;
-    }
-
-    task_created = xTaskCreatePinnedToCore(usb_stats_task, "usb_stats", 2048, NULL, 5, &g_stats_task_handle, 1);
-    if (task_created != pdTRUE) {
-        vTaskDelete(g_event_task_handle);
-        vTaskDelete(g_usb_events_task_handle);
         vQueueDelete(g_event_queue);
         usb_host_uninstall();
         return ESP_ERR_NO_MEM;

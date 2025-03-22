@@ -174,9 +174,10 @@ typedef void (*usb_hid_report_callback_t)(usb_hid_report_t *report);
 /**
  * @brief Initialize the USB HID Host* 
  * @param report_queue Queue to receive HID reports
+ * @param verbose
  * @return esp_err_t ESP_OK on success, error code otherwise
  */
-esp_err_t usb_hid_host_init(QueueHandle_t report_queue);
+esp_err_t usb_hid_host_init(QueueHandle_t report_queue, bool verbose);
 
 /**
  * @brief Deinitialize the USB HID Host

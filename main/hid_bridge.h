@@ -212,7 +212,7 @@ typedef uint8_t key_mask_t;
  * 
  * @return esp_err_t ESP_OK on success
  */
-esp_err_t hid_bridge_init(void);
+esp_err_t hid_bridge_init(bool verbose);
 
 /**
  * @brief Deinitialize HID bridge
