@@ -41,13 +41,20 @@ typedef struct {
     uint16_t bit_size;
 } report_field_info_t;
 
+#define MAX_REPORTS_PER_INTERFACE 8
+
 typedef struct {
     report_field_info_t fields[MAX_REPORT_FIELDS];
     uint8_t num_fields;
     uint16_t total_bits;
-    uint8_t report_id;
     uint16_t usage_stack[MAX_REPORT_FIELDS];
     uint8_t usage_stack_pos;
+} report_info_t;
+
+typedef struct {
+    report_info_t reports[MAX_REPORTS_PER_INTERFACE];
+    uint8_t report_ids[MAX_REPORTS_PER_INTERFACE];
+    uint8_t num_reports;
     uint16_t collection_stack[MAX_COLLECTION_DEPTH];
     uint8_t collection_depth;
 } report_map_t;
@@ -226,11 +233,17 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
     uint8_t current_report_id = 0;
     bool is_relative = false;
     
-    report_map->num_fields = 0;
-    report_map->total_bits = 0;
-    report_map->usage_stack_pos = 0;
+    // Initialize report map
+    report_map->num_reports = 0;
     report_map->collection_depth = 0;
-    report_map->report_id = 0;
+    
+    // Initialize first report info
+    report_info_t *current_report = &report_map->reports[0];
+    report_map->report_ids[0] = 0;
+    report_map->num_reports = 1;
+    current_report->num_fields = 0;
+    current_report->total_bits = 0;
+    current_report->usage_stack_pos = 0;
 
     for (size_t i = 0; i < length;) {
         uint8_t item = desc[i++];
@@ -250,20 +263,40 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
                 switch (item_tag) {
                     case 8: // Input
                     case 9: // Output
-                        if (report_map->num_fields < MAX_REPORT_FIELDS) {
+                        if (current_report && current_report->num_fields < MAX_REPORT_FIELDS) {
                             bool is_constant = (data & 0x01) != 0;
                             bool is_variable = (data & 0x02) != 0;
                             is_relative = (data & 0x04) != 0;
                             bool is_array = !is_variable;
 
-                            // Update report ID if one is set
+                            // If we have a report ID, find or create the corresponding report info
                             if (current_report_id != 0) {
-                                report_map->report_id = current_report_id;
+                                int report_index = -1;
+                                for (int i = 0; i < report_map->num_reports; i++) {
+                                    if (report_map->report_ids[i] == current_report_id) {
+                                        report_index = i;
+                                        current_report = &report_map->reports[i];
+                                        break;
+                                    }
+                                }
+                                if (report_index == -1) {
+                                    if (report_map->num_reports >= MAX_REPORTS_PER_INTERFACE) {
+                                        ESP_LOGE(TAG, "Too many reports for interface %d", interface_num);
+                                        continue;
+                                    }
+                                    report_index = report_map->num_reports;
+                                    report_map->report_ids[report_index] = current_report_id;
+                                    current_report = &report_map->reports[report_index];
+                                    current_report->num_fields = 0;
+                                    current_report->total_bits = 0;
+                                    current_report->usage_stack_pos = 0;
+                                    report_map->num_reports++;
+                                }
                             }
 
                             if (is_constant) {
                                 // Handle constant/padding field
-                                report_field_info_t *field = &report_map->fields[report_map->num_fields];
+                                report_field_info_t *field = &current_report->fields[current_report->num_fields];
                                 field->attr.usage_page = current_usage_page;
                                 field->attr.usage = 0;
                                 field->attr.report_size = report_size;
@@ -273,13 +306,13 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
                                 field->attr.constant = true;
                                 field->attr.variable = false;
                                 field->attr.relative = false;
-                                field->bit_offset = report_map->total_bits;
+                                field->bit_offset = current_report->total_bits;
                                 field->bit_size = report_size * report_count;
-                                report_map->total_bits += report_size * report_count;
-                                report_map->num_fields++;
+                                current_report->total_bits += report_size * report_count;
+                                current_report->num_fields++;
                             } else if (is_array && has_usage_range) {
                                 // Handle array with usage range
-                                report_field_info_t *field = &report_map->fields[report_map->num_fields];
+                                report_field_info_t *field = &current_report->fields[current_report->num_fields];
                                 field->attr.usage_page = current_usage_page;
                                 field->attr.usage = usage_minimum;
                                 field->attr.usage_maximum = usage_maximum;
@@ -290,15 +323,15 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
                                 field->attr.constant = false;
                                 field->attr.variable = false;
                                 field->attr.relative = is_relative;
-                                field->bit_offset = report_map->total_bits;
+                                field->bit_offset = current_report->total_bits;
                                 field->bit_size = report_size * report_count;
-                                report_map->total_bits += report_size * report_count;
-                                report_map->num_fields++;
+                                current_report->total_bits += report_size * report_count;
+                                current_report->num_fields++;
                             } else if (has_usage_range && is_variable) {
                                 // Handle variable items with usage range
                                 uint16_t range_size = usage_maximum - usage_minimum + 1;
-                                for (uint8_t j = 0; j < report_count && j < range_size && report_map->num_fields < MAX_REPORT_FIELDS; j++) {
-                                    report_field_info_t *field = &report_map->fields[report_map->num_fields];
+                                for (uint8_t j = 0; j < report_count && j < range_size && current_report->num_fields < MAX_REPORT_FIELDS; j++) {
+                                    report_field_info_t *field = &current_report->fields[current_report->num_fields];
                                     field->attr.usage_page = current_usage_page;
                                     field->attr.usage = usage_minimum + j;
                                     field->attr.report_size = report_size;
@@ -308,21 +341,21 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
                                     field->attr.constant = false;
                                     field->attr.variable = true;
                                     field->attr.relative = is_relative;
-                                    field->bit_offset = report_map->total_bits;
+                                    field->bit_offset = current_report->total_bits;
                                     field->bit_size = report_size;
-                                    report_map->total_bits += report_size;
-                                    report_map->num_fields++;
+                                    current_report->total_bits += report_size;
+                                    current_report->num_fields++;
                                 }
                             } else {
                                 // Handle individual usages
-                                for (uint8_t j = 0; j < report_count && report_map->num_fields < MAX_REPORT_FIELDS; j++) {
-                                    report_field_info_t *field = &report_map->fields[report_map->num_fields];
+                                for (uint8_t j = 0; j < report_count && current_report->num_fields < MAX_REPORT_FIELDS; j++) {
+                                    report_field_info_t *field = &current_report->fields[current_report->num_fields];
                                     field->attr.usage_page = current_usage_page;
                                     
-                                    if (report_map->usage_stack_pos > j) {
-                                        field->attr.usage = report_map->usage_stack[j];
-                                    } else if (report_map->usage_stack_pos > 0) {
-                                        field->attr.usage = report_map->usage_stack[report_map->usage_stack_pos - 1];
+                                    if (current_report->usage_stack_pos > j) {
+                                        field->attr.usage = current_report->usage_stack[j];
+                                    } else if (current_report->usage_stack_pos > 0) {
+                                        field->attr.usage = current_report->usage_stack[current_report->usage_stack_pos - 1];
                                     } else {
                                         field->attr.usage = current_usage;
                                     }
@@ -334,15 +367,15 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
                                     field->attr.constant = false;
                                     field->attr.variable = is_variable;
                                     field->attr.relative = is_relative;
-                                    field->bit_offset = report_map->total_bits;
+                                    field->bit_offset = current_report->total_bits;
                                     field->bit_size = report_size;
-                                    report_map->total_bits += report_size;
-                                    report_map->num_fields++;
+                                    current_report->total_bits += report_size;
+                                    current_report->num_fields++;
                                 }
                             }
 
                             // Reset usage tracking after field processing
-                            report_map->usage_stack_pos = 0;
+                            current_report->usage_stack_pos = 0;
                             has_usage_range = false;
                             usage_minimum = 0;
                             usage_maximum = 0;
@@ -399,8 +432,8 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
             case 2: // Local
                 switch (item_tag) {
                     case 0: // Usage
-                        if (report_map->usage_stack_pos < MAX_REPORT_FIELDS) {
-                            report_map->usage_stack[report_map->usage_stack_pos++] = data;
+                        if (current_report && current_report->usage_stack_pos < MAX_REPORT_FIELDS) {
+                            current_report->usage_stack[current_report->usage_stack_pos++] = data;
                         }
                         current_usage = data;
                         break;
@@ -416,53 +449,25 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
                 break;
         }
     }
+    // Print the resulting map
+    ESP_LOGI(TAG, "Report map for interface %d:", interface_num);
+    for (int i = 0; i < report_map->num_reports; i++) {
+        ESP_LOGI(TAG, "  Report ID %d:", report_map->report_ids[i]);
+        report_info_t *report = &report_map->reports[i];
+        ESP_LOGI(TAG, "    Total bits: %d", report->total_bits);
+        ESP_LOGI(TAG, "    Fields: %d", report->num_fields);
+        for (int j = 0; j < report->num_fields; j++) {
+            report_field_info_t *field = &report->fields[j];
+            ESP_LOGI(TAG, "      Field %d: usage_page=0x%04x, usage=0x%04x, bit_offset=%d, bit_size=%d, %s%s%s",
+                j, field->attr.usage_page, field->attr.usage,
+                field->bit_offset, field->bit_size,
+                field->attr.constant ? "constant " : "",
+                field->attr.variable ? "variable " : "",
+                field->attr.relative ? "relative" : "absolute");
+        }
+    }
              
     xSemaphoreGive(g_report_maps_mutex);
-
-    // ESP_LOGI(TAG, "=== Report Descriptor Analysis for Interface %d ===", interface_num);
-    // ESP_LOGI(TAG, "");
-    // ESP_LOGI(TAG, "Total Fields: %d", report_map->num_fields);
-    // ESP_LOGI(TAG, "Total Bits: %d", report_map->total_bits);
-    // ESP_LOGI(TAG, "Report ID: %d", report_map->report_id);
-    // ESP_LOGI(TAG, "");
-    // ESP_LOGI(TAG, "");
-    // ESP_LOGI(TAG, "Field Details:");
-
-    // for (int i = 0; i < report_map->num_fields; i++) {
-    //     ESP_LOGI(TAG, "");
-    //     ESP_LOGI(TAG, "Field %d:", i + 1);
-
-    //     report_field_info_t *field = &report_map->fields[i];
-
-    //     const char* usage_page_name = field->attr.usage_page < sizeof(usage_page_names)/sizeof(usage_page_names[0]) &&
-    //         usage_page_names[field->attr.usage_page] ? usage_page_names[field->attr.usage_page] : "Unknown";
-    //     ESP_LOGI(TAG, "  Usage Page: 0x%04X (%s)", field->attr.usage_page, usage_page_name);
-
-    //     if (!field->attr.variable && field->attr.usage_maximum > 0) {
-    //         // Array field with usage range
-    //         ESP_LOGI(TAG, "  Usage Range: 0x%04X-0x%04X", field->attr.usage, field->attr.usage_maximum);
-    //         ESP_LOGI(TAG, "  Array Size: %d", field->attr.report_count);
-    //     } else {
-    //         // Regular field
-    //         if (field->attr.usage_page == HID_USAGE_PAGE_GENERIC_DESKTOP) {
-    //             const char* usage_name = field->attr.usage < sizeof(usage_names_gendesk)/sizeof(usage_names_gendesk[0]) &&
-    //                usage_names_gendesk[field->attr.usage] ? usage_names_gendesk[field->attr.usage] : "Unknown";
-    //             ESP_LOGI(TAG, "  Usage: 0x%04X (%s)", field->attr.usage, usage_name);
-    //         } else {
-    //             ESP_LOGI(TAG, "  Usage: 0x%04X", field->attr.usage);
-    //         }
-    //     }
-
-    //     ESP_LOGI(TAG, "  Report Size: %d bits", (int) field->attr.report_size);
-    //     ESP_LOGI(TAG, "  Variable: %s", field->attr.variable ? "Yes" : "No");
-    //     ESP_LOGI(TAG, "  Constant: %s", field->attr.constant ? "Yes" : "No");
-    //     ESP_LOGI(TAG, "  Logical Min: %d", field->attr.logical_min);
-    //     ESP_LOGI(TAG, "  Logical Max: %d", field->attr.logical_max);
-    // }
-
-    // ESP_LOGI(TAG, "");
-    // ESP_LOGI(TAG, "=== End of Report Descriptor Analysis ===");
-    // ESP_LOGI(TAG, "");
 }
 
 static int extract_field_value(const uint8_t *data, uint16_t bit_offset, uint16_t bit_size) {
@@ -515,27 +520,54 @@ static void process_report(const uint8_t *data, size_t length, uint8_t report_id
     }
 
     report_map_t *report_map = &g_interface_report_maps[interface_num];
+    const uint8_t *report_data = data;
+    size_t report_length = length;
+
+    // Skip report ID byte if device uses report IDs
+    if (report_map->num_reports > 1 || (report_map->num_reports == 1 && report_map->report_ids[0] != 0)) {
+        if (length < 1) {
+            ESP_LOGE(TAG, "Report too short for device with report IDs");
+            return;
+        }
+        report_data++;
+        report_length--;
+    }
+    
+    // Find the report info for this report ID
+    report_info_t *report_info = NULL;
+    for (int i = 0; i < report_map->num_reports; i++) {
+        if (report_map->report_ids[i] == report_id) {
+            report_info = &report_map->reports[i];
+            break;
+        }
+    }
+    
+    if (!report_info) {
+        ESP_LOGW(TAG, "Unknown report ID %d for interface %d", report_id, interface_num);
+        return;
+    }
+
     g_report.report_id = report_id;
     g_report.type = USB_HID_FIELD_TYPE_INPUT;
-    g_report.num_fields = report_map->num_fields;
-    g_report.raw_len = MIN(length, sizeof(g_report.raw));
+    g_report.num_fields = report_info->num_fields;
+    g_report.raw_len = MIN(report_length, sizeof(g_report.raw));
     g_report.fields = g_fields;
 
-    // char hex_str[64] = {0};
-    // for (size_t i = 0; i < g_report.raw_len; i++) {
-    //     sprintf(hex_str + i * 3, "%02X ", data[i]);
-    // }
-    // ESP_LOGI(TAG, "Raw report: %s", hex_str);
+    char hex_str[64] = {0};
+    for (size_t i = 0; i < length; i++) {
+        sprintf(hex_str + i * 3, "%02X ", data[i]);
+    }
+    ESP_LOGI(TAG, "Report (#%d): %s", report_id, hex_str);
 
-    const report_field_info_t * volatile field_info = report_map->fields;
-    for (uint8_t i = 0; i < report_map->num_fields; i++, field_info++) {
-        g_field_values[i] = extract_field_value(data, field_info->bit_offset, field_info->bit_size);
+    const report_field_info_t * volatile field_info = report_info->fields;
+    for (uint8_t i = 0; i < report_info->num_fields; i++, field_info++) {
+        g_field_values[i] = extract_field_value(report_data, field_info->bit_offset, field_info->bit_size);
         g_fields[i].attr = field_info->attr;
         g_fields[i].values = &g_field_values[i];
     }
 
-    memcpy(g_report.raw, data, g_report.raw_len);
-    xQueueSend(g_report_queue, &g_report, pdMS_TO_TICKS(100));
+    memcpy(g_report.raw, report_data, g_report.raw_len);
+    xQueueSend(g_report_queue, &g_report, 0);
 }
 
 static hid_event_queue_t g_interface_event = {
