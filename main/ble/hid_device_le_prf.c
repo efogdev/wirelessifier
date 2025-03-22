@@ -33,100 +33,96 @@ static const uint16_t hid_ccc_default = 0x0100;
 static const uint8_t hidReportMap[] = {
     // Mouse Report Descriptor
     0x05, 0x01, // Usage Page (Generic Desktop)
-        0x09, 0x02, // Usage (Mouse)
-        0xA1, 0x01, // Collection (Application)
-        0x85, 0x01, // Report Id (1)
-        0x09, 0x01, //   Usage (Pointer)
-        0xA1, 0x00, //   Collection (Physical)
-            // X, Y
-            0x05, 0x01, // Usage Page (Generic Desktop)
-            0x09, 0x30, // Usage (X)
-            0x09, 0x31, // Usage (Y)
-            0x95, 0x02, // Report Count (2)
-            0x75, 0x10, // Report Size (16)
-            0x16, 0x00, 0x80, // Logical Minimum (-32768)
-            0x26, 0xFF, 0x7F, // Logical Maximum (32767)
-            0x81, 0x06, // Input (Data, Variable, Relative)
-
-            // Vertical Wheel
-            0x09, 0x38, // Usage (Wheel)
-            0x95, 0x01, // Report Count (1)
-            0x75, 0x08, // Report Size (8)
-            0x15, 0x81, // Logical Minimum (-127)
-            0x25, 0x7F, // Logical Maximum (127)
-            0x81, 0x06, // Input (Data, Variable, Relative)
-
-            // Horizontal Wheel
-            0x05, 0x0C, // Usage Page (Consumer)
-            0x0A, 0x38, 0x02, // Usage (AC Pan)
-            0x95, 0x01, // Report Count (1)
-            0x75, 0x08, // Report Size (8)
-            0x15, 0x81, // Logical Minimum (-127)
-            0x25, 0x7F, // Logical Maximum (127)
-            0x81, 0x06, // Input (Data, Variable, Relative)
-
-            // Buttons
-            0x05, 0x09, // Usage Page (Buttons)
-            0x19, 0x01, // Usage Minimum (01) - Button 1
-            0x29, 0x05, // Usage Maximum (05) - Button 5
-            0x95, 0x05, // Report Count (5)
-            0x75, 0x01, // Report Size (1)
-            0x15, 0x00, // Logical Minimum (0)
-            0x25, 0x01, // Logical Maximum (1)
-            0x81, 0x02, // Input (Data, Variable, Absolute)
-
-            // 3-bit padding
-            0x95, 0x01, // Report Count (1)
-            0x75, 0x03, // Report Size (3)
-            0x81, 0x01, // Input (Constant)
-        0xC0, //   End Collection
+    0x09, 0x02, // Usage (Mouse)
+    0xA1, 0x01, // Collection (Application)
+    0x85, 0x01, // Report Id (1)
+    0x09, 0x01, //   Usage (Pointer)
+    0xA1, 0x00, //   Collection (Physical)
+    // X, Y
+    0x05, 0x01, // Usage Page (Generic Desktop)
+    0x09, 0x30, // Usage (X)
+    0x09, 0x31, // Usage (Y)
+    0x95, 0x02, // Report Count (2)
+    0x75, 0x10, // Report Size (16)
+    0x16, 0x00, 0x80, // Logical Minimum (-32768)
+    0x26, 0xFF, 0x7F, // Logical Maximum (32767)
+    0x81, 0x06, // Input (Data, Variable, Relative)
+    // Vertical Wheel
+    0x09, 0x38, // Usage (Wheel)
+    0x95, 0x01, // Report Count (1)
+    0x75, 0x08, // Report Size (8)
+    0x15, 0x81, // Logical Minimum (-127)
+    0x25, 0x7F, // Logical Maximum (127)
+    0x81, 0x06, // Input (Data, Variable, Relative)
+    // Horizontal Wheel
+    0x05, 0x0C, // Usage Page (Consumer)
+    0x0A, 0x38, 0x02, // Usage (AC Pan)
+    0x95, 0x01, // Report Count (1)
+    0x75, 0x08, // Report Size (8)
+    0x15, 0x81, // Logical Minimum (-127)
+    0x25, 0x7F, // Logical Maximum (127)
+    0x81, 0x06, // Input (Data, Variable, Relative)
+    // Buttons
+    0x05, 0x09, // Usage Page (Buttons)
+    0x19, 0x01, // Usage Minimum (01) - Button 1
+    0x29, 0x05, // Usage Maximum (05) - Button 5
+    0x95, 0x05, // Report Count (5)
+    0x75, 0x01, // Report Size (1)
+    0x15, 0x00, // Logical Minimum (0)
+    0x25, 0x01, // Logical Maximum (1)
+    0x81, 0x02, // Input (Data, Variable, Absolute)
+    // 3-bit padding
+    0x95, 0x01, // Report Count (1)
+    0x75, 0x03, // Report Size (3)
+    0x81, 0x01, // Input (Constant)
+    0xC0, //   End Collection
     0xC0, // End Collection
 
     // Keyboard Report Descriptor
-    0x05, 0x01,  // Usage Page (Generic Desktop)
-    0x09, 0x06,  // Usage (Keyboard)
-    0xA1, 0x01,  // Collection (Application)
-    0x85, 0x02,  // Report Id (2)
-    0x05, 0x07,  //   Usage Page (Key Codes)
-    0x19, 0xE0,  //   Usage Minimum (224)
-    0x29, 0xE7,  //   Usage Maximum (231)
-    0x15, 0x00,  //   Logical Minimum (0)
-    0x25, 0x01,  //   Logical Maximum (1)
-    0x75, 0x01,  //   Report Size (1)
-    0x95, 0x08,  //   Report Count (8)
-    0x81, 0x02,  //   Input (Data, Variable, Absolute) - Modifier byte
-    0x95, 0x01,  //   Report Count (1)
-    0x75, 0x08,  //   Report Size (8)
-    0x81, 0x01,  //   Input (Constant) - Reserved byte
-    0x05, 0x0C,  //   Usage Page (Consumer)
-    0x09, 0xB5,  //   Usage (Scan Next Track)
-    0x09, 0xB6,  //   Usage (Scan Previous Track)
-    0x09, 0xB7,  //   Usage (Stop)
-    0x09, 0xB8,  //   Usage (Eject)
-    0x09, 0xCD,  //   Usage (Play/Pause)
-    0x09, 0xE2,  //   Usage (Mute)
-    0x09, 0xE9,  //   Usage (Volume Up)
-    0x09, 0xEA,  //   Usage (Volume Down)
-    0x0A, 0x52, 0x01,  //   Usage (Email Reader)
-    0x0A, 0x53, 0x01,  //   Usage (Calculator)
-    0x0A, 0x54, 0x01,  //   Usage (Local Browser)
-    0x0A, 0x92, 0x01,  //   Usage (Explorer)
-    0x0A, 0x94, 0x01,  //   Usage (Home)
-    0x0A, 0x23, 0x02,  //   Usage (WWW Back)
-    0x0A, 0x24, 0x02,  //   Usage (WWW Forward)
-    0x0A, 0x25, 0x02,  //   Usage (WWW Stop)
-    0x95, 0x10,  //   Report Count (16)
-    0x75, 0x01,  //   Report Size (1)
-    0x81, 0x02,  //   Input (Data, Variable, Absolute)
-    0x05, 0x07,  //   Usage Page (Key Codes)
-    0x19, 0x00,  //   Usage Minimum (0)
-    0x29, 0x65,  //   Usage Maximum (101)
-    0x95, 0x06,  //   Report Count (6)
-    0x75, 0x08,  //   Report Size (8)
-    0x15, 0x00,  //   Logical Minimum (0)
-    0x25, 0x65,  //   Logical Maximum (101)
-    0x81, 0x00,  //   Input (Data, Array) - Key arrays
-    0xC0,        // End Collection
+    0x05, 0x01, // Usage Page (Generic Desktop)
+    0x09, 0x06, // Usage (Keyboard)
+    0xA1, 0x01, // Collection (Application)
+    0x85, 0x02, // Report Id (2)
+    0x05, 0x07, //   Usage Page (Key Codes)
+    0x19, 0xE0, //   Usage Minimum (224)
+    0x29, 0xE7, //   Usage Maximum (231)
+    0x15, 0x00, //   Logical Minimum (0)
+    0x25, 0x01, //   Logical Maximum (1)
+    0x75, 0x01, //   Report Size (1)
+    0x95, 0x08, //   Report Count (8)
+    0x81, 0x02, //   Input (Data, Variable, Absolute) - Modifier byte
+    0x95, 0x01, //   Report Count (1)
+    0x75, 0x08, //   Report Size (8)
+    0x81, 0x01, //   Input (Constant) - Reserved byte
+    0x05, 0x0C, //   Usage Page (Consumer)
+    0x09, 0xB5, //   Usage (Scan Next Track)
+    0x09, 0xB6, //   Usage (Scan Previous Track)
+    0x09, 0xB7, //   Usage (Stop)
+    0x09, 0xB8, //   Usage (Eject)
+    0x09, 0xCD, //   Usage (Play/Pause)
+    0x09, 0xE2, //   Usage (Mute)
+    0x09, 0xE9, //   Usage (Volume Up)
+    0x09, 0xEA, //   Usage (Volume Down)
+    0x0A, 0x52, 0x01, //   Usage (Email Reader)
+    0x0A, 0x53, 0x01, //   Usage (Calculator)
+    0x0A, 0x54, 0x01, //   Usage (Local Browser)
+    0x0A, 0x92, 0x01, //   Usage (Explorer)
+    0x0A, 0x94, 0x01, //   Usage (Home)
+    0x0A, 0x23, 0x02, //   Usage (WWW Back)
+    0x0A, 0x24, 0x02, //   Usage (WWW Forward)
+    0x0A, 0x25, 0x02, //   Usage (WWW Stop)
+    0x95, 0x10, //   Report Count (16)
+    0x75, 0x01, //   Report Size (1)
+    0x81, 0x02, //   Input (Data, Variable, Absolute)
+    0x05, 0x07, //   Usage Page (Key Codes)
+    0x19, 0x00, //   Usage Minimum (0)
+    0x29, 0x65, //   Usage Maximum (101)
+    0x95, 0x06, //   Report Count (6)
+    0x75, 0x08, //   Report Size (8)
+    0x15, 0x00, //   Logical Minimum (0)
+    0x25, 0x65, //   Logical Maximum (101)
+    0x81, 0x00, //   Input (Data, Array) - Key arrays
+    0xC0, // End Collection
     //
 };
 
@@ -221,9 +217,9 @@ static const uint8_t char_prop_write_nr = ESP_GATT_CHAR_PROP_BIT_WRITE_NR;
 static const uint8_t char_prop_read_write = ESP_GATT_CHAR_PROP_BIT_WRITE | ESP_GATT_CHAR_PROP_BIT_READ;
 static const uint8_t char_prop_read_notify = ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_NOTIFY;
 // static const uint8_t char_prop_read_write_notify =
-        // ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE | ESP_GATT_CHAR_PROP_BIT_NOTIFY;
+// ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE | ESP_GATT_CHAR_PROP_BIT_NOTIFY;
 // static const uint8_t char_prop_read_write_write_nr =
-        // ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE | ESP_GATT_CHAR_PROP_BIT_WRITE_NR;
+// ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE | ESP_GATT_CHAR_PROP_BIT_WRITE_NR;
 
 /// battery Service
 static const uint16_t battery_svc = ESP_GATT_UUID_BATTERY_SERVICE_SVC;
@@ -399,8 +395,8 @@ static esp_gatts_attr_db_t hidd_le_gatt_db[HIDD_LE_IDX_NB] =
         {ESP_GATT_AUTO_RSP}, {
             ESP_UUID_LEN_16, (uint8_t *) &character_client_config_uuid,
             (ESP_GATT_PERM_READ_ENCRYPTED | ESP_GATT_PERM_WRITE_ENCRYPTED),
-            sizeof(uint16_t),  sizeof(uint16_t),  
-            (uint8_t*)&hid_ccc_default          
+            sizeof(uint16_t), sizeof(uint16_t),
+            (uint8_t *) &hid_ccc_default
         }
     },
     [HIDD_LE_IDX_REPORT_MOUSE_REP_REF] = {
@@ -518,15 +514,15 @@ void esp_hidd_prf_cb_hdl(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
                 (hidd_le_env.hidd_cb)(ESP_HIDD_EVENT_BLE_CONNECT, &cb_param);
             }
 
-        esp_ble_conn_update_params_t conn_params;
-        memcpy(conn_params.bda, param->connect.remote_bda, sizeof(esp_bd_addr_t));
+            esp_ble_conn_update_params_t conn_params;
+            memcpy(conn_params.bda, param->connect.remote_bda, sizeof(esp_bd_addr_t));
 
-        conn_params.latency = 0x00;
-        conn_params.min_int = 0x06; // x 1.25ms
-        conn_params.max_int = 0x06; // x 1.25ms
-        
-        conn_params.timeout = 0xA0; // x 6.25ms
-        esp_ble_gap_update_conn_params(&conn_params);
+            conn_params.latency = 0x00;
+            conn_params.min_int = 0x06; // x 1.25ms
+            conn_params.max_int = 0x06; // x 1.25ms
+
+            conn_params.timeout = 0xA0; // x 6.25ms
+            esp_ble_gap_update_conn_params(&conn_params);
             break;
         }
         case ESP_GATTS_DISCONNECT_EVT: {

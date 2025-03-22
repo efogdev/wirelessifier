@@ -18,12 +18,13 @@
 #include "descriptor_parser.h"
 
 #define USB_STATS_INTERVAL_SEC 2
+#define HOST_HID_QUEUE_SIZE    4
 
 static const char *TAG = "usb_hid_host";
 static QueueHandle_t g_report_queue = NULL;
 static StaticQueue_t g_event_queue_storage;
 static QueueHandle_t g_event_queue = NULL;
-static uint8_t g_event_queue_array[4 * sizeof(hid_event_queue_t)];
+static uint8_t g_event_queue_array[HOST_HID_QUEUE_SIZE * sizeof(hid_event_queue_t)];
 static bool g_device_connected = false;
 static TaskHandle_t g_usb_events_task_handle = NULL;
 static TaskHandle_t g_event_task_handle = NULL;
@@ -55,7 +56,7 @@ esp_err_t usb_hid_host_init(QueueHandle_t report_queue) {
     g_report_maps_mutex = xSemaphoreCreateMutexStatic(&g_report_maps_mutex_buffer);
 
     g_device_connected = false;
-    g_event_queue = xQueueCreateStatic(4, sizeof(hid_event_queue_t), g_event_queue_array, &g_event_queue_storage);
+    g_event_queue = xQueueCreateStatic(HOST_HID_QUEUE_SIZE, sizeof(hid_event_queue_t), g_event_queue_array, &g_event_queue_storage);
 
     const usb_host_config_t host_config = {
         .skip_phy_setup = false,
@@ -148,16 +149,16 @@ bool usb_hid_host_device_connected(void) {
 }
 
 static void process_report(const uint8_t *const data, const size_t length, const uint8_t interface_num) {
-    char hex_str[length * 3 + 1];
-    hex_str[0] = '\0';
-    for (size_t i = 0; i < length; i++) {
-        sprintf(hex_str + i * 3, "%02X ", data[i]);
-    }
-
     s_current_rps++;
     if (!data || !g_report_queue || length <= 1 || interface_num >= USB_HOST_MAX_INTERFACES) {
         ESP_LOGE(TAG, "Invalid parameters: data=%p, queue=%p, len=%d, iface=%u", data, g_report_queue, length, interface_num);
         return;
+    }
+
+    char hex_str[length * 3 + 1];
+    hex_str[0] = '\0';
+    for (size_t i = 0; i < length; i++) {
+        sprintf(hex_str + i * 3, "%02X ", data[i]);
     }
 
     const report_map_t *const report_map = &g_interface_report_maps[interface_num];
