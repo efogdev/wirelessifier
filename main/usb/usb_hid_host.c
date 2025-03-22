@@ -183,23 +183,26 @@ bool usb_hid_host_device_connected(void) {
 }
 
 
-static void process_report(const uint8_t *data, const size_t length, const uint8_t interface_num) {
+static void process_report(const uint8_t *const data, const size_t length, const uint8_t interface_num) {
     s_current_rps++;
-    if (!data || !g_report_queue || length == 0 || length > 64 || interface_num >= USB_HOST_MAX_INTERFACES) {
+    if (!data || !g_report_queue || length <= 1 || interface_num >= USB_HOST_MAX_INTERFACES) {
         ESP_LOGE(TAG, "Invalid parameters: data=%p, queue=%p, len=%d, iface=%u", data, g_report_queue, length, interface_num);
         return;
     }
 
-    report_map_t *report_map = &g_interface_report_maps[interface_num];
+    const report_map_t *const report_map = &g_interface_report_maps[interface_num];
     const uint8_t *report_data = data;
     size_t report_length = length;
-
-    uint8_t report_id = 0;
-    // here: set report ID based on descriptor and report size
-    // some devices send report ID as the first byte while some don't
-    // and the first byte may be non-zero if it's not report ID
+    static uint8_t report_id = 0;
+    if (report_map->num_reports > 1) {
+        report_id = data[0];
+        report_data++;
+        report_length--;
+    } else if (report_map->num_reports == 1) {
+        report_id = report_map->report_ids[0];
+    }
     
-    report_info_t *report_info = NULL;
+    const report_info_t *report_info = NULL;
     for (int i = 0; i < report_map->num_reports; i++) {
         if (report_map->report_ids[i] == report_id) {
             report_info = &report_map->reports[i];
@@ -218,16 +221,17 @@ static void process_report(const uint8_t *data, const size_t length, const uint8
     g_report.raw_len = MIN(report_length, sizeof(g_report.raw));
     g_report.fields = g_fields;
 
-    char hex_str[64] = {0};
-    for (size_t i = 0; i < length; i++) {
-        sprintf(hex_str + i * 3, "%02X ", data[i]);
-    }
-    ESP_LOGI(TAG, "Report (#%d): %s", report_id, hex_str);
+    // static char hex_str[64];
+    // memset(hex_str, 0, sizeof(hex_str));
+    // for (size_t i = 0; i < length; i++) {
+    //     sprintf(hex_str + i * 3, "%02X ", data[i]);
+    // }
+    // ESP_LOGI(TAG, "Report (#%d): %s", report_id, hex_str);
 
-    const report_field_info_t * volatile field_info = report_info->fields;
-    for (uint8_t i = 0; i < report_info->num_fields; i++, field_info++) {
-        g_field_values[i] = extract_field_value(report_data, field_info->bit_offset, field_info->bit_size);
-        g_fields[i].attr = field_info->attr;
+    const report_field_info_t *const field_info = report_info->fields;
+    for (uint8_t i = 0; i < report_info->num_fields; i++) {
+        g_field_values[i] = extract_field_value(report_data, field_info[i].bit_offset, field_info[i].bit_size);
+        g_fields[i].attr = field_info[i].attr;
         g_fields[i].values = &g_field_values[i];
     }
 
