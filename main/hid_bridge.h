@@ -19,7 +19,7 @@ extern "C" {
 #define HID_USAGE_PAGE_SPORT           0x04
 #define HID_USAGE_PAGE_GAME            0x05
 #define HID_USAGE_PAGE_BUTTON          0x09
-#define HID_USAGE_PAGE_KEYBOARD        0x07
+#define HID_USAGE_PAGE_KEYBOARD        0x09
 #define HID_USAGE_PAGE_LEDS            0x08
 #define HID_USAGE_PAGE_CONSUMER        0x0C
 

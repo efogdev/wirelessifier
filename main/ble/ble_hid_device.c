@@ -226,7 +226,7 @@ esp_err_t ble_hid_device_init(void)
     }
 
     esp_ble_gap_register_callback(gap_event_handler);
-    esp_hidd_register_callbacks(hidd_event_callback);
+    esp_hidd_register_callbacks((esp_hidd_event_cb_t)hidd_event_callback);
 
     esp_ble_auth_req_t auth_req = ESP_LE_AUTH_REQ_SC_MITM_BOND;
     esp_ble_io_cap_t iocap = ESP_IO_CAP_NONE;           //set the IO capability to No output No input
