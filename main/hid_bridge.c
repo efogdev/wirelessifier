@@ -273,15 +273,14 @@ static esp_err_t process_keyboard_report(usb_hid_report_t *report) {
     return ESP_OK;
 }
 
-static esp_err_t process_mouse_report(usb_hid_report_t *report) {
-    static mouse_report_t ble_mouse_report = {0};
+static esp_err_t process_mouse_report(const usb_hid_report_t *report) {
+    mouse_report_t ble_mouse_report = {0};
     uint8_t btn_index = 0;
 
     for (int i = 0; i < report->num_fields; i++) {
         const usb_hid_field_t *field = &report->fields[i];
         const int value = field->values[0];
 
-        // Handle mouse fields based on usage page and usage
         if (field->attr.usage_page == HID_USAGE_PAGE_GENERIC_DESKTOP) {
             switch (field->attr.usage) {
                 case HID_USAGE_X:
@@ -302,7 +301,6 @@ static esp_err_t process_mouse_report(usb_hid_report_t *report) {
             btn_index++;
         }
     }
-
 
     return ble_hid_device_send_mouse_report(&ble_mouse_report);
 }
@@ -361,16 +359,20 @@ esp_err_t hid_bridge_process_report(usb_hid_report_t *report)
     bool is_mouse = false;
     bool is_keyboard = false;
 
-    // Scan all fields to determine report type
     for (int i = 0; i < report->num_fields; i++) {
         const usb_hid_field_t *field = &report->fields[i];
         
         if (field->attr.usage_page == HID_USAGE_PAGE_GENERIC_DESKTOP) {
             switch (field->attr.usage) {
+                case 0x1:
+                case 0x3:
+                case 0x4:
+                case 0x5:
                 case HID_USAGE_MOUSE:
                 case HID_USAGE_X:
                 case HID_USAGE_Y:
                 case HID_USAGE_WHEEL:
+                case 0x238: // AC_PAN
                     is_mouse = true;
                     break;
                 case HID_USAGE_KEYBOARD:

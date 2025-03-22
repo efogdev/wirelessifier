@@ -375,6 +375,8 @@ esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report)
         return ESP_ERR_INVALID_STATE;
     }
 
+    ESP_LOGI(TAG, "Mouse: X=%d Y=%d wheel=%d pan=%d buttons=%02x", report->x, report->y, report->wheel, report->pan, report->buttons);
+
     if (check_high_speed_device()) {
         if (s_accumulator_timer == NULL) {
             s_accumulator_timer = xTimerCreate("acc_timer", acc_window, pdTRUE, NULL, accumulator_timer_callback);

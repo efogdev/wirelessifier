@@ -36,8 +36,8 @@ static const uint8_t hidReportMap[] = {
     0x09, 0x02, // Usage (Mouse)
     0xA1, 0x01, // Collection (Application)
     0x85, 0x01, // Report Id (1)
-    0x09, 0x01, //   Usage (Pointer)
-    0xA1, 0x00, //   Collection (Physical)
+    0x09, 0x01, // Usage (Pointer)
+    0xA1, 0x00, // Collection (Physical)
     // X, Y
     0x05, 0x01, // Usage Page (Generic Desktop)
     0x09, 0x30, // Usage (X)
@@ -65,16 +65,12 @@ static const uint8_t hidReportMap[] = {
     // Buttons
     0x05, 0x09, // Usage Page (Buttons)
     0x19, 0x01, // Usage Minimum (01) - Button 1
-    0x29, 0x05, // Usage Maximum (05) - Button 5
-    0x95, 0x05, // Report Count (5)
+    0x29, 0x08, // Usage Maximum (08) - Button 8
+    0x95, 0x08, // Report Count (8)
     0x75, 0x01, // Report Size (1)
     0x15, 0x00, // Logical Minimum (0)
     0x25, 0x01, // Logical Maximum (1)
     0x81, 0x02, // Input (Data, Variable, Absolute)
-    // 3-bit padding
-    0x95, 0x01, // Report Count (1)
-    0x75, 0x03, // Report Size (3)
-    0x81, 0x01, // Input (Constant)
     0xC0, //   End Collection
     0xC0, // End Collection
 
@@ -129,12 +125,10 @@ static const uint8_t hidReportMap[] = {
 /// Battery Service Attributes Indexes
 enum {
     BAS_IDX_SVC,
-
     BAS_IDX_BATT_LVL_CHAR,
     BAS_IDX_BATT_LVL_VAL,
     BAS_IDX_BATT_LVL_NTF_CFG,
     BAS_IDX_BATT_LVL_PRES_FMT,
-
     BAS_IDX_NB,
 };
 
@@ -573,9 +567,7 @@ void esp_hidd_prf_cb_hdl(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
     }
 }
 
-void hidd_le_create_service(esp_gatt_if_t gatts_if) {
-    /* Here should added the battery service first, because the hid service should include the battery service.
-       After finish to added the battery service then can added the hid service. */
+void hidd_le_create_service(const esp_gatt_if_t gatts_if) {
     esp_ble_gatts_create_attr_tab(bas_att_db, gatts_if, BAS_IDX_NB, 0);
 }
 
@@ -584,7 +576,7 @@ void hidd_le_init(void) {
     memset(&hidd_le_env, 0, sizeof(hidd_le_env_t));
 }
 
-void hidd_clcb_alloc(uint16_t conn_id, esp_bd_addr_t bda) {
+void hidd_clcb_alloc(const uint16_t conn_id, esp_bd_addr_t bda) {
     uint8_t i_clcb = 0;
     hidd_clcb_t *p_clcb = NULL;
 
@@ -597,13 +589,11 @@ void hidd_clcb_alloc(uint16_t conn_id, esp_bd_addr_t bda) {
             break;
         }
     }
-    return;
 }
 
 bool hidd_clcb_dealloc(uint16_t conn_id) {
     uint8_t i_clcb = 0;
     hidd_clcb_t *p_clcb = NULL;
-
     for (i_clcb = 0, p_clcb = hidd_le_env.hidd_clcb; i_clcb < HID_MAX_APPS; i_clcb++, p_clcb++) {
         memset(p_clcb, 0, sizeof(hidd_clcb_t));
         return true;
@@ -615,14 +605,13 @@ bool hidd_clcb_dealloc(uint16_t conn_id) {
 static struct gatts_profile_inst heart_rate_profile_tab[PROFILE_NUM] = {
     [PROFILE_APP_IDX] = {
         .gatts_cb = esp_hidd_prf_cb_hdl,
-        .gatts_if = ESP_GATT_IF_NONE, /* Not get the gatt_if, so initial is ESP_GATT_IF_NONE */
+        .gatts_if = ESP_GATT_IF_NONE,
     },
 
 };
 
-static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
+static void gatts_event_handler(const esp_gatts_cb_event_t event, const esp_gatt_if_t gatts_if,
                                 esp_ble_gatts_cb_param_t *param) {
-    /* If event is register event, store the gatts_if for each profile */
     if (event == ESP_GATTS_REG_EVT) {
         if (param->reg.status == ESP_GATT_OK) {
             heart_rate_profile_tab[PROFILE_APP_IDX].gatts_if = gatts_if;
@@ -637,7 +626,6 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
     do {
         for (int idx = 0; idx < PROFILE_NUM; idx++) {
             if (gatts_if == ESP_GATT_IF_NONE ||
-                /* ESP_GATT_IF_NONE, not specify a certain gatt_if, need to call every profile cb function */
                 gatts_if == heart_rate_profile_tab[idx].gatts_if) {
                 if (heart_rate_profile_tab[idx].gatts_cb) {
                     heart_rate_profile_tab[idx].gatts_cb(event, gatts_if, param);
@@ -652,7 +640,7 @@ esp_err_t hidd_register_cb(void) {
     return esp_ble_gatts_register_callback(gatts_event_handler);
 }
 
-void hidd_set_attr_value(uint16_t handle, uint16_t val_len, const uint8_t *value) {
+void hidd_set_attr_value(const uint16_t handle, const uint16_t val_len, const uint8_t *value) {
     hidd_inst_t *hidd_inst = &hidd_le_env.hidd_inst;
     if (hidd_inst->att_tbl[HIDD_LE_IDX_HID_INFO_VAL] <= handle &&
         hidd_inst->att_tbl[HIDD_LE_IDX_REPORT_REP_REF] >= handle) {
@@ -662,8 +650,8 @@ void hidd_set_attr_value(uint16_t handle, uint16_t val_len, const uint8_t *value
     }
 }
 
-void hidd_get_attr_value(uint16_t handle, uint16_t *length, uint8_t **value) {
-    hidd_inst_t *hidd_inst = &hidd_le_env.hidd_inst;
+void hidd_get_attr_value(const uint16_t handle, uint16_t *length, uint8_t **value) {
+    const hidd_inst_t *hidd_inst = &hidd_le_env.hidd_inst;
     if (hidd_inst->att_tbl[HIDD_LE_IDX_HID_INFO_VAL] <= handle &&
         hidd_inst->att_tbl[HIDD_LE_IDX_REPORT_REP_REF] >= handle) {
         esp_ble_gatts_get_attr_value(handle, length, (const uint8_t **) value);

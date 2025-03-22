@@ -136,10 +136,8 @@ esp_err_t usb_hid_host_deinit(void) {
     }
 
     g_event_queue = NULL;
-
     g_report_queue = NULL;
     g_device_connected = false;
-    
     ESP_LOGI(TAG, "USB HID Host deinitialized");
     return ret;
 }
@@ -155,11 +153,11 @@ static void process_report(const uint8_t *const data, const size_t length, const
         return;
     }
 
-    char hex_str[length * 3 + 1];
-    hex_str[0] = '\0';
-    for (size_t i = 0; i < length; i++) {
-        sprintf(hex_str + i * 3, "%02X ", data[i]);
-    }
+    // char hex_str[length * 3 + 1];
+    // hex_str[0] = '\0';
+    // for (size_t i = 0; i < length; i++) {
+    //     sprintf(hex_str + i * 3, "%02X ", data[i]);
+    // }
 
     const report_map_t *const report_map = &g_interface_report_maps[interface_num];
     const uint8_t *report_data = data;
@@ -173,7 +171,7 @@ static void process_report(const uint8_t *const data, const size_t length, const
         report_id = report_map->report_ids[0];
     }
 
-    ESP_LOGI(TAG, "HID [%d] %s", report_id, hex_str);
+    // ESP_LOGI(TAG, "HID [%d] %s", report_id, hex_str);
     
     const report_info_t *report_info = NULL;
     for (int i = 0; i < report_map->num_reports; i++) {
@@ -209,7 +207,7 @@ static hid_event_queue_t g_interface_event = {
     .event_group = APP_EVENT_INTERFACE
 };
 
-static void hid_host_interface_callback(hid_host_device_handle_t hid_device_handle, const hid_host_interface_event_t event, void *arg) {
+static void hid_host_interface_callback(const hid_host_device_handle_t hid_device_handle, const hid_host_interface_event_t event, void *arg) {
     if (!g_event_queue) {
         return;
     }
@@ -227,7 +225,7 @@ static hid_event_queue_t g_device_event = {
     .event_group = APP_EVENT_HID_DEVICE
 };
 
-static void hid_host_device_callback(hid_host_device_handle_t hid_device_handle, const hid_host_driver_event_t event, void *arg) {
+static void hid_host_device_callback(const hid_host_device_handle_t hid_device_handle, const hid_host_driver_event_t event, void *arg) {
     if (!g_event_queue) {
         return;
     }
@@ -247,7 +245,7 @@ static const char *hid_proto_name_str[] = {
     "MOUSE"
 };
 
-static void process_device_event(hid_host_device_handle_t hid_device_handle, const hid_host_driver_event_t event, void *arg) {
+static void process_device_event(const hid_host_device_handle_t hid_device_handle, const hid_host_driver_event_t event, void *arg) {
     hid_host_dev_params_t dev_params;
     ESP_ERROR_CHECK(hid_host_device_get_params(hid_device_handle, &dev_params));
 
@@ -286,9 +284,9 @@ static void process_device_event(hid_host_device_handle_t hid_device_handle, con
     }
 }
 
-static uint8_t cur_if_evt_data[64] = {0};
+static uint8_t cur_if_evt_data[128] = {0};
 
-static void process_interface_event(hid_host_device_handle_t hid_device_handle, const hid_host_interface_event_t event, void *arg) {
+static void process_interface_event(const hid_host_device_handle_t hid_device_handle, const hid_host_interface_event_t event, void *arg) {
     static size_t data_length = 0;
     static hid_host_dev_params_t dev_params;
 
