@@ -330,14 +330,14 @@ bool ble_hid_device_connected(void)
     return s_connected;
 }
 
-static void check_high_speed_device() {
+static bool check_high_speed_device() {
     if (s_is_high_speed == true) {
-        return;
+        return true;
     }
 
-    int64_t current_time = esp_timer_get_time() / 1000; 
+    const int64_t current_time = esp_timer_get_time() / 1000;
     if (s_last_event_time > 0) {
-        int64_t delay = current_time - s_last_event_time;
+        const int64_t delay = current_time - s_last_event_time;
         if (delay < HIGH_SPEED_DEVICE_THRESHOLD_MS) {
             s_fast_events_count++;
             if (s_fast_events_count >= HIGH_SPEED_DEVICE_THRESHOLD_EVENTS) {
@@ -349,6 +349,7 @@ static void check_high_speed_device() {
         }
     }
     s_last_event_time = current_time;
+    return s_is_high_speed;
 }
 
 esp_err_t ble_hid_device_send_keyboard_report(const keyboard_report_t *report)
@@ -373,9 +374,8 @@ esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report)
     if (!s_connected) {
         return ESP_ERR_INVALID_STATE;
     }
-
-    check_high_speed_device();
-    if (s_is_high_speed) {
+    
+    if (check_high_speed_device()) {
         if (s_accumulator_timer == NULL) {
             s_accumulator_timer = xTimerCreate("acc_timer", acc_window, pdTRUE, NULL, accumulator_timer_callback);
             xTimerStart(s_accumulator_timer, 0);
