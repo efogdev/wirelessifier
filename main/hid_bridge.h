@@ -19,7 +19,6 @@ extern "C" {
 #define HID_USAGE_PAGE_SPORT           0x04
 #define HID_USAGE_PAGE_GAME            0x05
 #define HID_USAGE_PAGE_BUTTON          0x09
-#define HID_USAGE_PAGE_KEYBOARD        0x09
 #define HID_USAGE_PAGE_LEDS            0x08
 #define HID_USAGE_PAGE_CONSUMER        0x0C
 
@@ -245,15 +244,15 @@ typedef enum {
 typedef struct {
     uint16_t usage_page;
     uint16_t usage;
-    uint16_t usage_maximum;  // For array fields with usage range
-    uint8_t report_size;    // Size in bits
-    uint8_t report_count;   // Number of data fields
+    uint16_t usage_maximum;
+    uint8_t report_size;
+    uint8_t report_count;
     int logical_min;
     int logical_max;
-    bool constant;          // Constant vs Data
-    bool variable;          // Variable vs Array
-    bool relative;          // Relative vs Absolute
-    bool array;            // Array vs Variable
+    bool constant;
+    bool variable;
+    bool relative;
+    bool array;
 } usb_hid_field_attr_t;
 
 typedef struct {
@@ -262,13 +261,15 @@ typedef struct {
 } usb_hid_field_t;
 
 typedef struct {
+    bool is_mouse;
+    bool is_keyboard;
     uint8_t if_id;
     uint8_t report_id;
     usb_hid_field_type_t type;
     uint8_t num_fields;
     usb_hid_field_t *fields;
-    uint8_t raw[USB_HID_MAX_RAW_REPORT_SIZE];       // Raw report data
-    uint16_t raw_len;      // Length of raw data
+    uint8_t raw[USB_HID_MAX_RAW_REPORT_SIZE];
+    uint16_t raw_len;
 } usb_hid_report_t;
 
 typedef struct {

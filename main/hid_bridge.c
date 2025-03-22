@@ -395,7 +395,7 @@ esp_err_t hid_bridge_process_report(const usb_hid_report_t *report)
             ESP_LOGI(TAG, "USB HID event received, restarting BLE stack");
 
             s_ble_stack_active = true;
-            esp_err_t ret = ble_hid_device_init();
+            const esp_err_t ret = ble_hid_device_init();
             if (ret != ESP_OK) {
                 s_ble_stack_active = false;
                 ESP_LOGE(TAG, "Failed to initialize BLE HID device: %s", esp_err_to_name(ret));
@@ -413,41 +413,9 @@ esp_err_t hid_bridge_process_report(const usb_hid_report_t *report)
     }
 
     esp_err_t ret = ESP_OK;
-    bool is_mouse = false;
-    bool is_keyboard = false;
-
-    for (int i = 0; i < report->num_fields; i++) {
-        const usb_hid_field_t *field = &report->fields[i];
-        
-        if (field->attr.usage_page == HID_USAGE_PAGE_GENERIC_DESKTOP) {
-            switch (field->attr.usage) {
-                case 0x1:
-                case 0x3:
-                case 0x4:
-                case 0x5:
-                case HID_USAGE_MOUSE:
-                case HID_USAGE_X:
-                case HID_USAGE_Y:
-                case HID_USAGE_WHEEL:
-                case 0x238: // AC_PAN
-                    is_mouse = true;
-                    break;
-                case HID_USAGE_KEYPAD:
-                    is_keyboard = true;
-                    break;
-            }
-        } else if (field->attr.usage_page == HID_USAGE_PAGE_BUTTONS || field->attr.usage_page == HID_USAGE_KEYPAD) {
-            is_keyboard = true;
-        }
-    }
-
-    if (is_mouse) {
-        ESP_LOGI(TAG, "mouse");
+    if (report->is_mouse) {
         ret = process_mouse_report(report);
-    }
-    
-    if (is_keyboard) {
-        ESP_LOGI(TAG, "kbd");
+    } else if (report->is_keyboard) {
         ret = process_keyboard_report(report);
     }
 

@@ -41,10 +41,16 @@ static bool g_verbose = false;
 static uint8_t g_field_counts[USB_HOST_MAX_INTERFACES][MAX_REPORTS_PER_INTERFACE] = {0};
 
 static void usb_lib_task(void *arg);
+
 static void usb_stats_task(void *arg);
+
 static void device_event_task(void *arg);
-static void hid_host_device_callback(hid_host_device_handle_t hid_device_handle, hid_host_driver_event_t event, void *arg);
-static void hid_host_interface_callback(hid_host_device_handle_t hid_device_handle, hid_host_interface_event_t event, void *arg);
+
+static void hid_host_device_callback(hid_host_device_handle_t hid_device_handle, hid_host_driver_event_t event,
+                                     void *arg);
+
+static void hid_host_interface_callback(hid_host_device_handle_t hid_device_handle, hid_host_interface_event_t event,
+                                        void *arg);
 
 uint8_t usb_hid_host_get_num_fields(const uint8_t report_id, const uint8_t interface_num) {
     return g_field_counts[interface_num][report_id];
@@ -72,7 +78,8 @@ esp_err_t usb_hid_host_init(const QueueHandle_t report_queue, const bool verbose
         return ESP_ERR_NO_MEM;
     }
 
-    BaseType_t task_created = xTaskCreatePinnedToCore(device_event_task, "dev_evt", 2048, NULL, 11, &g_device_task_handle, 1);
+    BaseType_t task_created = xTaskCreatePinnedToCore(device_event_task, "dev_evt", 2048, NULL, 11,
+                                                      &g_device_task_handle, 1);
     if (task_created != pdTRUE) {
         vQueueDelete(g_device_event_queue);
         return ESP_ERR_NO_MEM;
@@ -149,15 +156,10 @@ bool usb_hid_host_device_connected(void) {
 static void process_report(const uint8_t *const data, const size_t length, const uint8_t interface_num) {
     s_current_rps++;
     if (!data || !g_report_queue || length <= 1 || interface_num >= USB_HOST_MAX_INTERFACES) {
-        ESP_LOGE(TAG, "Invalid parameters: data=%p, queue=%p, len=%d, iface=%u", data, g_report_queue, length, interface_num);
+        ESP_LOGE(TAG, "Invalid parameters: data=%p, queue=%p, len=%d, iface=%u", data, g_report_queue, length,
+                 interface_num);
         return;
     }
-
-    // char hex_str[length * 3 + 1];
-    // hex_str[0] = '\0';
-    // for (size_t i = 0; i < length; i++) {
-    //     sprintf(hex_str + i * 3, "%02X ", data[i]);
-    // }
 
     const report_map_t *const report_map = &g_interface_report_maps[interface_num];
     const uint8_t *report_data = data;
@@ -171,8 +173,6 @@ static void process_report(const uint8_t *const data, const size_t length, const
         report_id = report_map->report_ids[0];
     }
 
-    // ESP_LOGI(TAG, "HID [%d] %s", report_id, hex_str);
-    
     const report_info_t *report_info = NULL;
     for (int i = 0; i < report_map->num_reports; i++) {
         if (report_map->report_ids[i] == report_id) {
@@ -180,7 +180,7 @@ static void process_report(const uint8_t *const data, const size_t length, const
             break;
         }
     }
-    
+
     if (!report_info) {
         ESP_LOGW(TAG, "Unknown report ID %d for interface %d", report_id, interface_num);
         return;
@@ -193,11 +193,26 @@ static void process_report(const uint8_t *const data, const size_t length, const
     g_report.raw_len = MIN(report_length, sizeof(g_report.raw));
     g_report.fields = g_fields;
 
+    bool is_keyboard = false;
     const report_field_info_t *const field_info = report_info->fields;
     for (uint8_t i = 0; i < report_info->num_fields; i++) {
         g_field_values[i] = extract_field_value(report_data, field_info[i].bit_offset, field_info[i].bit_size);
         g_fields[i].attr = field_info[i].attr;
         g_fields[i].values = &g_field_values[i];
+
+        if (field_info[i].attr.usage_page == HID_USAGE_PAGE_GENERIC_DESKTOP &&
+            (field_info[i].attr.usage == HID_USAGE_X || field_info[i].attr.usage == HID_USAGE_Y)) {
+            g_report.is_mouse = true;
+        }
+
+        if (field_info[i].attr.usage_page == HID_USAGE_KEYPAD) {
+            is_keyboard = true;
+        }
+    }
+    
+    if (is_keyboard) {
+        g_report.is_keyboard = true;
+        g_report.is_mouse = false;
     }
 
     memcpy(g_report.raw, report_data, g_report.raw_len);
@@ -206,14 +221,17 @@ static void process_report(const uint8_t *const data, const size_t length, const
 
 static uint8_t cur_if_evt_data[128] = {0};
 
-static void hid_host_interface_callback(const hid_host_device_handle_t hid_device_handle, const hid_host_interface_event_t event, void *arg) {
+static void hid_host_interface_callback(const hid_host_device_handle_t hid_device_handle,
+                                        const hid_host_interface_event_t event, void *arg) {
     static size_t data_length = 0;
     static hid_host_dev_params_t dev_params;
 
     ESP_ERROR_CHECK(hid_host_device_get_params(hid_device_handle, &dev_params));
     switch (event) {
         case HID_HOST_INTERFACE_EVENT_INPUT_REPORT:
-            ESP_ERROR_CHECK(hid_host_device_get_raw_input_report_data(hid_device_handle, cur_if_evt_data, sizeof(cur_if_evt_data), &data_length));
+            ESP_ERROR_CHECK(
+                hid_host_device_get_raw_input_report_data(hid_device_handle, cur_if_evt_data, sizeof(cur_if_evt_data), &
+                    data_length));
             process_report(cur_if_evt_data, data_length, dev_params.iface_num);
             break;
 
@@ -259,12 +277,15 @@ static void device_event_task(void *arg) {
                 if (desc != NULL) {
                     ESP_LOGI(TAG, "Got report descriptor, length = %d", desc_len);
                     if (xSemaphoreTake(g_report_maps_mutex, portMAX_DELAY) == pdTRUE) {
-                        parse_report_descriptor(desc, desc_len, dev_params.iface_num, &g_interface_report_maps[dev_params.iface_num]);
+                        parse_report_descriptor(desc, desc_len, dev_params.iface_num,
+                                                &g_interface_report_maps[dev_params.iface_num]);
                         const report_map_t *report_map = &g_interface_report_maps[dev_params.iface_num];
                         for (int i = 0; i < report_map->num_reports; i++) {
                             ESP_LOGI(TAG, "Expecting %d fields for interface=%d report=%d",
-                                report_map->reports[i].num_fields, dev_params.iface_num, report_map->report_ids[i]);
-                            g_field_counts[dev_params.iface_num][report_map->report_ids[i]] = report_map->reports[i].num_fields;
+                                     report_map->reports[i].num_fields, dev_params.iface_num,
+                                     report_map->report_ids[i]);
+                            g_field_counts[dev_params.iface_num][report_map->report_ids[i]] = report_map->reports[i].
+                                    num_fields;
                         }
                         xSemaphoreGive(g_report_maps_mutex);
                     } else {
@@ -276,13 +297,14 @@ static void device_event_task(void *arg) {
                 g_device_connected = true;
             } else {
                 ESP_LOGI(TAG, "Unknown device event, subclass = %d, proto = %s, iface = %d",
-                    dev_params.sub_class, dev_params.proto, dev_params.iface_num);
+                         dev_params.sub_class, dev_params.proto, dev_params.iface_num);
             }
         }
     }
 }
 
-static void hid_host_device_callback(const hid_host_device_handle_t hid_device_handle, const hid_host_driver_event_t event, void *arg) {
+static void hid_host_device_callback(const hid_host_device_handle_t hid_device_handle,
+                                     const hid_host_driver_event_t event, void *arg) {
     usb_device_type_event_t evt = {
         .device_handle = hid_device_handle,
         .event = event
@@ -324,7 +346,7 @@ static void usb_stats_task(void *arg) {
     while (1) {
         const uint32_t reports_per_sec = (s_current_rps - prev_count) / USB_STATS_INTERVAL_SEC;
         ESP_LOGI(TAG, "USB: %lu rps", reports_per_sec);
-        
+
         prev_count = s_current_rps;
         vTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(USB_STATS_INTERVAL_SEC * 1000));
     }

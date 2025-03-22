@@ -77,7 +77,6 @@ static const char* const usage_names_gendesk[] = {
 #define HID_USAGE_PAGE_KEY_CODES       0x07
 #define HID_USAGE_PAGE_LEDS            0x08
 #define HID_USAGE_PAGE_BUTTONS         0x09
-#define HID_USAGE_PAGE_KEYBOARD        0x09
 #define HID_USAGE_PAGE_CONSUMER        0x0C
 
 // HID Report Usages from HID Usage Tables 1.12 Section 4, Table 6
