@@ -521,11 +521,11 @@ static void process_report(const uint8_t *data, size_t length, uint8_t report_id
     g_report.raw_len = MIN(length, sizeof(g_report.raw));
     g_report.fields = g_fields;
 
-    char hex_str[64] = {0};
-    for (size_t i = 0; i < g_report.raw_len; i++) {
-        sprintf(hex_str + i * 3, "%02X ", data[i]);
-    }
-    ESP_LOGI(TAG, "Raw report: %s", hex_str);
+    // char hex_str[64] = {0};
+    // for (size_t i = 0; i < g_report.raw_len; i++) {
+    //     sprintf(hex_str + i * 3, "%02X ", data[i]);
+    // }
+    // ESP_LOGI(TAG, "Raw report: %s", hex_str);
 
     const report_field_info_t * volatile field_info = report_map->fields;
     for (uint8_t i = 0; i < report_map->num_fields; i++, field_info++) {
