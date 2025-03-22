@@ -514,17 +514,18 @@ static void process_report(const uint8_t *data, size_t length, uint8_t report_id
         return;
     }
 
-    if (report_id != 0) {
-        data++;
-        length--;
-    }
-
     report_map_t *report_map = &g_interface_report_maps[interface_num];
     g_report.report_id = report_id;
     g_report.type = USB_HID_FIELD_TYPE_INPUT;
     g_report.num_fields = report_map->num_fields;
     g_report.raw_len = MIN(length, sizeof(g_report.raw));
     g_report.fields = g_fields;
+
+    char hex_str[64] = {0};
+    for (size_t i = 0; i < g_report.raw_len; i++) {
+        sprintf(hex_str + i * 3, "%02X ", data[i]);
+    }
+    ESP_LOGI(TAG, "Raw report: %s", hex_str);
 
     const report_field_info_t * volatile field_info = report_map->fields;
     for (uint8_t i = 0; i < report_map->num_fields; i++, field_info++) {
@@ -623,7 +624,6 @@ static void process_interface_event(hid_host_device_handle_t hid_device_handle, 
     switch (event) {
         case HID_HOST_INTERFACE_EVENT_INPUT_REPORT:
             ESP_ERROR_CHECK(hid_host_device_get_raw_input_report_data(hid_device_handle, cur_if_evt_data, sizeof(cur_if_evt_data), &data_length));
-            // ESP_LOGD(TAG, "Raw input report data: length=%d", data_length);
             uint8_t report_id = (data_length > 0) ? cur_if_evt_data[0] : 0;
             process_report(cur_if_evt_data, data_length, report_id, dev_params.iface_num);
             break;
