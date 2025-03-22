@@ -13,8 +13,8 @@ extern "C" {
 #endif
 
 #define MAX_REPORT_FIELDS 64
-#define MAX_COLLECTION_DEPTH 12
-#define MAX_REPORTS_PER_INTERFACE 12
+#define MAX_COLLECTION_DEPTH 10
+#define MAX_REPORTS_PER_INTERFACE 10
 
 typedef struct {
     usb_hid_field_attr_t attr;

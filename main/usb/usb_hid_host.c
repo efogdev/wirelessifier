@@ -28,14 +28,11 @@ static TaskHandle_t g_event_task_handle = NULL;
 static TaskHandle_t g_stats_task_handle = NULL;
 static uint32_t s_current_rps = 0;
 static SemaphoreHandle_t g_report_maps_mutex;
-
 static usb_hid_report_t g_report;
 static usb_hid_field_t g_fields[MAX_REPORT_FIELDS];
 static int g_field_values[MAX_REPORT_FIELDS];
-
 static report_map_t g_interface_report_maps[USB_HOST_MAX_INTERFACES] = {0};
 
-// Define named struct types for events
 typedef struct {
     hid_host_device_handle_t handle;
     hid_host_driver_event_t event;

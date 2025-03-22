@@ -60,7 +60,7 @@ static const char* const usage_names_gendesk[] = {
     [0x39] = "Hat Switch"
 };
 
-#define USB_HOST_MAX_INTERFACES     8
+#define USB_HOST_MAX_INTERFACES     4
 #define USB_HID_MAX_RAW_REPORT_SIZE 64
 
 // HID Report Items from HID 1.11 Section 6.2.2
@@ -78,7 +78,7 @@ static const char* const usage_names_gendesk[] = {
 #define HID_LOGICAL_MAX_2   0x26 // 2-byte data
 #define HID_INPUT           0x81
 #define HID_OUTPUT          0x91
-#define HID_FEATURE        0xB1
+#define HID_FEATURE         0xB1
 
 // HID Report Usage Pages from HID Usage Tables 1.12 Section 3, Table 1
 #define HID_USAGE_PAGE_GENERIC_DESKTOP 0x01

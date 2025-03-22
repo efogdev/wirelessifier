@@ -243,6 +243,11 @@ void parse_report_descriptor(const uint8_t *desc, const size_t length, const uin
                 break;
         }
     }
+
+    // Log number of fields for each report
+    for (int i = 0; i < report_map->num_reports; i++) {
+        ESP_LOGI(TAG, "Report ID %d has %d fields", report_map->report_ids[i], report_map->reports[i].num_fields);
+    }
 }
 
 int extract_field_value(const uint8_t *data, const uint16_t bit_offset, const uint16_t bit_size) {
