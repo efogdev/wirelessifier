@@ -125,10 +125,8 @@ esp_err_t hid_bridge_init(void)
     s_ble_stack_active = true;
 
     // Create queue using static allocation
-    s_hid_report_queue = xQueueCreateStatic(HID_QUEUE_SIZE, 
-                                          HID_QUEUE_ITEM_SIZE,
-                                          s_hid_report_queue_storage,
-                                          &s_hid_report_queue_struct);
+    s_hid_report_queue = xQueueCreateStatic(HID_QUEUE_SIZE,
+        HID_QUEUE_ITEM_SIZE, s_hid_report_queue_storage, &s_hid_report_queue_struct);
     if (s_hid_report_queue == NULL) {
         ESP_LOGE(TAG, "Failed to create HID report queue");
         vSemaphoreDelete(s_ble_stack_mutex);

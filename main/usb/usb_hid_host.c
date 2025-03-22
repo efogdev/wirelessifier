@@ -82,7 +82,7 @@ esp_err_t usb_hid_host_init(QueueHandle_t report_queue) {
     }
 
     g_device_connected = false;
-    g_event_queue = xQueueCreate(16, sizeof(hid_event_queue_t));
+    g_event_queue = xQueueCreate(4, sizeof(hid_event_queue_t));
     if (g_event_queue == NULL) {
         ESP_LOGE(TAG, "Failed to create event queue");
         return ESP_ERR_NO_MEM;
