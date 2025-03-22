@@ -13,7 +13,7 @@ extern "C" {
 #endif
 
 #define MAX_REPORT_FIELDS 64
-#define MAX_COLLECTION_DEPTH 8
+#define MAX_COLLECTION_DEPTH 10
 #define MAX_REPORTS_PER_INTERFACE 10
 
 typedef struct {

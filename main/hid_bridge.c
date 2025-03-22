@@ -324,8 +324,7 @@ bool hid_bridge_is_ble_paused(void)
 
 esp_err_t hid_bridge_process_report(const usb_hid_report_t *report)
 {
-    ESP_LOGI(TAG, "Received HID report (%d fields)", report->num_fields);
-    
+    // ESP_LOGI(TAG, "Received HID report (%d fields)", report->num_fields);
     // for (int i = 0; i < report->num_fields; i++) {
     //     const usb_hid_field_t *field = &report->fields[i];
     //     const char *usage_page_desc = "";
@@ -426,7 +425,7 @@ esp_err_t hid_bridge_process_report(const usb_hid_report_t *report)
                 case 0x238: // AC_PAN
                     is_mouse = true;
                     break;
-                case HID_USAGE_KEYBOARD:
+                case HID_USAGE_KEYPAD:
                     is_keyboard = true;
                     break;
             }
