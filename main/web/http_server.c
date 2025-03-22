@@ -28,8 +28,8 @@ EventGroupHandle_t wifi_event_group;
 
 static esp_err_t root_get_handler(httpd_req_t *req)
 {
-    extern const uint8_t web_front_index_html_start[] asm("_binary_index_html_start");
-    extern const uint8_t web_front_index_html_end[] asm("_binary_index_html_end");
+    extern const uint8_t web_front_index_html_start[] asm("_binary_index_min_html_start");
+    extern const uint8_t web_front_index_html_end[] asm("_binary_index_min_html_end");
     const size_t index_html_size = (web_front_index_html_end - web_front_index_html_start);
     
     httpd_resp_set_type(req, "text/html");
@@ -40,8 +40,8 @@ static esp_err_t root_get_handler(httpd_req_t *req)
 
 static esp_err_t settings_get_handler(httpd_req_t *req)
 {
-    extern const uint8_t web_front_settings_html_start[] asm("_binary_settings_html_start");
-    extern const uint8_t web_front_settings_html_end[] asm("_binary_settings_html_end");
+    extern const uint8_t web_front_settings_html_start[] asm("_binary_settings_min_html_start");
+    extern const uint8_t web_front_settings_html_end[] asm("_binary_settings_min_html_end");
     const size_t settings_html_size = (web_front_settings_html_end - web_front_settings_html_start);
     
     httpd_resp_set_type(req, "text/html");

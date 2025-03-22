@@ -7,10 +7,15 @@
     "lib": "lib"
   },
   "scripts": {
-    "build": "bunx esbuild js/settings.jsx --outfile=lib/settings.js --target=es2015 --bundle=false --jsx=transform --minify"
+    "build": "bunx concurrently 'bun run build:settings' 'bun run build:html'",
+    "build:settings": "bunx esbuild js/settings.jsx --outfile=lib/settings.js --target=es2015 --bundle=false --jsx=transform --minify",
+    "build:html": "bun meta/build-html.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs"
+  "type": "commonjs",
+  "devDependencies": {
+    "html-minifier-terser": "^7.2.0"
+  }
 }
