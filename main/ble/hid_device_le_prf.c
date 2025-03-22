@@ -30,6 +30,17 @@ static const uint16_t hid_ccc_default = 0x0100;
 
 // HID Report Map characteristic value
 // Comprehensive HID descriptor supporting multiple report types
+
+/// Battery Service Attributes Indexes
+enum {
+    BAS_IDX_SVC,
+    BAS_IDX_BATT_LVL_CHAR,
+    BAS_IDX_BATT_LVL_VAL,
+    BAS_IDX_BATT_LVL_NTF_CFG,
+    BAS_IDX_BATT_LVL_PRES_FMT,
+    BAS_IDX_NB,
+};
+
 static const uint8_t hidReportMap[] = {
     // Mouse Report Descriptor
     0x05, 0x01, // Usage Page (Generic Desktop)
@@ -74,62 +85,62 @@ static const uint8_t hidReportMap[] = {
     0xC0, //   End Collection
     0xC0, // End Collection
 
-    // Keyboard Report Descriptor
+    0x05, 0x01, // Usage Page (Generic Desktop)
+    0x09, 0x80, // Usage (System Control)
+    0xa1, 0x01, // Collection (Application)
+    0x85, 0x03, //  Report ID (3)
+    0x19, 0x01, //  Usage Minimum (1)
+    0x2a, 0xb7, 0x00, //  Usage Maximum (183)
+    0x15, 0x01, //  Logical Minimum (1)
+    0x26, 0xb7, 0x00, //  Logical Maximum (183)
+    0x95, 0x01, //  Report Count (1)
+    0x75, 0x10, //  Report Size (16)
+    0x81, 0x00, //  Input (Data,Arr,Abs)
+    0xc0, // End Collection
+
+    0x05, 0x0c, // Usage Page (Consumer Devices)
+    0x09, 0x01, // Usage (Consumer Control)
+    0xa1, 0x01, // Collection (Application)
+    0x85, 0x04, //  Report ID (4)
+    0x19, 0x01, //  Usage Minimum (1)
+    0x2a, 0xa0, 0x02, //  Usage Maximum (672)
+    0x15, 0x01, //  Logical Minimum (1)
+    0x26, 0xa0, 0x02, //  Logical Maximum (672)
+    0x95, 0x01, //  Report Count (1)
+    0x75, 0x10, //  Report Size (16)
+    0x81, 0x00, //  Input (Data,Arr,Abs)
+    0xc0, // End Collection
+
     0x05, 0x01, // Usage Page (Generic Desktop)
     0x09, 0x06, // Usage (Keyboard)
-    0xA1, 0x01, // Collection (Application)
-    0x85, 0x02, // Report Id (2)
-    0x05, 0x07, //   Usage Page (Key Codes)
-    0x19, 0xE0, //   Usage Minimum (224)
-    0x29, 0xE7, //   Usage Maximum (231)
-    0x15, 0x00, //   Logical Minimum (0)
-    0x25, 0x01, //   Logical Maximum (1)
-    0x75, 0x01, //   Report Size (1)
-    0x95, 0x08, //   Report Count (8)
-    0x81, 0x02, //   Input (Data, Variable, Absolute) - Modifier byte
-    0x95, 0x01, //   Report Count (1)
-    0x75, 0x08, //   Report Size (8)
-    0x81, 0x01, //   Input (Constant) - Reserved byte
-    0x05, 0x0C, //   Usage Page (Consumer)
-    0x09, 0xB5, //   Usage (Scan Next Track)
-    0x09, 0xB6, //   Usage (Scan Previous Track)
-    0x09, 0xB7, //   Usage (Stop)
-    0x09, 0xB8, //   Usage (Eject)
-    0x09, 0xCD, //   Usage (Play/Pause)
-    0x09, 0xE2, //   Usage (Mute)
-    0x09, 0xE9, //   Usage (Volume Up)
-    0x09, 0xEA, //   Usage (Volume Down)
-    0x0A, 0x52, 0x01, //   Usage (Email Reader)
-    0x0A, 0x53, 0x01, //   Usage (Calculator)
-    0x0A, 0x54, 0x01, //   Usage (Local Browser)
-    0x0A, 0x92, 0x01, //   Usage (Explorer)
-    0x0A, 0x94, 0x01, //   Usage (Home)
-    0x0A, 0x23, 0x02, //   Usage (WWW Back)
-    0x0A, 0x24, 0x02, //   Usage (WWW Forward)
-    0x0A, 0x25, 0x02, //   Usage (WWW Stop)
-    0x95, 0x10, //   Report Count (16)
-    0x75, 0x01, //   Report Size (1)
-    0x81, 0x02, //   Input (Data, Variable, Absolute)
-    0x05, 0x07, //   Usage Page (Key Codes)
-    0x19, 0x00, //   Usage Minimum (0)
-    0x29, 0x65, //   Usage Maximum (101)
-    0x95, 0x06, //   Report Count (6)
-    0x75, 0x08, //   Report Size (8)
-    0x15, 0x00, //   Logical Minimum (0)
-    0x25, 0x65, //   Logical Maximum (101)
-    0x81, 0x00, //   Input (Data, Array) - Key arrays
-    0xC0, // End Collection
-    //
-};
-
-/// Battery Service Attributes Indexes
-enum {
-    BAS_IDX_SVC,
-    BAS_IDX_BATT_LVL_CHAR,
-    BAS_IDX_BATT_LVL_VAL,
-    BAS_IDX_BATT_LVL_NTF_CFG,
-    BAS_IDX_BATT_LVL_PRES_FMT,
-    BAS_IDX_NB,
+    0xa1, 0x01, // Collection (Application)
+    0x85, 0x06, //  Report ID (6)
+    0x05, 0x07, //  Usage Page (Keyboard)
+    0x19, 0xe0, //  Usage Minimum (224)
+    0x29, 0xe7, //  Usage Maximum (231)
+    0x15, 0x00, //  Logical Minimum (0)
+    0x25, 0x01, //  Logical Maximum (1)
+    0x95, 0x08, //  Report Count (8)
+    0x75, 0x01, //  Report Size (1)
+    0x81, 0x02, //  Input (Data,Var,Abs)
+    0x05, 0x07, //  Usage Page (Keyboard)
+    0x19, 0x00, //  Usage Minimum (0)
+    0x29, 0xef, //  Usage Maximum (239)
+    0x15, 0x00, //  Logical Minimum (0)
+    0x25, 0x01, //  Logical Maximum (1)
+    0x95, 0xf0, //  Report Count (240)
+    0x75, 0x01, //  Report Size (1)
+    0x81, 0x02, //  Input (Data,Var,Abs)
+    0x05, 0x08, //  Usage Page (LEDs)
+    0x19, 0x01, //  Usage Minimum (1)
+    0x29, 0x05, //  Usage Maximum (5)
+    0x95, 0x05, //  Report Count (5)
+    0x75, 0x01, //  Report Size (1)
+    0x91, 0x02, //  Output (Data,Var,Abs)
+    0x95, 0x01, //  Report Count (1)
+    0x75, 0x03, //  Report Size (3)
+    0x91, 0x01, //  Output (Cnst,Arr,Abs)
+    0xc0, // End Collection
 };
 
 #define HI_UINT16(a) (((a) >> 8) & 0xFF)
@@ -145,45 +156,27 @@ struct gatts_profile_inst {
 };
 
 hidd_le_env_t hidd_le_env;
-
-// HID report map length
 uint8_t hidReportMapLen = sizeof(hidReportMap);
 uint8_t hidProtocolMode = HID_PROTOCOL_MODE_REPORT;
 
-// HID report mapping table
-//static hidRptMap_t  hidRptMap[HID_NUM_REPORTS];
-
-// HID Information characteristic value
 static const uint8_t hidInfo[HID_INFORMATION_LEN] = {
     LO_UINT16(0x0111), HI_UINT16(0x0111), // bcdHID (USB HID version)
     0x00, // bCountryCode
     HID_KBD_FLAGS
 };
 
-// HID External Report Reference Descriptor
 static uint16_t hidExtReportRefDesc = ESP_GATT_UUID_BATTERY_LEVEL;
 
-// HID Report Reference characteristic descriptor, mouse input
 static uint8_t hidReportRefMouseIn[HID_REPORT_REF_LEN] =
         {HID_RPT_ID_MOUSE_IN, HID_REPORT_TYPE_INPUT};
 
 
-// HID Report Reference characteristic descriptor, key input
 static uint8_t hidReportRefKeyIn[HID_REPORT_REF_LEN] =
         {HID_RPT_ID_KEY_IN, HID_REPORT_TYPE_INPUT};
 
-// HID Report Reference characteristic descriptor, LED output
-// HID Report Reference characteristic descriptor
 static uint8_t hidReportRefFeature[HID_REPORT_REF_LEN] =
         {HID_RPT_ID_FEATURE, HID_REPORT_TYPE_FEATURE};
 
-// HID Report Reference characteristic descriptor, consumer control input
-/*
- *  Heart Rate PROFILE ATTRIBUTES
- ****************************************************************************************
- */
-
-/// hid Service uuid
 static uint16_t hid_le_svc = ATT_SVC_HID;
 uint16_t hid_count = 0;
 esp_gatts_incl_svc_desc_t incl_svc = {0};
@@ -222,7 +215,8 @@ static const uint16_t bat_lev_uuid = ESP_GATT_UUID_BATTERY_LEVEL;
 static const uint8_t bat_lev_ccc[2] = {0x00, 0x00};
 static const uint16_t char_format_uuid = ESP_GATT_UUID_CHAR_PRESENT_FORMAT;
 
-static uint8_t battery_lev = 50;
+static uint8_t battery_lev = 95;
+
 /// Full HRS Database Description - Used to add attributes into the database
 static const esp_gatts_attr_db_t bas_att_db[BAS_IDX_NB] =
 {
@@ -514,8 +508,8 @@ void esp_hidd_prf_cb_hdl(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
             conn_params.latency = 0x00;
             conn_params.min_int = 0x06; // x 1.25ms
             conn_params.max_int = 0x06; // x 1.25ms
-
             conn_params.timeout = 0xA0; // x 6.25ms
+
             esp_ble_gap_update_conn_params(&conn_params);
             break;
         }
@@ -572,7 +566,6 @@ void hidd_le_create_service(const esp_gatt_if_t gatts_if) {
 }
 
 void hidd_le_init(void) {
-    // Reset the hid device target environment
     memset(&hidd_le_env, 0, sizeof(hidd_le_env_t));
 }
 
@@ -641,7 +634,7 @@ esp_err_t hidd_register_cb(void) {
 }
 
 void hidd_set_attr_value(const uint16_t handle, const uint16_t val_len, const uint8_t *value) {
-    hidd_inst_t *hidd_inst = &hidd_le_env.hidd_inst;
+    const hidd_inst_t *hidd_inst = &hidd_le_env.hidd_inst;
     if (hidd_inst->att_tbl[HIDD_LE_IDX_HID_INFO_VAL] <= handle &&
         hidd_inst->att_tbl[HIDD_LE_IDX_REPORT_REP_REF] >= handle) {
         esp_ble_gatts_set_attr_value(handle, val_len, value);
@@ -669,12 +662,12 @@ static void hid_add_id_tbl(void) {
     hid_rpt_map[0].mode = HID_PROTOCOL_MODE_REPORT;
 
     // Key input report
-    hid_rpt_map[1].id = hidReportRefKeyIn[0];
-    hid_rpt_map[1].type = hidReportRefKeyIn[1];
-    hid_rpt_map[1].handle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_KEY_IN_VAL];
-    hid_rpt_map[1].cccdHandle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_KEY_IN_CCC];
-    hid_rpt_map[1].mode = HID_PROTOCOL_MODE_REPORT;
+    hid_rpt_map[3].id = hidReportRefKeyIn[0];
+    hid_rpt_map[3].type = hidReportRefKeyIn[1];
+    hid_rpt_map[3].handle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_KEY_IN_VAL];
+    hid_rpt_map[3].cccdHandle = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_KEY_IN_CCC];
+    hid_rpt_map[3].mode = HID_PROTOCOL_MODE_REPORT;
 
     // Setup report ID map
-    hid_dev_register_reports(2, hid_rpt_map);
+    hid_dev_register_reports(4, hid_rpt_map);
 }
