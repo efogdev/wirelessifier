@@ -306,6 +306,7 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
                                 field->attr.constant = true;
                                 field->attr.variable = false;
                                 field->attr.relative = false;
+                                field->attr.array = false;
                                 field->bit_offset = current_report->total_bits;
                                 field->bit_size = report_size * report_count;
                                 current_report->total_bits += report_size * report_count;
@@ -323,6 +324,7 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
                                 field->attr.constant = false;
                                 field->attr.variable = false;
                                 field->attr.relative = is_relative;
+                                field->attr.array = true;
                                 field->bit_offset = current_report->total_bits;
                                 field->bit_size = report_size * report_count;
                                 current_report->total_bits += report_size * report_count;
@@ -341,6 +343,7 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
                                     field->attr.constant = false;
                                     field->attr.variable = true;
                                     field->attr.relative = is_relative;
+                                    field->attr.array = false;
                                     field->bit_offset = current_report->total_bits;
                                     field->bit_size = report_size;
                                     current_report->total_bits += report_size;
@@ -367,6 +370,7 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
                                     field->attr.constant = false;
                                     field->attr.variable = is_variable;
                                     field->attr.relative = is_relative;
+                                    field->attr.array = !is_variable;
                                     field->bit_offset = current_report->total_bits;
                                     field->bit_size = report_size;
                                     current_report->total_bits += report_size;
@@ -458,11 +462,12 @@ static void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t 
         ESP_LOGI(TAG, "    Fields: %d", report->num_fields);
         for (int j = 0; j < report->num_fields; j++) {
             report_field_info_t *field = &report->fields[j];
-            ESP_LOGI(TAG, "      Field %d: usage_page=0x%04x, usage=0x%04x, bit_offset=%d, bit_size=%d, %s%s%s",
+                            ESP_LOGI(TAG, "      Field %d: usage_page=0x%04x, usage=0x%04x, bit_offset=%d, bit_size=%d, %s%s%s%s",
                 j, field->attr.usage_page, field->attr.usage,
                 field->bit_offset, field->bit_size,
                 field->attr.constant ? "constant " : "",
                 field->attr.variable ? "variable " : "",
+                field->attr.array ? "array " : "",
                 field->attr.relative ? "relative" : "absolute");
         }
     }

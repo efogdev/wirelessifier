@@ -129,6 +129,7 @@ typedef struct {
     bool constant;          // Constant vs Data
     bool variable;          // Variable vs Array
     bool relative;          // Relative vs Absolute
+    bool array;            // Array vs Variable
 } usb_hid_field_attr_t;
 
 // HID report field data
