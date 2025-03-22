@@ -442,10 +442,12 @@ esp_err_t hid_bridge_process_report(const usb_hid_report_t *report)
     }
 
     if (is_mouse) {
+        ESP_LOGI(TAG, "mouse");
         ret = process_mouse_report(report);
     }
     
     if (is_keyboard) {
+        ESP_LOGI(TAG, "kbd");
         ret = process_keyboard_report(report);
     }
 
