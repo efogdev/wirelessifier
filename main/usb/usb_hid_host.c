@@ -221,13 +221,6 @@ static void process_report(const uint8_t *const data, const size_t length, const
     g_report.raw_len = MIN(report_length, sizeof(g_report.raw));
     g_report.fields = g_fields;
 
-    // static char hex_str[64];
-    // memset(hex_str, 0, sizeof(hex_str));
-    // for (size_t i = 0; i < length; i++) {
-    //     sprintf(hex_str + i * 3, "%02X ", data[i]);
-    // }
-    // ESP_LOGI(TAG, "Report (#%d): %s", report_id, hex_str);
-
     const report_field_info_t *const field_info = report_info->fields;
     for (uint8_t i = 0; i < report_info->num_fields; i++) {
         g_field_values[i] = extract_field_value(report_data, field_info[i].bit_offset, field_info[i].bit_size);

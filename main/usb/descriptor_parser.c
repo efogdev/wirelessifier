@@ -10,7 +10,7 @@
 
 static const char *TAG = "usb_hid_parser";
 
-void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t interface_num, report_map_t *report_map) {
+void parse_report_descriptor(const uint8_t *desc, const size_t length, const uint8_t interface_num, report_map_t *report_map) {
     uint16_t current_usage_page = 0;
     uint8_t report_size = 0;
     uint8_t report_count = 0;
@@ -36,10 +36,10 @@ void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t interfa
     current_report->usage_stack_pos = 0;
 
     for (size_t i = 0; i < length;) {
-        uint8_t item = desc[i++];
-        uint8_t item_size = item & 0x3;
-        uint8_t item_type = (item >> 2) & 0x3;
-        uint8_t item_tag = (item >> 4) & 0xF;
+        const uint8_t item = desc[i++];
+        const uint8_t item_size = item & 0x3;
+        const uint8_t item_type = (item >> 2) & 0x3;
+        const uint8_t item_tag = (item >> 4) & 0xF;
         
         uint32_t data = 0;
         if (item_size > 0) {
@@ -62,10 +62,10 @@ void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t interfa
                             // If we have a report ID, find or create the corresponding report info
                             if (current_report_id != 0) {
                                 int report_index = -1;
-                                for (int i = 0; i < report_map->num_reports; i++) {
-                                    if (report_map->report_ids[i] == current_report_id) {
-                                        report_index = i;
-                                        current_report = &report_map->reports[i];
+                                for (int j = 0; j < report_map->num_reports; j++) {
+                                    if (report_map->report_ids[j] == current_report_id) {
+                                        report_index = j;
+                                        current_report = &report_map->reports[j];
                                         break;
                                     }
                                 }
@@ -121,7 +121,7 @@ void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t interfa
                                 current_report->num_fields++;
                             } else if (has_usage_range && is_variable) {
                                 // Handle variable items with usage range
-                                uint16_t range_size = usage_maximum - usage_minimum + 1;
+                                const uint16_t range_size = usage_maximum - usage_minimum + 1;
                                 for (uint8_t j = 0; j < report_count && j < range_size && current_report->num_fields < MAX_REPORT_FIELDS; j++) {
                                     report_field_info_t *field = &current_report->fields[current_report->num_fields];
                                     field->attr.usage_page = current_usage_page;
@@ -245,7 +245,7 @@ void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t interfa
     }
 }
 
-int extract_field_value(const uint8_t *data, uint16_t bit_offset, uint16_t bit_size) {
+int extract_field_value(const uint8_t *data, const uint16_t bit_offset, const uint16_t bit_size) {
     if (!data || bit_size == 0 || bit_size > 32) {
         return 0;
     }
@@ -266,12 +266,11 @@ int extract_field_value(const uint8_t *data, uint16_t bit_offset, uint16_t bit_s
     while (bits_remaining > 0) {
         uint8_t current_byte;
         memcpy(&current_byte, &data[byte_offset], sizeof(uint8_t));
-        
-        uint8_t bits_to_read = MIN(8 - bit_shift, bits_remaining);
-        uint8_t mask = ((1 << bits_to_read) - 1);
-        int byte_value = (current_byte >> bit_shift) & mask;
-        
-        uint8_t shift_amount = bit_size - bits_remaining;
+
+        const uint8_t bits_to_read = MIN(8 - bit_shift, bits_remaining);
+        const uint8_t mask = ((1 << bits_to_read) - 1);
+        const int byte_value = (current_byte >> bit_shift) & mask;
+        const uint8_t shift_amount = bit_size - bits_remaining;
         value |= (byte_value << shift_amount);
         
         bits_remaining -= bits_to_read;
