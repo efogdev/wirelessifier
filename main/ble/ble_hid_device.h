@@ -3,20 +3,17 @@
 #include <stdbool.h>
 #include "esp_err.h"
 
-// Keyboard report structure
 typedef struct {
-    uint8_t modifier;     // Modifier keys
-    uint8_t reserved;     // Reserved byte
-    uint8_t keycode[6];   // Array of 6 key codes
+    uint8_t modifier;
+    uint32_t keycodes;
 } keyboard_report_t;
 
-// Mouse report structure
 typedef struct {
-    uint8_t buttons;    // Button state
-    uint16_t x;        // X movement
-    uint16_t y;        // Y movement
-    int8_t wheel;      // Wheel movement
-    int8_t pan;      // Wheel movement
+    uint8_t buttons;
+    uint16_t x;
+    uint16_t y;
+    int8_t wheel;
+    int8_t pan;
 } mouse_report_t;
 
 /**

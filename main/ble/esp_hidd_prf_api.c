@@ -5,7 +5,7 @@
 #include "esp_log.h"
 
 // HID keyboard input report length
-#define HID_KEYBOARD_IN_RPT_LEN     8
+#define HID_KEYBOARD_IN_RPT_LEN     32
 
 // HID mouse input report length
 #define HID_MOUSE_IN_RPT_LEN        7
@@ -81,8 +81,8 @@ void esp_hidd_send_keyboard_value(const uint16_t conn_id, const key_mask_t speci
         buffer[i + 2] = keyboard_cmd[i];
     }
 
-    hid_dev_send_report(hidd_le_env.gatt_if, conn_id,
-                        HID_RPT_ID_KEY_IN, HID_REPORT_TYPE_INPUT, HID_KEYBOARD_IN_RPT_LEN, buffer);
+    hid_dev_send_report(hidd_le_env.gatt_if,
+        conn_id, HID_RPT_ID_KEY_IN, HID_REPORT_TYPE_INPUT, HID_KEYBOARD_IN_RPT_LEN, buffer);
 }
 
 void esp_hidd_send_mouse_value(const uint16_t conn_id, const uint8_t mouse_button, const uint16_t mickeys_x,

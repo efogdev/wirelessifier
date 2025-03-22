@@ -344,13 +344,17 @@ esp_err_t ble_hid_device_send_keyboard_report(const keyboard_report_t *report)
         return ESP_ERR_INVALID_STATE;
     }
     
-    check_high_speed_device();
-    uint8_t buffer[8];
-    buffer[0] = report->modifier;
-    buffer[1] = report->reserved;
-    memcpy(&buffer[2], report->keycode, 6);
-
-    esp_hidd_send_keyboard_value(s_conn_id, 0, buffer, 8);
+    uint8_t keys[6] = {0};
+    uint32_t mask = report->keycodes;
+    int key_count = 0;
+    
+    for (int i = 0; i < 32 && key_count < 6; i++) {
+        if (mask & (1UL << i)) {
+            keys[key_count++] = i;
+        }
+    }
+    
+    esp_hidd_send_keyboard_value(s_conn_id, report->modifier, keys, key_count);
     return ESP_OK;
 }
 
@@ -370,8 +374,7 @@ esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report)
         }
 
         if (s_acc_buttons != report->buttons || (s_is_fast_mode && s_batch_count >= s_batch_size)) {
-            esp_hidd_send_mouse_value(s_conn_id, 
-                report->buttons, s_acc_x, s_acc_y, s_acc_wheel, s_acc_pan);
+            esp_hidd_send_mouse_value(s_conn_id, report->buttons, s_acc_x, s_acc_y, s_acc_wheel, s_acc_pan);
 
             s_acc_buttons = 0;
             s_acc_x = 0;

@@ -267,10 +267,23 @@ esp_err_t hid_bridge_stop(void)
     return ESP_OK;
 }
 
-static esp_err_t process_keyboard_report(usb_hid_report_t *report) {
-    // static keyboard_report_t ble_kb_report = {0};
-    // return ble_hid_device_send_keyboard_report(&ble_kb_report);
-    return ESP_OK;
+static esp_err_t process_keyboard_report(const usb_hid_report_t *report) {
+    keyboard_report_t ble_kb_report = {0};
+
+    for (int i = 0; i < report->num_fields; i++) {
+        const usb_hid_field_t *field = &report->fields[i];
+        const int value = field->values[0];
+
+        if (field->attr.usage_page == HID_USAGE_PAGE_KEYBOARD) {
+            if (field->attr.usage >= 0xE0 && field->attr.usage <= 0xE7 && value) {
+                ble_kb_report.modifier |= (1 << (field->attr.usage - 0xE0));
+            } else if (field->attr.usage <= 0xA4 && value) {
+                ble_kb_report.keycodes |= (1UL << field->attr.usage);
+            }
+        }
+    }
+
+    return ble_hid_device_send_keyboard_report(&ble_kb_report);
 }
 
 static esp_err_t process_mouse_report(const usb_hid_report_t *report) {
