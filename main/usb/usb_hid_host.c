@@ -156,8 +156,7 @@ bool usb_hid_host_device_connected(void) {
 static void process_report(const uint8_t *const data, const size_t length, const uint8_t interface_num) {
     s_current_rps++;
     if (!data || !g_report_queue || length <= 1 || interface_num >= USB_HOST_MAX_INTERFACES) {
-        ESP_LOGE(TAG, "Invalid parameters: data=%p, queue=%p, len=%d, iface=%u", data, g_report_queue, length,
-                 interface_num);
+        ESP_LOGE(TAG, "Invalid parameters: data=%p, queue=%p, len=%d, iface=%u", data, g_report_queue, length, interface_num);
         return;
     }
 
@@ -193,27 +192,15 @@ static void process_report(const uint8_t *const data, const size_t length, const
     g_report.raw_len = MIN(report_length, sizeof(g_report.raw));
     g_report.fields = g_fields;
 
-    bool is_keyboard = false;
     const report_field_info_t *const field_info = report_info->fields;
     for (uint8_t i = 0; i < report_info->num_fields; i++) {
         g_field_values[i] = extract_field_value(report_data, field_info[i].bit_offset, field_info[i].bit_size);
         g_fields[i].attr = field_info[i].attr;
         g_fields[i].values = &g_field_values[i];
-
-        if (field_info[i].attr.usage_page == HID_USAGE_PAGE_GENERIC_DESKTOP &&
-            (field_info[i].attr.usage == HID_USAGE_X || field_info[i].attr.usage == HID_USAGE_Y)) {
-            g_report.is_mouse = true;
-        }
-
-        if (field_info[i].attr.usage_page == HID_USAGE_KEYPAD) {
-            is_keyboard = true;
-        }
     }
-    
-    if (is_keyboard) {
-        g_report.is_keyboard = true;
-        g_report.is_mouse = false;
-    }
+
+    g_report.is_keyboard = report_info->is_keyboard;
+    g_report.is_mouse = report_info->is_mouse;
 
     memcpy(g_report.raw, report_data, g_report.raw_len);
     xQueueSend(g_report_queue, &g_report, 0);

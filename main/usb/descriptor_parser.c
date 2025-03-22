@@ -31,6 +31,8 @@ void parse_report_descriptor(const uint8_t *desc, const size_t length, const uin
     current_report->num_fields = 0;
     current_report->total_bits = 0;
     current_report->usage_stack_pos = 0;
+    current_report->is_mouse = false;
+    current_report->is_keyboard = false;
 
     for (size_t i = 0; i < length;) {
         const uint8_t item = desc[i++];
@@ -77,6 +79,8 @@ void parse_report_descriptor(const uint8_t *desc, const size_t length, const uin
                                     current_report->num_fields = 0;
                                     current_report->total_bits = 0;
                                     current_report->usage_stack_pos = 0;
+                                    current_report->is_mouse = false;
+                                    current_report->is_keyboard = false;
                                     report_map->num_reports++;
                                 }
                             }
@@ -134,6 +138,16 @@ void parse_report_descriptor(const uint8_t *desc, const size_t length, const uin
                                     field->bit_offset = current_report->total_bits;
                                     field->bit_size = report_size;
                                     current_report->total_bits += report_size;
+                                    
+                                    if (field->attr.usage_page == HID_USAGE_PAGE_GENERIC_DESKTOP &&
+                                        (field->attr.usage == HID_USAGE_X || field->attr.usage == HID_USAGE_Y)) {
+                                        current_report->is_mouse = true;
+                                    }
+                                    
+                                    if (field->attr.usage_page == HID_USAGE_KEYPAD) {
+                                        current_report->is_keyboard = true;
+                                    }
+                                    
                                     current_report->num_fields++;
                                 }
                             } else {
@@ -170,6 +184,11 @@ void parse_report_descriptor(const uint8_t *desc, const size_t length, const uin
                             has_usage_range = false;
                             usage_minimum = 0;
                             usage_maximum = 0;
+
+                            // If it's a keyboard report, it can't be a mouse
+                            if (current_report->is_keyboard) {
+                                current_report->is_mouse = false;
+                            }
                         }
                         break;
                     case 10: // Collection

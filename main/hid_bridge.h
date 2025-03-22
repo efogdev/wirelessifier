@@ -284,6 +284,8 @@ typedef struct {
     uint16_t total_bits;
     uint16_t usage_stack[MAX_REPORT_FIELDS];
     uint8_t usage_stack_pos;
+    bool is_mouse;
+    bool is_keyboard;
 } report_info_t;
 
 typedef struct {
