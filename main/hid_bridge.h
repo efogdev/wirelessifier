@@ -262,6 +262,7 @@ typedef struct {
 } usb_hid_field_t;
 
 typedef struct {
+    uint8_t if_id;
     uint8_t report_id;
     usb_hid_field_type_t type;
     uint8_t num_fields;

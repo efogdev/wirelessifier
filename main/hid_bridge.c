@@ -268,15 +268,12 @@ esp_err_t hid_bridge_stop(void)
 }
 
 static esp_err_t process_keyboard_report(const usb_hid_report_t *report) {
-    uint8_t expected_fields = usb_hid_host_get_num_fields(report->report_id, 0);
+    const uint8_t expected_fields = usb_hid_host_get_num_fields(report->report_id, report->if_id);
     if (expected_fields != report->num_fields) {
-        ESP_LOGE(TAG, "Keyboard report field count mismatch: expected %d, got %d", 
-                 expected_fields, report->num_fields);
-        return ESP_ERR_INVALID_STATE;
+        return ESP_OK;
     }
 
     keyboard_report_t ble_kb_report = {0};
-
     for (int i = 0; i < report->num_fields; i++) {
         const usb_hid_field_t *field = &report->fields[i];
         const int value = field->values[0];
@@ -294,15 +291,12 @@ static esp_err_t process_keyboard_report(const usb_hid_report_t *report) {
 }
 
 static esp_err_t process_mouse_report(const usb_hid_report_t *report) {
-    uint8_t expected_fields = usb_hid_host_get_num_fields(report->report_id, 0);
+    const uint8_t expected_fields = usb_hid_host_get_num_fields(report->report_id, report->if_id);
     if (expected_fields != report->num_fields) {
-        ESP_LOGE(TAG, "Mouse report field count mismatch: expected %d, got %d", 
-                 expected_fields, report->num_fields);
-        return ESP_ERR_INVALID_STATE;
+        return ESP_OK;
     }
 
     mouse_report_t ble_mouse_report = {0};
-
     for (int i = 0; i < report->num_fields; i++) {
         const usb_hid_field_t *field = &report->fields[i];
         const int value = field->values[0];

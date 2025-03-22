@@ -43,7 +43,7 @@ static void hid_host_interface_callback(hid_host_device_handle_t hid_device_hand
 static void process_device_event(hid_host_device_handle_t hid_device_handle, hid_host_driver_event_t event, void *arg);
 static void process_interface_event(hid_host_device_handle_t hid_device_handle, hid_host_interface_event_t event, void *arg);
 
-uint8_t usb_hid_host_get_num_fields(uint8_t report_id, uint8_t interface_num) {
+uint8_t usb_hid_host_get_num_fields(const uint8_t report_id, const uint8_t interface_num) {
     if (interface_num >= USB_HOST_MAX_INTERFACES) {
         return 0;
     }
@@ -190,6 +190,7 @@ static void process_report(const uint8_t *const data, const size_t length, const
         return;
     }
 
+    g_report.if_id = interface_num;
     g_report.report_id = report_id;
     g_report.type = USB_HID_FIELD_TYPE_INPUT;
     g_report.num_fields = report_info->num_fields;
@@ -276,6 +277,8 @@ static void process_device_event(const hid_host_device_handle_t hid_device_handl
                 parse_report_descriptor(desc, desc_len, dev_params.iface_num, &g_interface_report_maps[dev_params.iface_num]);
                 const report_map_t *report_map = &g_interface_report_maps[dev_params.iface_num];
                 for (int i = 0; i < report_map->num_reports; i++) {
+                    ESP_LOGI(TAG, "Expecting %d fields for interface=%d report=%d",
+                        report_map->reports[i].num_fields, dev_params.iface_num, report_map->report_ids[i]);
                     g_field_counts[dev_params.iface_num][report_map->report_ids[i]] = report_map->reports[i].num_fields;
                 }
                 xSemaphoreGive(g_report_maps_mutex);
