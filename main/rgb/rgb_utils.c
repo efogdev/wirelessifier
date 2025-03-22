@@ -1,5 +1,3 @@
-/* RGB utility functions and LED control
- */
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
@@ -10,15 +8,15 @@
 #include "neopixel.h"
 #include <math.h>
 #include "esp_wifi.h"
-#include "../utils/storage.h"
+#include "storage.h"
 
 static const char *TAG = "RGB_UTILS";
-#define BASE_FPS 120
+#define BASE_FPS 90
 static uint16_t s_current_fps = BASE_FPS;
-uint8_t g_rgb_brightness = 35; // Default value, will be updated from settings
+uint8_t g_rgb_brightness = 35;
 
-#define WIFI_BLINK_FAST_MS 250  // Fast blink period (ms)
-#define WIFI_BLINK_SLOW_MS 1000 // Slow blink period (ms)
+#define WIFI_BLINK_FAST_MS 250
+#define WIFI_BLINK_SLOW_MS 1000
 
 typedef enum {
     WIFI_ANIM_NONE,
@@ -30,7 +28,6 @@ typedef enum {
     BATTERY_CHARGE_LEVEL_LOW,
 } status_animation_type_t;
 
-// Pattern definitions
 static const led_pattern_t led_patterns[] = {
     // IDLE 
     {
@@ -119,7 +116,7 @@ static inline uint32_t get_cycle_time_ms(uint8_t speed) {
 }
 
 static inline float get_animation_progress(uint32_t current_time, uint32_t cycle_time) {
-    uint32_t elapsed = current_time - s_animation_start_time;
+    const uint32_t elapsed = current_time - s_animation_start_time;
     return (float)(elapsed % cycle_time) / cycle_time;
 }
 
@@ -256,7 +253,7 @@ void led_control_deinit(void)
 void led_update_pattern(bool usb_connected, bool ble_connected, bool ble_paused)
 {
     int new_pattern = LED_PATTERN_IDLE;
-    uint32_t current_time = pdTICKS_TO_MS(xTaskGetTickCount());
+    const uint32_t current_time = pdTICKS_TO_MS(xTaskGetTickCount());
     
     if (ble_paused) {
         new_pattern = LED_PATTERN_SLEEPING;
@@ -365,7 +362,7 @@ void led_update_wifi_status(bool is_apsta_mode, bool is_connected)
 
 static void update_wifi_status_led(tNeopixel* pixels)
 {
-    uint32_t current_time = pdTICKS_TO_MS(xTaskGetTickCount());
+    const uint32_t current_time = pdTICKS_TO_MS(xTaskGetTickCount());
     
     // If no WiFi animation is set, return
     if (s_wifi_animation == WIFI_ANIM_NONE) {
@@ -415,8 +412,8 @@ static void update_status_led(tNeopixel* pixels)
         update_wifi_status_led(pixels);
         return;
     }
-    
-    uint32_t current_time = pdTICKS_TO_MS(xTaskGetTickCount());
+
+    const uint32_t current_time = pdTICKS_TO_MS(xTaskGetTickCount());
     
     // Update blink state if needed
     if (s_status_mode == STATUS_MODE_BLINK && 
@@ -443,15 +440,14 @@ static void update_status_led(tNeopixel* pixels)
 
 static inline void apply_pattern(tNeopixel* pixels, const led_pattern_t* pattern)
 {
-    int column_length = (s_num_leds - 1) / 2;
-    uint32_t current_color = s_use_secondary_color ? pattern->colors[1] : pattern->colors[0];
-    uint32_t current_time = pdTICKS_TO_MS(xTaskGetTickCount());
-    uint32_t cycle_time = get_cycle_time_ms(pattern->speed);
-    float progress = get_animation_progress(current_time, cycle_time);
+    const int column_length = (s_num_leds - 1) / 2;
+    const uint32_t current_color = s_use_secondary_color ? pattern->colors[1] : pattern->colors[0];
+    const uint32_t current_time = pdTICKS_TO_MS(xTaskGetTickCount());
+    const uint32_t cycle_time = get_cycle_time_ms(pattern->speed);
+    const float progress = get_animation_progress(current_time, cycle_time);
 
     switch (pattern->type) {
         case ANIM_TYPE_RUNNING_LIGHT_BOUNCE: {
-            // Calculate position with bounce
             float bounce_progress;
             if (progress < 0.5f) {
                 bounce_progress = progress * 2.0f; // Going down
@@ -460,22 +456,22 @@ static inline void apply_pattern(tNeopixel* pixels, const led_pattern_t* pattern
             }
             
             // Calculate center position (0 to column_length-1)
-            float center_pos = bounce_progress * (column_length - 1);
+            const float center_pos = bounce_progress * (column_length - 1);
             
             // Apply to both columns with trail, second column inverted
             for (int col = 0; col < 2; col++) {
-                int col_offset = 1 + (col * column_length);
+                const int col_offset = 1 + (col * column_length);
                 
                 for (int i = 0; i < column_length; i++) {
                     // For second column, invert the position calculation
-                    float pos = col == 0 ? i - center_pos : 
+                    const float pos = col == 0 ? i - center_pos :
                         (column_length - 1 - i) - center_pos;
-                    float distance = fabsf(pos);
+                    const float distance = fabsf(pos);
                     if (distance <= pattern->trail_length) {
-                        float intensity = 1.0f - (distance / pattern->trail_length);
-                        uint8_t r = ((current_color >> 16) & 0xFF);
-                        uint8_t g = ((current_color >> 8) & 0xFF);
-                        uint8_t b = (current_color & 0xFF);
+                        const float intensity = 1.0f - (distance / pattern->trail_length);
+                        const uint8_t r = ((current_color >> 16) & 0xFF);
+                        const uint8_t g = ((current_color >> 8) & 0xFF);
+                        const uint8_t b = (current_color & 0xFF);
                         pixels[col_offset + i].rgb = rgb_color(
                             (r * (int)(intensity * 100)) / 100,
                             (g * (int)(intensity * 100)) / 100,
@@ -492,12 +488,12 @@ static inline void apply_pattern(tNeopixel* pixels, const led_pattern_t* pattern
             if (brightness_progress > 1.0f) {
                 brightness_progress = 2.0f - brightness_progress; // Fade out
             }
-            
-            uint32_t color = pattern->colors[0];
-            uint8_t r = (color >> 16) & 0xFF;
-            uint8_t g = (color >> 8) & 0xFF;
-            uint8_t b = color & 0xFF;
-            uint32_t result_color = rgb_color(
+
+            const uint32_t color = pattern->colors[0];
+            const uint8_t r = (color >> 16) & 0xFF;
+            const uint8_t g = (color >> 8) & 0xFF;
+            const uint8_t b = color & 0xFF;
+            const uint32_t result_color = rgb_color(
                 (r * (int)(brightness_progress * 100)) / 100,
                 (g * (int)(brightness_progress * 100)) / 100,
                 (b * (int)(brightness_progress * 100)) / 100
@@ -511,12 +507,12 @@ static inline void apply_pattern(tNeopixel* pixels, const led_pattern_t* pattern
 
         case ANIM_TYPE_RUNNING_LIGHT: {
             // Calculate base position for each column (0 to column_length)
-            float base_pos = progress * column_length;
+            const float base_pos = progress * column_length;
             
             // Apply to both columns, second column inverted
             for (int col = 0; col < 2; col++) {
-                int col_offset = 1 + (col * column_length);
-                float base_i = pattern->direction_up ? 
+                const int col_offset = 1 + (col * column_length);
+                const float base_i = pattern->direction_up ?
                     base_pos : (column_length - base_pos);
                 
                 for (int i = 0; i < column_length; i++) {
@@ -535,10 +531,10 @@ static inline void apply_pattern(tNeopixel* pixels, const led_pattern_t* pattern
                     }
                     
                     if (distance <= pattern->trail_length) {
-                        float intensity = 1.0f - (distance / pattern->trail_length);
-                        uint8_t r = ((current_color >> 16) & 0xFF);
-                        uint8_t g = ((current_color >> 8) & 0xFF);
-                        uint8_t b = (current_color & 0xFF);
+                        const float intensity = 1.0f - (distance / pattern->trail_length);
+                        const uint8_t r = ((current_color >> 16) & 0xFF);
+                        const uint8_t g = ((current_color >> 8) & 0xFF);
+                        const uint8_t b = (current_color & 0xFF);
                         pixels[col_offset + i].rgb = rgb_color(
                             (r * (int)(intensity * 100)) / 100,
                             (g * (int)(intensity * 100)) / 100,
@@ -555,18 +551,18 @@ static inline void apply_pattern(tNeopixel* pixels, const led_pattern_t* pattern
 static void blend_colors(tNeopixel* dest, const tNeopixel* src1, const tNeopixel* src2, float blend_factor)
 {
     // Extract RGB components
-    uint8_t r1 = (src1->rgb >> 16) & 0xFF;
-    uint8_t g1 = (src1->rgb >> 8) & 0xFF;
-    uint8_t b1 = src1->rgb & 0xFF;
-    
-    uint8_t r2 = (src2->rgb >> 16) & 0xFF;
-    uint8_t g2 = (src2->rgb >> 8) & 0xFF;
-    uint8_t b2 = src2->rgb & 0xFF;
+    const uint8_t r1 = (src1->rgb >> 16) & 0xFF;
+    const uint8_t g1 = (src1->rgb >> 8) & 0xFF;
+    const uint8_t b1 = src1->rgb & 0xFF;
+
+    const uint8_t r2 = (src2->rgb >> 16) & 0xFF;
+    const uint8_t g2 = (src2->rgb >> 8) & 0xFF;
+    const uint8_t b2 = src2->rgb & 0xFF;
     
     // Linear interpolation between colors
-    uint8_t r = r1 + (uint8_t)((float)(r2 - r1) * blend_factor);
-    uint8_t g = g1 + (uint8_t)((float)(g2 - g1) * blend_factor);
-    uint8_t b = b1 + (uint8_t)((float)(b2 - b1) * blend_factor);
+    const uint8_t r = r1 + (uint8_t)((float)(r2 - r1) * blend_factor);
+    const uint8_t g = g1 + (uint8_t)((float)(g2 - g1) * blend_factor);
+    const uint8_t b = b1 + (uint8_t)((float)(b2 - b1) * blend_factor);
     
     dest->rgb = NP_RGB(r, g, b);
 }
@@ -599,8 +595,8 @@ static void led_control_task(void *arg)
         
         // Handle transition if active
         if (s_in_transition) {
-            uint32_t current_time = pdTICKS_TO_MS(xTaskGetTickCount());
-            uint32_t elapsed = current_time - s_transition_start_time;
+            const uint32_t current_time = pdTICKS_TO_MS(xTaskGetTickCount());
+            const uint32_t elapsed = current_time - s_transition_start_time;
             
             if (elapsed >= TRANSITION_DURATION_MS) {
                 // Transition complete
@@ -608,7 +604,7 @@ static void led_control_task(void *arg)
                 memcpy(pixels, new_state, sizeof(tNeopixel) * s_num_leds);
             } else {
                 // Calculate blend factor (0.0 to 1.0)
-                float blend_factor = (float)elapsed / TRANSITION_DURATION_MS;
+                const float blend_factor = (float)elapsed / TRANSITION_DURATION_MS;
                 
                 // Blend between previous and new state
                 for (int i = 0; i < s_num_leds; i++) {

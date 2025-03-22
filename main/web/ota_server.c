@@ -24,7 +24,7 @@ static void report_ota_progress(int progress) {
     ws_broadcast_json("ota_progress", progress_str);
 }
 
-static esp_err_t validate_image_header(esp_app_desc_t *new_app_info) {
+static esp_err_t validate_image_header(const esp_app_desc_t *new_app_info) {
     if (new_app_info == NULL) {
         return ESP_ERR_INVALID_ARG;
     }

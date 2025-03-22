@@ -83,7 +83,7 @@ static const char *default_settings = "{"
 static char *current_settings = NULL;
 
 // Helper function to get MAC address as a string
-static void get_mac_address_str(char *mac_str, size_t size) {
+static void get_mac_address_str(char *mac_str, const size_t size) {
     uint8_t mac[6];
     esp_read_mac(mac, ESP_MAC_BT);
     snprintf(mac_str, size, "%02X:%02X:%02X:%02X:%02X:%02X", 
@@ -303,7 +303,7 @@ static cJSON* find_json_by_path(const char* path) {
 }
 
 // Get a specific setting value as a string
-esp_err_t storage_get_string_setting(const char* path, char* value, size_t max_len) {
+esp_err_t storage_get_string_setting(const char* path, char* value, const size_t max_len) {
     if (!path || !value || max_len == 0) return ESP_ERR_INVALID_ARG;
     
     cache_entry_t* entry = cache_find(path);

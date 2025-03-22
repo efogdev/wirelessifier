@@ -33,7 +33,7 @@ void task_monitor_increment_usb_report_counter(void)
     g_usb_report_counter++;
 }
 
-static esp_err_t print_real_time_stats(TickType_t xTicksToWait)
+static esp_err_t print_real_time_stats(const TickType_t xTicksToWait)
 {
     UBaseType_t start_array_size, end_array_size;
     uint32_t start_run_time, end_run_time;

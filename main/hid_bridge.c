@@ -309,9 +309,8 @@ static esp_err_t process_mouse_report(const usb_hid_report_t *report) {
             }
         } else if (field->attr.usage_page == HID_USAGE_PAGE_BUTTONS) {
             if (field->attr.usage >= 1 && field->attr.usage <= 8 && value) {
-                ble_mouse_report.buttons |= (1 << btn_index);
+                ble_mouse_report.buttons |= (1 << (field->attr.usage - 1));
             }
-            btn_index++;
         }
     }
 
@@ -323,7 +322,7 @@ bool hid_bridge_is_ble_paused(void)
     return !s_ble_stack_active && usb_hid_host_device_connected();
 }
 
-esp_err_t hid_bridge_process_report(usb_hid_report_t *report)
+esp_err_t hid_bridge_process_report(const usb_hid_report_t *report)
 {
     // ESP_LOGD(TAG, "Processing HID report (%d fields)", report->num_fields);
 

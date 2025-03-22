@@ -97,7 +97,7 @@ esp_err_t usb_hid_host_init(QueueHandle_t report_queue) {
         .callback_arg = NULL
     };
 
-    esp_err_t ret = hid_host_install(&hid_host_config);
+    const esp_err_t ret = hid_host_install(&hid_host_config);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to install HID host driver: %d", ret);
         vTaskDelete(g_usb_events_task_handle);
@@ -360,7 +360,7 @@ static void usb_stats_task(void *arg) {
     TickType_t last_wake_time = xTaskGetTickCount();
 
     while (1) {
-        uint32_t reports_per_sec = (s_current_rps - prev_count) / USB_STATS_INTERVAL_SEC;
+        const uint32_t reports_per_sec = (s_current_rps - prev_count) / USB_STATS_INTERVAL_SEC;
         ESP_LOGI(TAG, "USB: %lu rps", reports_per_sec);
         
         prev_count = s_current_rps;

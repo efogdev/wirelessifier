@@ -74,7 +74,7 @@ static inline char *parse_dns_name(char *raw_name, char *parsed_name, size_t par
     return label + 1;
 }
 
-static int parse_dns_request(char *req, size_t req_len, char *dns_reply, size_t dns_reply_max_len)
+static int parse_dns_request(const char *req, size_t req_len, char *dns_reply, size_t dns_reply_max_len)
 {
     if (req_len > dns_reply_max_len) {
         return -1;

@@ -52,7 +52,7 @@ void hid_dev_register_reports(const uint8_t num_reports, hid_report_map_t *p_rep
     cache_size = 0;
 }
 
-void hid_keyboard_build_report(uint8_t *buffer, keyboard_cmd_t cmd) {
+void hid_keyboard_build_report(uint8_t *buffer, const keyboard_cmd_t cmd) {
     if (!buffer) {
         ESP_LOGE(HID_LE_PRF_TAG, "%s(), the buffer is NULL, hid build report failed.", __func__);
         return;

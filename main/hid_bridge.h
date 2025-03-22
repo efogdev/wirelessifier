@@ -243,7 +243,7 @@ esp_err_t hid_bridge_stop(void);
  * @param report USB HID report to process
  * @return esp_err_t ESP_OK on success
  */
-esp_err_t hid_bridge_process_report(usb_hid_report_t *report);
+esp_err_t hid_bridge_process_report(const usb_hid_report_t *report);
 
 /**
  * @brief Check if BLE stack is paused due to USB inactivity

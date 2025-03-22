@@ -1,5 +1,5 @@
 #include "ble_hid_device.h"
-#include "../const.h"
+#include "const.h"
 #include <esp_gatt_common_api.h>
 #include <stdio.h>
 #include <string.h>
@@ -13,9 +13,7 @@
 #include "esp_bt_defs.h"
 #include "esp_gap_ble_api.h"
 #include "esp_bt_main.h"
-#include "hid_dev.h"
-#include "../utils/storage.h"
-#include "../const.h"
+#include "storage.h"
 
 #define HIGH_SPEED_DEVICE_THRESHOLD_MS 6
 #define HIGH_SPEED_DEVICE_THRESHOLD_EVENTS 5
@@ -41,6 +39,7 @@ typedef enum {
     SPEED_MODE_FAST,
     SPEED_MODE_VERYFAST
 } speed_mode_t;
+
 static speed_mode_t s_high_speed_submode = SPEED_MODE_SLOW;
 static uint8_t hidd_service_uuid128[] = {
     /* LSB <--------------------------------------------------------------------------------> MSB */
@@ -56,7 +55,7 @@ static esp_ble_adv_data_t hidd_adv_data = {
     .max_interval = 0x80, // slave connection max interval, Time = max_interval * 1.25 msec
     .appearance = ESP_BLE_APPEARANCE_GENERIC_HID,
     .manufacturer_len = 0,
-    .p_manufacturer_data =  NULL,
+    .p_manufacturer_data = NULL,
     .service_data_len = 0,
     .p_service_data = NULL,
     .service_uuid_len = sizeof(hidd_service_uuid128),
@@ -65,16 +64,15 @@ static esp_ble_adv_data_t hidd_adv_data = {
 };
 
 static esp_ble_adv_params_t hidd_adv_params = {
-    .adv_int_min        = 0x20,
-    .adv_int_max        = 0x30,
-    .adv_type           = ADV_TYPE_IND,
-    .own_addr_type      = BLE_ADDR_TYPE_PUBLIC,
-    .channel_map        = ADV_CHNL_ALL,
-    .adv_filter_policy  = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
+    .adv_int_min = 0x20,
+    .adv_int_max = 0x30,
+    .adv_type = ADV_TYPE_IND,
+    .own_addr_type = BLE_ADDR_TYPE_PUBLIC,
+    .channel_map = ADV_CHNL_ALL,
+    .adv_filter_policy = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
 };
 
-static void hidd_event_callback(const esp_hidd_cb_event_t event, const esp_hidd_cb_param_t *param)
-{
+static void hidd_event_callback(const esp_hidd_cb_event_t event, const esp_hidd_cb_param_t *param) {
     switch (event) {
         case ESP_HIDD_EVENT_REG_FINISH: {
             if (param->init_finish.state == ESP_HIDD_INIT_OK) {
@@ -87,7 +85,7 @@ static void hidd_event_callback(const esp_hidd_cb_event_t event, const esp_hidd_
             }
             break;
         }
-		case ESP_HIDD_EVENT_BLE_CONNECT: {
+        case ESP_HIDD_EVENT_BLE_CONNECT: {
             ESP_LOGI(TAG, "ESP_HIDD_EVENT_BLE_CONNECT");
             s_conn_id = param->connect.conn_id;
             s_connected = true;
@@ -110,33 +108,32 @@ static void hidd_event_callback(const esp_hidd_cb_event_t event, const esp_hidd_
     }
 }
 
-static void gap_event_handler(const esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
-{
+static void gap_event_handler(const esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param) {
     switch (event) {
-    case ESP_GAP_BLE_ADV_DATA_SET_COMPLETE_EVT:
-        esp_ble_gap_start_advertising(&hidd_adv_params);
-        break;
-     case ESP_GAP_BLE_SEC_REQ_EVT:
-        esp_ble_gap_security_rsp(param->ble_security.ble_req.bd_addr, true);
-	 break;
-     case ESP_GAP_BLE_AUTH_CMPL_EVT:
-        esp_bd_addr_t bd_addr;
-        memcpy(bd_addr, param->ble_security.auth_cmpl.bd_addr, sizeof(esp_bd_addr_t));
-        ESP_LOGI(TAG, "remote BD_ADDR: %08x%04x",\
-                (bd_addr[0] << 24) + (bd_addr[1] << 16) + (bd_addr[2] << 8) + bd_addr[3],
-                (bd_addr[4] << 8) + bd_addr[5]);
-        ESP_LOGI(TAG, "address type = %d", param->ble_security.auth_cmpl.addr_type);
-        ESP_LOGI(TAG, "pair status = %s",param->ble_security.auth_cmpl.success ? "success" : "fail");
-        if(!param->ble_security.auth_cmpl.success) {
-            ESP_LOGE(TAG, "fail reason = 0x%x",param->ble_security.auth_cmpl.fail_reason);
-            if(param->ble_security.auth_cmpl.fail_reason == 0x66) {
-                ESP_LOGI(TAG, "Unbonding device due to error 0x66");
-                esp_ble_remove_bond_device(bd_addr);
+        case ESP_GAP_BLE_ADV_DATA_SET_COMPLETE_EVT:
+            esp_ble_gap_start_advertising(&hidd_adv_params);
+            break;
+        case ESP_GAP_BLE_SEC_REQ_EVT:
+            esp_ble_gap_security_rsp(param->ble_security.ble_req.bd_addr, true);
+            break;
+        case ESP_GAP_BLE_AUTH_CMPL_EVT:
+            esp_bd_addr_t bd_addr;
+            memcpy(bd_addr, param->ble_security.auth_cmpl.bd_addr, sizeof(esp_bd_addr_t));
+            ESP_LOGI(TAG, "remote BD_ADDR: %08x%04x",\
+                     (bd_addr[0] << 24) + (bd_addr[1] << 16) + (bd_addr[2] << 8) + bd_addr[3],
+                     (bd_addr[4] << 8) + bd_addr[5]);
+            ESP_LOGI(TAG, "address type = %d", param->ble_security.auth_cmpl.addr_type);
+            ESP_LOGI(TAG, "pair status = %s", param->ble_security.auth_cmpl.success ? "success" : "fail");
+            if (!param->ble_security.auth_cmpl.success) {
+                ESP_LOGE(TAG, "fail reason = 0x%x", param->ble_security.auth_cmpl.fail_reason);
+                if (param->ble_security.auth_cmpl.fail_reason == 0x66) {
+                    ESP_LOGI(TAG, "Unbonding device due to error 0x66");
+                    esp_ble_remove_bond_device(bd_addr);
+                }
             }
-        }
-        break;
-    default:
-        break;
+            break;
+        default:
+            break;
     }
 }
 
@@ -152,8 +149,7 @@ static void accumulator_timer_callback(TimerHandle_t timer) {
 
 static TickType_t acc_window = pdMS_TO_TICKS(8);
 
-esp_err_t ble_hid_device_init(void)
-{
+esp_err_t ble_hid_device_init(void) {
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
@@ -173,7 +169,7 @@ esp_err_t ble_hid_device_init(void)
     }
 
     s_is_fast_mode = false;
-    switch(s_high_speed_submode) {
+    switch (s_high_speed_submode) {
         case SPEED_MODE_FAST:
             s_is_fast_mode = true;
             s_batch_size = 5;
@@ -220,17 +216,17 @@ esp_err_t ble_hid_device_init(void)
         return ret;
     }
 
-    if((ret = esp_hidd_profile_init()) != ESP_OK) {
+    if ((ret = esp_hidd_profile_init()) != ESP_OK) {
         ESP_LOGE(TAG, "%s init bluedroid failed", __func__);
         return ret;
     }
 
     esp_ble_gap_register_callback(gap_event_handler);
-    esp_hidd_register_callbacks((esp_hidd_event_cb_t)hidd_event_callback);
+    esp_hidd_register_callbacks((esp_hidd_event_cb_t) hidd_event_callback);
 
     esp_ble_auth_req_t auth_req = ESP_LE_AUTH_REQ_SC_MITM_BOND;
-    esp_ble_io_cap_t iocap = ESP_IO_CAP_NONE;           //set the IO capability to No output No input
-    uint8_t key_size = 16;      //the key size should be 7~16 bytes
+    esp_ble_io_cap_t iocap = ESP_IO_CAP_NONE; //set the IO capability to No output No input
+    uint8_t key_size = 16; //the key size should be 7~16 bytes
     uint8_t init_key = ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK;
     uint8_t rsp_key = ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK;
     esp_ble_gap_set_security_param(ESP_BLE_SM_AUTHEN_REQ_MODE, &auth_req, sizeof(uint8_t));
@@ -241,7 +237,7 @@ esp_err_t ble_hid_device_init(void)
 
     char tx_power_str[10];
     esp_power_level_t power_level = ESP_PWR_LVL_N0;
-    
+
     if (storage_get_string_setting("connectivity.bleTxPower", tx_power_str, sizeof(tx_power_str)) == ESP_OK) {
         ESP_LOGI(TAG, "BLE TX power setting: %s", tx_power_str);
         if (strcmp(tx_power_str, "n6") == 0) {
@@ -266,8 +262,7 @@ esp_err_t ble_hid_device_init(void)
     return ESP_OK;
 }
 
-esp_err_t ble_hid_device_deinit(void)
-{
+esp_err_t ble_hid_device_deinit(void) {
     esp_err_t ret;
 
     if ((ret = esp_hidd_profile_deinit()) != ESP_OK) {
@@ -293,16 +288,15 @@ esp_err_t ble_hid_device_deinit(void)
     return ESP_OK;
 }
 
-esp_err_t ble_hid_device_start_advertising(void)
-{
+esp_err_t ble_hid_device_start_advertising(void) {
     char device_name[32];
     if (storage_get_string_setting("deviceInfo.name", device_name, sizeof(device_name)) != ESP_OK) {
         strcpy(device_name, DEVICE_NAME);
     }
-    
+
     ESP_LOGI(TAG, "Advertising with device name: %s", device_name);
     esp_ble_gap_set_device_name(device_name);
-    esp_err_t ret = esp_ble_gap_config_adv_data(&hidd_adv_data);
+    const esp_err_t ret = esp_ble_gap_config_adv_data(&hidd_adv_data);
     if (ret) {
         ESP_LOGE(TAG, "config adv data failed, error code = %x", ret);
         return ret;
@@ -311,8 +305,7 @@ esp_err_t ble_hid_device_start_advertising(void)
     return ESP_OK;
 }
 
-bool ble_hid_device_connected(void)
-{
+bool ble_hid_device_connected(void) {
     return s_connected;
 }
 
@@ -338,29 +331,27 @@ static bool check_high_speed_device() {
     return s_is_high_speed;
 }
 
-esp_err_t ble_hid_device_send_keyboard_report(const keyboard_report_t *report)
-{
+esp_err_t ble_hid_device_send_keyboard_report(const keyboard_report_t *report) {
     if (!s_connected) {
         return ESP_ERR_INVALID_STATE;
     }
-    
+
     uint8_t keys[6] = {0};
     uint32_t mask = report->keycodes;
     int key_count = 0;
-    
+
     for (int i = 0; i < 32 && key_count < 6; i++) {
         if (mask & (1UL << i)) {
             keys[key_count++] = i;
         }
     }
-    
+
     esp_hidd_send_keyboard_value(s_conn_id, report->modifier, keys, key_count);
     return ESP_OK;
 }
 
 // goal is to map any high (up to 1000hz) report rate to lower BLE report rate
-esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report)
-{
+esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report) {
     // ESP_LOGI(TAG, "Mouse: X=%d Y=%d wheel=%d pan=%d buttons=%02x", report->x, report->y, report->wheel, report->pan, report->buttons);
 
     if (!s_connected) {
@@ -407,7 +398,7 @@ esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report)
             s_acc_y = 0;
             s_acc_wheel = 0;
             s_acc_pan = 0;
-            
+
             return ESP_OK;
         }
     }

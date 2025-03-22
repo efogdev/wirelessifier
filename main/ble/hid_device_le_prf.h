@@ -15,15 +15,10 @@
 #include "hid_bridge.h"
 
 #define SUPPORT_REPORT_VENDOR                 false
-//HID BLE profile log tag
 #define HID_LE_PRF_TAG                        "HID_LE_PRF"
 
 /// Maximal number of HIDS that can be added in the DB
-#ifndef USE_ONE_HIDS_INSTANCE
-#define HIDD_LE_NB_HIDS_INST_MAX              (2)
-#else
 #define HIDD_LE_NB_HIDS_INST_MAX              (1)
-#endif
 
 #define HIDD_GREAT_VER   0x01  //Version + Subversion
 #define HIDD_SUB_VER     0x00  //Version + Subversion
@@ -40,7 +35,7 @@
 #define HID_RPT_ID_LED_OUT       2  // ToDo: LED output report ID
 #define HID_RPT_ID_FEATURE       0  // ToDo: Feature report ID
 
-#define HIDD_APP_ID			0x1812 //ATT_SVC_HID
+#define HIDD_APP_ID			0x1812 // ATT_SVC_HID
 #define BATTRAY_APP_ID       0x180f
 #define ATT_SVC_HID          0x1812
 
@@ -48,7 +43,7 @@
 #define HIDD_LE_NB_REPORT_INST_MAX            (8)
 
 /// Maximal length of Report Char. Value
-#define HIDD_LE_REPORT_MAX_LEN                (64)
+#define HIDD_LE_REPORT_MAX_LEN                (32)
 /// Maximal length of Report Map Char. Value
 #define HIDD_LE_REPORT_MAP_MAX_LEN            (256)
 
@@ -216,28 +211,28 @@ enum {
 enum {
     HIDD_LE_DESC_MASK = 0x10,
 
-    HIDD_LE_BOOT_KB_IN_REPORT_CFG     = HIDD_LE_BOOT_KB_IN_REPORT_CHAR | HIDD_LE_DESC_MASK,
-    HIDD_LE_BOOT_MOUSE_IN_REPORT_CFG  = HIDD_LE_BOOT_MOUSE_IN_REPORT_CHAR | HIDD_LE_DESC_MASK,
-    HIDD_LE_REPORT_CFG                = HIDD_LE_REPORT_CHAR | HIDD_LE_DESC_MASK,
+    HIDD_LE_BOOT_KB_IN_REPORT_CFG = HIDD_LE_BOOT_KB_IN_REPORT_CHAR | HIDD_LE_DESC_MASK,
+    HIDD_LE_BOOT_MOUSE_IN_REPORT_CFG = HIDD_LE_BOOT_MOUSE_IN_REPORT_CHAR | HIDD_LE_DESC_MASK,
+    HIDD_LE_REPORT_CFG = HIDD_LE_REPORT_CHAR | HIDD_LE_DESC_MASK,
 };
 
 /// Features Flag Values
 enum {
-    HIDD_LE_CFG_KEYBOARD      = 0x01,
-    HIDD_LE_CFG_MOUSE         = 0x02,
-    HIDD_LE_CFG_PROTO_MODE    = 0x04,
-    HIDD_LE_CFG_MAP_EXT_REF   = 0x08,
-    HIDD_LE_CFG_BOOT_KB_WR    = 0x10,
+    HIDD_LE_CFG_KEYBOARD = 0x01,
+    HIDD_LE_CFG_MOUSE = 0x02,
+    HIDD_LE_CFG_PROTO_MODE = 0x04,
+    HIDD_LE_CFG_MAP_EXT_REF = 0x08,
+    HIDD_LE_CFG_BOOT_KB_WR = 0x10,
     HIDD_LE_CFG_BOOT_MOUSE_WR = 0x20,
 };
 
 /// Report Char. Configuration Flag Values
 enum {
-    HIDD_LE_CFG_REPORT_IN     = 0x01,
-    HIDD_LE_CFG_REPORT_OUT    = 0x02,
+    HIDD_LE_CFG_REPORT_IN = 0x01,
+    HIDD_LE_CFG_REPORT_OUT = 0x02,
     //HOGPD_CFG_REPORT_FEAT can be used as a mask to check Report type
-    HIDD_LE_CFG_REPORT_FEAT   = 0x03,
-    HIDD_LE_CFG_REPORT_WR     = 0x10,
+    HIDD_LE_CFG_REPORT_FEAT = 0x03,
+    HIDD_LE_CFG_REPORT_WR = 0x10,
 };
 
 /// Pointer to the connection clean-up function
@@ -254,22 +249,22 @@ typedef struct {
 } hidd_feature_t;
 
 typedef struct {
-    bool                        in_use;
-    bool                        congest;
-    uint16_t                  conn_id;
-    bool                        connected;
-    esp_bd_addr_t         remote_bda;
-    uint32_t                  trans_id;
-    uint8_t                    cur_srvc_id;
+    bool in_use;
+    bool congest;
+    uint16_t conn_id;
+    bool connected;
+    esp_bd_addr_t remote_bda;
+    uint32_t trans_id;
+    uint8_t cur_srvc_id;
 } hidd_clcb_t;
 
 // HID report mapping table
 typedef struct {
-    uint16_t    handle;           // Handle of report characteristic
-    uint16_t    cccdHandle;       // Handle of CCCD for report characteristic
-    uint8_t     id;               // Report ID
-    uint8_t     type;             // Report type
-    uint8_t     mode;             // Protocol mode (report or boot)
+    uint16_t handle; // Handle of report characteristic
+    uint16_t cccdHandle; // Handle of CCCD for report characteristic
+    uint8_t id; // Report ID
+    uint8_t type; // Report type
+    uint8_t mode; // Protocol mode (report or boot)
 } hidRptMap_t;
 
 typedef struct {
@@ -280,7 +275,7 @@ typedef struct {
     ///Attribute handle Table
     uint16_t att_tbl[HIDD_LE_IDX_NB];
     /// Supported Features
-    hidd_feature_t   hidd_feature[HIDD_LE_NB_HIDS_INST_MAX];
+    hidd_feature_t hidd_feature[HIDD_LE_NB_HIDS_INST_MAX];
     /// Current Protocol Mode
     uint8_t proto_mode[HIDD_LE_NB_HIDS_INST_MAX];
     /// Number of HIDS added in the database
@@ -309,24 +304,29 @@ typedef struct {
 
 /* service engine control block */
 typedef struct {
-    hidd_clcb_t                  hidd_clcb[HID_MAX_APPS];          /* connection link*/
-    esp_gatt_if_t                gatt_if;
-    bool                         enabled;
-    bool                         is_take;
-    bool                         is_primery;
-    hidd_inst_t                  hidd_inst;
-    esp_hidd_event_cb_t          hidd_cb;
-    uint8_t                      inst_id;
+    hidd_clcb_t hidd_clcb[HID_MAX_APPS]; /* connection link*/
+    esp_gatt_if_t gatt_if;
+    bool enabled;
+    bool is_take;
+    bool is_primery;
+    hidd_inst_t hidd_inst;
+    esp_hidd_event_cb_t hidd_cb;
+    uint8_t inst_id;
 } hidd_le_env_t;
 
 extern hidd_le_env_t hidd_le_env;
 extern uint8_t hidProtocolMode;
 
-void hidd_clcb_alloc (uint16_t conn_id, esp_bd_addr_t bda);
-bool hidd_clcb_dealloc (uint16_t conn_id);
+void hidd_clcb_alloc(uint16_t conn_id, esp_bd_addr_t bda);
+
+bool hidd_clcb_dealloc(uint16_t conn_id);
+
 void hidd_le_create_service(esp_gatt_if_t gatts_if);
+
 void hidd_set_attr_value(uint16_t handle, uint16_t val_len, const uint8_t *value);
+
 void hidd_get_attr_value(uint16_t handle, uint16_t *length, uint8_t **value);
+
 esp_err_t hidd_register_cb(void);
 
 #endif  ///__HID_DEVICE_LE_PRF__
