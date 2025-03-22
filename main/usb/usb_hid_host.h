@@ -22,6 +22,8 @@
 #include "esp_err.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
+#include "usb/hid_host.h"
+#include "usb/usb_host.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -110,14 +112,35 @@ static const char* const usage_names_gendesk[] = {
 #define HID_USAGE_WHEEL      0x38
 #define HID_USAGE_HAT_SWITCH 0x39
 
-// HID report field types
+typedef struct {
+    hid_host_device_handle_t handle;
+    hid_host_driver_event_t event;
+    void *arg;
+} device_event_t;
+
+typedef struct {
+    hid_host_device_handle_t handle;
+    hid_host_interface_event_t event;
+    void *arg;
+} interface_event_t;
+
+typedef struct {
+    enum {
+        APP_EVENT_HID_DEVICE,
+        APP_EVENT_INTERFACE
+    } event_group;
+    union {
+        device_event_t device_event;
+        interface_event_t interface_event;
+    };
+} hid_event_queue_t;
+
 typedef enum {
     USB_HID_FIELD_TYPE_INPUT = 0,
     USB_HID_FIELD_TYPE_OUTPUT = 1,
     USB_HID_FIELD_TYPE_FEATURE = 2
 } usb_hid_field_type_t;
 
-// HID report field attributes
 typedef struct {
     uint16_t usage_page;
     uint16_t usage;
@@ -132,13 +155,11 @@ typedef struct {
     bool array;            // Array vs Variable
 } usb_hid_field_attr_t;
 
-// HID report field data
 typedef struct {
     usb_hid_field_attr_t attr;
     int *values;       // Array of values for this field
 } usb_hid_field_t;
 
-// HID report structure
 typedef struct {
     uint8_t report_id;
     usb_hid_field_type_t type;
@@ -148,7 +169,6 @@ typedef struct {
     uint16_t raw_len;      // Length of raw data
 } usb_hid_report_t;
 
-// Callback function type for HID reports
 typedef void (*usb_hid_report_callback_t)(usb_hid_report_t *report);
 
 /**

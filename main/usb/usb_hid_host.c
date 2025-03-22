@@ -21,40 +21,20 @@
 
 static const char *TAG = "usb_hid_host";
 static QueueHandle_t g_report_queue = NULL;
+static StaticQueue_t g_event_queue_storage;
 static QueueHandle_t g_event_queue = NULL;
+static uint8_t g_event_queue_array[4 * sizeof(hid_event_queue_t)];
 static bool g_device_connected = false;
 static TaskHandle_t g_usb_events_task_handle = NULL;
 static TaskHandle_t g_event_task_handle = NULL;
 static TaskHandle_t g_stats_task_handle = NULL;
 static uint32_t s_current_rps = 0;
+static StaticSemaphore_t g_report_maps_mutex_buffer;
 static SemaphoreHandle_t g_report_maps_mutex;
 static usb_hid_report_t g_report;
 static usb_hid_field_t g_fields[MAX_REPORT_FIELDS];
 static int g_field_values[MAX_REPORT_FIELDS];
 static report_map_t g_interface_report_maps[USB_HOST_MAX_INTERFACES] = {0};
-
-typedef struct {
-    hid_host_device_handle_t handle;
-    hid_host_driver_event_t event;
-    void *arg;
-} device_event_t;
-
-typedef struct {
-    hid_host_device_handle_t handle;
-    hid_host_interface_event_t event;
-    void *arg;
-} interface_event_t;
-
-typedef struct {
-    enum {
-        APP_EVENT_HID_DEVICE,
-        APP_EVENT_INTERFACE
-    } event_group;
-    union {
-        device_event_t device_event;
-        interface_event_t interface_event;
-    };
-} hid_event_queue_t;
 
 static void usb_lib_task(void *arg);
 static void hid_host_event_task(void *arg);
@@ -72,18 +52,10 @@ esp_err_t usb_hid_host_init(QueueHandle_t report_queue) {
     }
 
     g_report_queue = report_queue;
-    g_report_maps_mutex = xSemaphoreCreateMutex();
-    if (g_report_maps_mutex == NULL) {
-        ESP_LOGE(TAG, "Failed to create report maps mutex");
-        return ESP_ERR_NO_MEM;
-    }
+    g_report_maps_mutex = xSemaphoreCreateMutexStatic(&g_report_maps_mutex_buffer);
 
     g_device_connected = false;
-    g_event_queue = xQueueCreate(4, sizeof(hid_event_queue_t));
-    if (g_event_queue == NULL) {
-        ESP_LOGE(TAG, "Failed to create event queue");
-        return ESP_ERR_NO_MEM;
-    }
+    g_event_queue = xQueueCreateStatic(4, sizeof(hid_event_queue_t), g_event_queue_array, &g_event_queue_storage);
 
     const usb_host_config_t host_config = {
         .skip_phy_setup = false,
@@ -162,12 +134,8 @@ esp_err_t usb_hid_host_deinit(void) {
         ESP_LOGE(TAG, "Failed to uninstall USB host: %d", ret);
     }
 
-    if (g_event_queue != NULL) {
-        vQueueDelete(g_event_queue);
-        g_event_queue = NULL;
-    }
+    g_event_queue = NULL;
 
-    vSemaphoreDelete(g_report_maps_mutex);
     g_report_queue = NULL;
     g_device_connected = false;
     

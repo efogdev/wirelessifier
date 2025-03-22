@@ -374,7 +374,7 @@ esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report)
     if (!s_connected) {
         return ESP_ERR_INVALID_STATE;
     }
-    
+
     if (check_high_speed_device()) {
         if (s_accumulator_timer == NULL) {
             s_accumulator_timer = xTimerCreate("acc_timer", acc_window, pdTRUE, NULL, accumulator_timer_callback);
