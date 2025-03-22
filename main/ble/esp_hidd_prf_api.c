@@ -44,7 +44,7 @@ esp_err_t esp_hidd_profile_init(void) {
 }
 
 esp_err_t esp_hidd_profile_deinit(void) {
-    uint16_t hidd_svc_hdl = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_SVC];
+    const uint16_t hidd_svc_hdl = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_SVC];
     if (!hidd_le_env.enabled) {
         ESP_LOGE(HID_LE_PRF_TAG, "HID device profile already initialized");
         return ESP_OK;

@@ -108,7 +108,6 @@ typedef union {
     } led_write;
 } esp_hidd_cb_param_t;
 
-
 /**
  * @brief HID device event callback function type
  * @param event : Event type

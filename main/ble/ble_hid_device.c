@@ -54,7 +54,7 @@ static esp_ble_adv_data_t hidd_adv_data = {
     .include_txpower = true,
     .min_interval = 0x6, // slave connection min interval, Time = min_interval * 1.25 msec
     .max_interval = 0x80, // slave connection max interval, Time = max_interval * 1.25 msec
-    .appearance = ESP_BLE_APPEARANCE_HID_MOUSE,
+    .appearance = ESP_BLE_APPEARANCE_GENERIC_HID,
     .manufacturer_len = 0,
     .p_manufacturer_data =  NULL,
     .service_data_len = 0,
@@ -73,15 +73,13 @@ static esp_ble_adv_params_t hidd_adv_params = {
     .adv_filter_policy  = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
 };
 
-static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *param)
+static void hidd_event_callback(const esp_hidd_cb_event_t event, const esp_hidd_cb_param_t *param)
 {
-    switch(event) {
+    switch (event) {
         case ESP_HIDD_EVENT_REG_FINISH: {
             if (param->init_finish.state == ESP_HIDD_INIT_OK) {
-                // Get device name from settings
                 char device_name[32];
                 if (storage_get_string_setting("deviceInfo.name", device_name, sizeof(device_name)) != ESP_OK) {
-                    // Fallback to default name from const.h
                     strcpy(device_name, DEVICE_NAME);
                 }
                 esp_ble_gap_set_device_name(device_name);
@@ -89,10 +87,6 @@ static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *
             }
             break;
         }
-        case ESP_BAT_EVENT_REG: 
-            break;
-        case ESP_HIDD_EVENT_DEINIT_FINISH:
-	        break;
 		case ESP_HIDD_EVENT_BLE_CONNECT: {
             ESP_LOGI(TAG, "ESP_HIDD_EVENT_BLE_CONNECT");
             s_conn_id = param->connect.conn_id;
@@ -106,11 +100,6 @@ static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *
             esp_ble_gap_start_advertising(&hidd_adv_params);
             break;
         }
-        case ESP_HIDD_EVENT_BLE_VENDOR_REPORT_WRITE_EVT: {
-            ESP_LOGI(TAG, "%s, ESP_HIDD_EVENT_BLE_VENDOR_REPORT_WRITE_EVT", __func__);
-            ESP_LOG_BUFFER_HEX(TAG, param->vendor_write.data, param->vendor_write.length);
-            break;
-        }
         case ESP_HIDD_EVENT_BLE_LED_REPORT_WRITE_EVT: {
             ESP_LOGI(TAG, "ESP_HIDD_EVENT_BLE_LED_REPORT_WRITE_EVT");
             ESP_LOG_BUFFER_HEX(TAG, param->led_write.data, param->led_write.length);
@@ -121,7 +110,7 @@ static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *
     }
 }
 
-static void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
+static void gap_event_handler(const esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
 {
     switch (event) {
     case ESP_GAP_BLE_ADV_DATA_SET_COMPLETE_EVT:
@@ -171,7 +160,6 @@ esp_err_t ble_hid_device_init(void)
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
-
     init_global_settings();
 
     char mode_str[16] = {0};
@@ -240,7 +228,6 @@ esp_err_t ble_hid_device_init(void)
     esp_ble_gap_register_callback(gap_event_handler);
     esp_hidd_register_callbacks(hidd_event_callback);
 
-    /* set the security iocap & auth_req & key size & init key response key parameters to the stack*/
     esp_ble_auth_req_t auth_req = ESP_LE_AUTH_REQ_SC_MITM_BOND;
     esp_ble_io_cap_t iocap = ESP_IO_CAP_NONE;           //set the IO capability to No output No input
     uint8_t key_size = 16;      //the key size should be 7~16 bytes
@@ -251,7 +238,7 @@ esp_err_t ble_hid_device_init(void)
     esp_ble_gap_set_security_param(ESP_BLE_SM_MAX_KEY_SIZE, &key_size, sizeof(uint8_t));
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_INIT_KEY, &init_key, sizeof(uint8_t));
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_RSP_KEY, &rsp_key, sizeof(uint8_t));
-    // Set TX power based on settings
+
     char tx_power_str[10];
     esp_power_level_t power_level = ESP_PWR_LVL_N0;
     
@@ -275,7 +262,7 @@ esp_err_t ble_hid_device_init(void)
     esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_DEFAULT, power_level);
     esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, power_level);
     esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_SCAN, power_level);
-    esp_ble_gatt_set_local_mtu(120);
+    esp_ble_gatt_set_local_mtu(48);
     return ESP_OK;
 }
 
@@ -308,7 +295,6 @@ esp_err_t ble_hid_device_deinit(void)
 
 esp_err_t ble_hid_device_start_advertising(void)
 {
-    // Get device name from settings
     char device_name[32];
     if (storage_get_string_setting("deviceInfo.name", device_name, sizeof(device_name)) != ESP_OK) {
         strcpy(device_name, DEVICE_NAME);
@@ -371,11 +357,11 @@ esp_err_t ble_hid_device_send_keyboard_report(const keyboard_report_t *report)
 // goal is to map any high (up to 1000hz) report rate to lower BLE report rate
 esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report)
 {
+    // ESP_LOGI(TAG, "Mouse: X=%d Y=%d wheel=%d pan=%d buttons=%02x", report->x, report->y, report->wheel, report->pan, report->buttons);
+
     if (!s_connected) {
         return ESP_ERR_INVALID_STATE;
     }
-
-    // ESP_LOGI(TAG, "Mouse: X=%d Y=%d wheel=%d pan=%d buttons=%02x", report->x, report->y, report->wheel, report->pan, report->buttons);
 
     if (check_high_speed_device()) {
         if (s_accumulator_timer == NULL) {
