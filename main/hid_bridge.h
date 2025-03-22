@@ -257,7 +257,7 @@ typedef struct {
 
 typedef struct {
     usb_hid_field_attr_t attr;
-    int *values;       // Array of values for this field
+    int *values;
 } usb_hid_field_t;
 
 typedef struct {

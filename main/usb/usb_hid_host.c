@@ -13,9 +13,9 @@
 #include <task_monitor.h>
 #include "descriptor_parser.h"
 
-#define USB_STATS_INTERVAL_SEC 2
-#define HOST_HID_QUEUE_SIZE    4
-#define DEVICE_EVENT_QUEUE_SIZE 8
+#define USB_STATS_INTERVAL_SEC  2
+#define HOST_HID_QUEUE_SIZE     1
+#define DEVICE_EVENT_QUEUE_SIZE 6
 
 static const char *TAG = "usb_hid_host";
 static QueueHandle_t g_report_queue = NULL;
@@ -206,7 +206,7 @@ static void process_report(const uint8_t *const data, const size_t length, const
     xQueueSend(g_report_queue, &g_report, 0);
 }
 
-static uint8_t cur_if_evt_data[128] = {0};
+static uint8_t cur_if_evt_data[64] = {0};
 
 static void hid_host_interface_callback(const hid_host_device_handle_t hid_device_handle,
                                         const hid_host_interface_event_t event, void *arg) {

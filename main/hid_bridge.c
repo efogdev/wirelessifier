@@ -300,22 +300,22 @@ static esp_err_t process_mouse_report(const usb_hid_report_t *report) {
         const usb_hid_field_t *field = &report->fields[i];
         const int value = field->values[0];
 
-        if (field->attr.usage_page == HID_USAGE_PAGE_GENERIC_DESKTOP) {
+        if (field->attr.usage_page == HID_USAGE_PAGE_BUTTONS) {
+            if (field->attr.usage >= 1 && field->attr.usage <= 8 && value) {
+                ble_mouse_report.buttons |= (1 << (field->attr.usage - 1));
+            }
+        } else {
             switch (field->attr.usage) {
                 case HID_USAGE_X:
                     ble_mouse_report.x = value;
-                    break;
+                break;
                 case HID_USAGE_Y:
                     ble_mouse_report.y = value;
-                    break;
+                break;
                 case HID_USAGE_WHEEL:
                     ble_mouse_report.wheel = value;
-                    break;
+                break;
                 default: break;
-            }
-        } else if (field->attr.usage_page == HID_USAGE_PAGE_BUTTONS) {
-            if (field->attr.usage >= 1 && field->attr.usage <= 8 && value) {
-                ble_mouse_report.buttons |= (1 << (field->attr.usage - 1));
             }
         }
     }

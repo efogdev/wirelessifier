@@ -7,7 +7,8 @@
 
 static const char *TAG = "usb_hid_parser";
 
-void parse_report_descriptor(const uint8_t *desc, const size_t length, const uint8_t interface_num, report_map_t *report_map) {
+void parse_report_descriptor(const uint8_t *desc, const size_t length, const uint8_t interface_num,
+                             report_map_t *report_map) {
     uint16_t current_usage_page = 0;
     uint8_t report_size = 0;
     uint8_t report_count = 0;
@@ -19,12 +20,7 @@ void parse_report_descriptor(const uint8_t *desc, const size_t length, const uin
     bool has_usage_range = false;
     uint8_t current_report_id = 0;
     bool is_relative = false;
-    
-    // Initialize report map
-    report_map->num_reports = 0;
-    report_map->collection_depth = 0;
-    
-    // Initialize first report info
+
     report_info_t *current_report = &report_map->reports[0];
     report_map->report_ids[0] = 0;
     report_map->num_reports = 1;
@@ -39,7 +35,7 @@ void parse_report_descriptor(const uint8_t *desc, const size_t length, const uin
         const uint8_t item_size = item & 0x3;
         const uint8_t item_type = (item >> 2) & 0x3;
         const uint8_t item_tag = (item >> 4) & 0xF;
-        
+
         uint32_t data = 0;
         if (item_size > 0) {
             for (uint8_t j = 0; j < item_size && i < length; j++) {
@@ -123,7 +119,9 @@ void parse_report_descriptor(const uint8_t *desc, const size_t length, const uin
                             } else if (has_usage_range && is_variable) {
                                 // Handle variable items with usage range
                                 const uint16_t range_size = usage_maximum - usage_minimum + 1;
-                                for (uint8_t j = 0; j < report_count && j < range_size && current_report->num_fields < MAX_REPORT_FIELDS; j++) {
+                                for (uint8_t j = 0;
+                                     j < report_count && j < range_size && current_report->num_fields < MAX_REPORT_FIELDS;
+                                     j++) {
                                     report_field_info_t *field = &current_report->fields[current_report->num_fields];
                                     field->attr.usage_page = current_usage_page;
                                     field->attr.usage = usage_minimum + j;
@@ -138,16 +136,6 @@ void parse_report_descriptor(const uint8_t *desc, const size_t length, const uin
                                     field->bit_offset = current_report->total_bits;
                                     field->bit_size = report_size;
                                     current_report->total_bits += report_size;
-                                    
-                                    if (field->attr.usage_page == HID_USAGE_PAGE_GENERIC_DESKTOP &&
-                                        (field->attr.usage == HID_USAGE_X || field->attr.usage == HID_USAGE_Y)) {
-                                        current_report->is_mouse = true;
-                                    }
-                                    
-                                    if (field->attr.usage_page == HID_USAGE_KEYPAD) {
-                                        current_report->is_keyboard = true;
-                                    }
-                                    
                                     current_report->num_fields++;
                                 }
                             } else {
@@ -155,15 +143,16 @@ void parse_report_descriptor(const uint8_t *desc, const size_t length, const uin
                                 for (uint8_t j = 0; j < report_count && current_report->num_fields < MAX_REPORT_FIELDS; j++) {
                                     report_field_info_t *field = &current_report->fields[current_report->num_fields];
                                     field->attr.usage_page = current_usage_page;
-                                    
+
                                     if (current_report->usage_stack_pos > j) {
                                         field->attr.usage = current_report->usage_stack[j];
                                     } else if (current_report->usage_stack_pos > 0) {
-                                        field->attr.usage = current_report->usage_stack[current_report->usage_stack_pos - 1];
+                                        field->attr.usage = current_report->usage_stack[
+                                            current_report->usage_stack_pos - 1];
                                     } else {
                                         field->attr.usage = current_usage;
                                     }
-                                    
+
                                     field->attr.report_size = report_size;
                                     field->attr.report_count = 1;
                                     field->attr.logical_min = logical_min;
@@ -184,11 +173,6 @@ void parse_report_descriptor(const uint8_t *desc, const size_t length, const uin
                             has_usage_range = false;
                             usage_minimum = 0;
                             usage_maximum = 0;
-
-                            // If it's a keyboard report, it can't be a mouse
-                            if (current_report->is_keyboard) {
-                                current_report->is_mouse = false;
-                            }
                         }
                         break;
                     case 10: // Collection
@@ -211,20 +195,20 @@ void parse_report_descriptor(const uint8_t *desc, const size_t length, const uin
                         break;
                     case 1: // Logical Minimum
                         if (item_size == 1 && (data & 0x80)) {
-                            logical_min = (int8_t)data;
+                            logical_min = (int8_t) data;
                         } else if (item_size == 2 && (data & 0x8000)) {
-                            logical_min = (int16_t)data;
+                            logical_min = (int16_t) data;
                         } else {
-                            logical_min = (int)data;
+                            logical_min = (int) data;
                         }
                         break;
                     case 2: // Logical Maximum
                         if (item_size == 1 && (data & 0x80)) {
-                            logical_max = (int8_t)data;
+                            logical_max = (int8_t) data;
                         } else if (item_size == 2 && (data & 0x8000)) {
-                            logical_max = (int16_t)data;
+                            logical_max = (int16_t) data;
                         } else {
-                            logical_max = (int)data;
+                            logical_max = (int) data;
                         }
                         break;
                     case 7: // Report Size
@@ -259,6 +243,26 @@ void parse_report_descriptor(const uint8_t *desc, const size_t length, const uin
                 break;
         }
     }
+
+    for (int i = 0; i < report_map->num_reports; i++) {
+        report_info_t *report = &report_map->reports[i];
+        for (int j = 0; j < report->num_fields; j++) {
+            const report_field_info_t *field = &report->fields[j];
+
+            if (field->attr.usage_page == HID_USAGE_PAGE_GENERIC_DESKTOP &&
+                (field->attr.usage == HID_USAGE_X || field->attr.usage == HID_USAGE_Y)) {
+                report->is_mouse = true;
+            }
+
+            if (field->attr.usage_page == HID_USAGE_KEYPAD) {
+                report->is_keyboard = true;
+            }
+        }
+
+        if (report->is_keyboard) {
+            report->is_mouse = false;
+        }
+    }
 }
 
 int extract_field_value(const uint8_t *data, const uint16_t bit_offset, const uint16_t bit_size) {
@@ -270,7 +274,7 @@ int extract_field_value(const uint8_t *data, const uint16_t bit_offset, const ui
     uint16_t byte_offset = bit_offset / 8;
     uint8_t bit_shift = bit_offset % 8;
     uint16_t bits_remaining = bit_size;
-    
+
     if (bit_size == 1) {
         uint8_t byte_value;
         memcpy(&byte_value, &data[byte_offset], sizeof(uint8_t));
@@ -286,7 +290,7 @@ int extract_field_value(const uint8_t *data, const uint16_t bit_offset, const ui
         const int byte_value = (current_byte >> bit_shift) & mask;
         const uint8_t shift_amount = bit_size - bits_remaining;
         value |= (byte_value << shift_amount);
-        
+
         bits_remaining -= bits_to_read;
         byte_offset++;
         bit_shift = 0;
