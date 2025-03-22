@@ -1,5 +1,3 @@
-/* RGB utility functions and LED control
- */
 #ifndef _RGB_UTILS_H
 #define _RGB_UTILS_H
 

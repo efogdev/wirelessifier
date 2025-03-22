@@ -1,12 +1,9 @@
-/**
- * @file descriptor_parser.c
- * @brief USB HID Report Descriptor Parser implementation
- */
-
 #include <stdio.h>
 #include <string.h>
 #include "esp_log.h"
 #include "descriptor_parser.h"
+#include <usb_hid_host.h>
+#include "hid_bridge.h"
 
 static const char *TAG = "usb_hid_parser";
 

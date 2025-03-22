@@ -1,42 +1,12 @@
-/**
- * @file descriptor_parser.h
- * @brief USB HID Report Descriptor Parser
- */
-
 #pragma once
 
 #include <stdint.h>
-#include "usb_hid_host.h"
+#include <usb/hid_host.h>
+#include "hid_bridge.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#define MAX_REPORT_FIELDS 64
-#define MAX_COLLECTION_DEPTH 10
-#define MAX_REPORTS_PER_INTERFACE 10
-
-typedef struct {
-    usb_hid_field_attr_t attr;
-    uint16_t bit_offset;
-    uint16_t bit_size;
-} report_field_info_t;
-
-typedef struct {
-    report_field_info_t fields[MAX_REPORT_FIELDS];
-    uint8_t num_fields;
-    uint16_t total_bits;
-    uint16_t usage_stack[MAX_REPORT_FIELDS];
-    uint8_t usage_stack_pos;
-} report_info_t;
-
-typedef struct {
-    report_info_t reports[MAX_REPORTS_PER_INTERFACE];
-    uint8_t report_ids[MAX_REPORTS_PER_INTERFACE];
-    uint8_t num_reports;
-    uint16_t collection_stack[MAX_COLLECTION_DEPTH];
-    uint8_t collection_depth;
-} report_map_t;
 
 /**
  * @brief Parse a HID report descriptor

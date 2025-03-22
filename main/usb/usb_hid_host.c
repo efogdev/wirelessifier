@@ -1,8 +1,3 @@
-/**
- * @file usb_hid_host.c
- * @brief USB HID Host implementation with full report descriptor support
- */
-
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
@@ -38,6 +33,7 @@ static usb_hid_field_t g_fields[MAX_REPORT_FIELDS];
 static int g_field_values[MAX_REPORT_FIELDS];
 static report_map_t g_interface_report_maps[USB_HOST_MAX_INTERFACES] = {0};
 static bool g_verbose = false;
+static uint8_t g_field_counts[USB_HOST_MAX_INTERFACES][MAX_REPORTS_PER_INTERFACE] = {0};
 
 static void usb_lib_task(void *arg);
 static void hid_host_event_task(void *arg);
@@ -46,6 +42,13 @@ static void hid_host_device_callback(hid_host_device_handle_t hid_device_handle,
 static void hid_host_interface_callback(hid_host_device_handle_t hid_device_handle, hid_host_interface_event_t event, void *arg);
 static void process_device_event(hid_host_device_handle_t hid_device_handle, hid_host_driver_event_t event, void *arg);
 static void process_interface_event(hid_host_device_handle_t hid_device_handle, hid_host_interface_event_t event, void *arg);
+
+uint8_t usb_hid_host_get_num_fields(uint8_t report_id, uint8_t interface_num) {
+    if (interface_num >= USB_HOST_MAX_INTERFACES) {
+        return 0;
+    }
+    return g_field_counts[interface_num][report_id];
+}
 
 esp_err_t usb_hid_host_init(const QueueHandle_t report_queue, const bool verbose) {
     ESP_LOGI(TAG, "Initializing USB HID Host");
@@ -271,6 +274,10 @@ static void process_device_event(const hid_host_device_handle_t hid_device_handl
             ESP_LOGI(TAG, "Got report descriptor, length = %d", desc_len);
             if (xSemaphoreTake(g_report_maps_mutex, portMAX_DELAY) == pdTRUE) {
                 parse_report_descriptor(desc, desc_len, dev_params.iface_num, &g_interface_report_maps[dev_params.iface_num]);
+                const report_map_t *report_map = &g_interface_report_maps[dev_params.iface_num];
+                for (int i = 0; i < report_map->num_reports; i++) {
+                    g_field_counts[dev_params.iface_num][report_map->report_ids[i]] = report_map->reports[i].num_fields;
+                }
                 xSemaphoreGive(g_report_maps_mutex);
             } else {
                 ESP_LOGE(TAG, "Failed to take report maps mutex");
@@ -301,6 +308,7 @@ static void process_interface_event(const hid_host_device_handle_t hid_device_ha
         case HID_HOST_INTERFACE_EVENT_DISCONNECTED:
             ESP_LOGI(TAG, "HID Device Disconnected - Interface: %d", dev_params.iface_num);
             g_device_connected = false;
+            memset(g_field_counts[dev_params.iface_num], 0, sizeof(g_field_counts[dev_params.iface_num]));
             ESP_ERROR_CHECK(hid_host_device_close(hid_device_handle));
             break;
 

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "esp_err.h"
-#include "usb/usb_hid_host.h"
+#include "usb/hid_host.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -206,6 +206,91 @@ typedef uint8_t keyboard_cmd_t;
 typedef uint8_t mouse_cmd_t;
 typedef uint8_t consumer_cmd_t;
 typedef uint8_t key_mask_t;
+
+#define USB_HOST_MAX_INTERFACES     4
+#define USB_HID_MAX_RAW_REPORT_SIZE 64
+#define MAX_REPORT_FIELDS 64
+#define MAX_COLLECTION_DEPTH 10
+#define MAX_REPORTS_PER_INTERFACE 10
+
+typedef struct {
+    hid_host_device_handle_t handle;
+    hid_host_driver_event_t event;
+    void *arg;
+} device_event_t;
+
+typedef struct {
+    hid_host_device_handle_t handle;
+    hid_host_interface_event_t event;
+    void *arg;
+} interface_event_t;
+
+typedef struct {
+    enum {
+        APP_EVENT_HID_DEVICE,
+        APP_EVENT_INTERFACE
+    } event_group;
+    union {
+        device_event_t device_event;
+        interface_event_t interface_event;
+    };
+} hid_event_queue_t;
+
+typedef enum {
+    USB_HID_FIELD_TYPE_INPUT = 0,
+    USB_HID_FIELD_TYPE_OUTPUT = 1,
+    USB_HID_FIELD_TYPE_FEATURE = 2
+} usb_hid_field_type_t;
+
+typedef struct {
+    uint16_t usage_page;
+    uint16_t usage;
+    uint16_t usage_maximum;  // For array fields with usage range
+    uint8_t report_size;    // Size in bits
+    uint8_t report_count;   // Number of data fields
+    int logical_min;
+    int logical_max;
+    bool constant;          // Constant vs Data
+    bool variable;          // Variable vs Array
+    bool relative;          // Relative vs Absolute
+    bool array;            // Array vs Variable
+} usb_hid_field_attr_t;
+
+typedef struct {
+    usb_hid_field_attr_t attr;
+    int *values;       // Array of values for this field
+} usb_hid_field_t;
+
+typedef struct {
+    uint8_t report_id;
+    usb_hid_field_type_t type;
+    uint8_t num_fields;
+    usb_hid_field_t *fields;
+    uint8_t raw[USB_HID_MAX_RAW_REPORT_SIZE];       // Raw report data
+    uint16_t raw_len;      // Length of raw data
+} usb_hid_report_t;
+
+typedef struct {
+    usb_hid_field_attr_t attr;
+    uint16_t bit_offset;
+    uint16_t bit_size;
+} report_field_info_t;
+
+typedef struct {
+    report_field_info_t fields[MAX_REPORT_FIELDS];
+    uint8_t num_fields;
+    uint16_t total_bits;
+    uint16_t usage_stack[MAX_REPORT_FIELDS];
+    uint8_t usage_stack_pos;
+} report_info_t;
+
+typedef struct {
+    report_info_t reports[MAX_REPORTS_PER_INTERFACE];
+    uint8_t report_ids[MAX_REPORTS_PER_INTERFACE];
+    uint8_t num_reports;
+    uint16_t collection_stack[MAX_COLLECTION_DEPTH];
+    uint8_t collection_depth;
+} report_map_t;
 
 /**
  * @brief Initialize HID bridge

@@ -1,15 +1,3 @@
-/**
- * @file usb_hid_host.h
- * @brief USB HID Host interface
- * 
- * This header file defines the interface for the USB HID Host functionality.
- * It provides functions to initialize and deinitialize the USB HID Host,
- * check device connection status, and defines the structures for HID reports.
- * 
- * The implementation follows the architecture described in the USB Host Library documentation,
- * with a Host Library Daemon Task and a Client Task for handling USB events.
- */
-
 #pragma once
 
 // Utility macro for getting minimum of two values
@@ -24,6 +12,7 @@
 #include "freertos/queue.h"
 #include "usb/hid_host.h"
 #include "usb/usb_host.h"
+#include "descriptor_parser.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -61,9 +50,6 @@ static const char* const usage_names_gendesk[] = {
     [0x38] = "Wheel",
     [0x39] = "Hat Switch"
 };
-
-#define USB_HOST_MAX_INTERFACES     4
-#define USB_HID_MAX_RAW_REPORT_SIZE 64
 
 // HID Report Items from HID 1.11 Section 6.2.2
 #define HID_USAGE_PAGE      0x05
@@ -112,63 +98,6 @@ static const char* const usage_names_gendesk[] = {
 #define HID_USAGE_WHEEL      0x38
 #define HID_USAGE_HAT_SWITCH 0x39
 
-typedef struct {
-    hid_host_device_handle_t handle;
-    hid_host_driver_event_t event;
-    void *arg;
-} device_event_t;
-
-typedef struct {
-    hid_host_device_handle_t handle;
-    hid_host_interface_event_t event;
-    void *arg;
-} interface_event_t;
-
-typedef struct {
-    enum {
-        APP_EVENT_HID_DEVICE,
-        APP_EVENT_INTERFACE
-    } event_group;
-    union {
-        device_event_t device_event;
-        interface_event_t interface_event;
-    };
-} hid_event_queue_t;
-
-typedef enum {
-    USB_HID_FIELD_TYPE_INPUT = 0,
-    USB_HID_FIELD_TYPE_OUTPUT = 1,
-    USB_HID_FIELD_TYPE_FEATURE = 2
-} usb_hid_field_type_t;
-
-typedef struct {
-    uint16_t usage_page;
-    uint16_t usage;
-    uint16_t usage_maximum;  // For array fields with usage range
-    uint8_t report_size;    // Size in bits
-    uint8_t report_count;   // Number of data fields
-    int logical_min;
-    int logical_max;
-    bool constant;          // Constant vs Data
-    bool variable;          // Variable vs Array
-    bool relative;          // Relative vs Absolute
-    bool array;            // Array vs Variable
-} usb_hid_field_attr_t;
-
-typedef struct {
-    usb_hid_field_attr_t attr;
-    int *values;       // Array of values for this field
-} usb_hid_field_t;
-
-typedef struct {
-    uint8_t report_id;
-    usb_hid_field_type_t type;
-    uint8_t num_fields;
-    usb_hid_field_t *fields;
-    uint8_t raw[USB_HID_MAX_RAW_REPORT_SIZE];       // Raw report data
-    uint16_t raw_len;      // Length of raw data
-} usb_hid_report_t;
-
 typedef void (*usb_hid_report_callback_t)(usb_hid_report_t *report);
 
 /**
@@ -193,6 +122,14 @@ esp_err_t usb_hid_host_deinit(void);
  * @return true if a USB HID device is connected, false otherwise
  */
 bool usb_hid_host_device_connected(void);
+
+/**
+ * @brief Get the number of fields for a given report ID
+ * @param report_id Report ID to look up
+ * @param interface_num Interface number
+ * @return Number of fields, or 0 if report ID not found
+ */
+uint8_t usb_hid_host_get_num_fields(uint8_t report_id, uint8_t interface_num);
 
 #ifdef __cplusplus
 }
