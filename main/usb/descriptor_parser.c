@@ -260,14 +260,12 @@ int extract_field_value(const uint8_t *data, const uint16_t bit_offset, const ui
     uint8_t bit_shift = bit_offset % 8;
     uint16_t bits_remaining = bit_size;
     
-    // Handle single bit case separately for efficiency
     if (bit_size == 1) {
         uint8_t byte_value;
         memcpy(&byte_value, &data[byte_offset], sizeof(uint8_t));
         return (byte_value >> bit_shift) & 0x01;
     }
 
-    // Process multiple bytes
     while (bits_remaining > 0) {
         uint8_t current_byte;
         memcpy(&current_byte, &data[byte_offset], sizeof(uint8_t));

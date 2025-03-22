@@ -147,8 +147,13 @@ bool usb_hid_host_device_connected(void) {
     return g_device_connected;
 }
 
-
 static void process_report(const uint8_t *const data, const size_t length, const uint8_t interface_num) {
+    char hex_str[length * 3 + 1];
+    hex_str[0] = '\0';
+    for (size_t i = 0; i < length; i++) {
+        sprintf(hex_str + i * 3, "%02X ", data[i]);
+    }
+
     s_current_rps++;
     if (!data || !g_report_queue || length <= 1 || interface_num >= USB_HOST_MAX_INTERFACES) {
         ESP_LOGE(TAG, "Invalid parameters: data=%p, queue=%p, len=%d, iface=%u", data, g_report_queue, length, interface_num);
@@ -166,6 +171,8 @@ static void process_report(const uint8_t *const data, const size_t length, const
     } else if (report_map->num_reports == 1) {
         report_id = report_map->report_ids[0];
     }
+
+    ESP_LOGI(TAG, "HID [%d] %s", report_id, hex_str);
     
     const report_info_t *report_info = NULL;
     for (int i = 0; i < report_map->num_reports; i++) {
