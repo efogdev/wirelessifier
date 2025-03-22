@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Unlicense OR CC0-1.0
  */
 
-
-
 #ifndef __HID_DEVICE_LE_PRF__
 #define __HID_DEVICE_LE_PRF__
 #include <stdbool.h>
@@ -14,6 +12,7 @@
 #include "esp_hidd_prf_api.h"
 #include "esp_gap_ble_api.h"
 #include "hid_dev.h"
+#include "hid_bridge.h"
 
 #define SUPPORT_REPORT_VENDOR                 false
 //HID BLE profile log tag
@@ -63,7 +62,6 @@
 /// Boot Report Notification Configuration Bit Mask
 #define HIDD_LE_REPORT_NTF_CFG_MASK           (0x20)
 
-
 /* HID information flags */
 #define HID_FLAGS_REMOTE_WAKE           0x01      // RemoteWake
 #define HID_FLAGS_NORMALLY_CONNECTABLE  0x02      // NormallyConnectable
@@ -85,11 +83,26 @@
 // HID feature flags
 #define HID_KBD_FLAGS             HID_FLAGS_REMOTE_WAKE
 
-/* HID Report type */
-#define HID_REPORT_TYPE_INPUT       1
-#define HID_REPORT_TYPE_OUTPUT      2
-#define HID_REPORT_TYPE_FEATURE     3
+// HID Consumer Control report bitmasks
+#define HID_CC_RPT_NUMERIC_BITS         0xF0
+#define HID_CC_RPT_CHANNEL_BITS         0xCF
+#define HID_CC_RPT_VOLUME_BITS          0x3F
+#define HID_CC_RPT_BUTTON_BITS          0xF0
+#define HID_CC_RPT_SELECTION_BITS       0xCF
 
+// Macros for the HID Consumer Control 2-byte report
+#define HID_CC_RPT_SET_NUMERIC(s, x)    (s)[0] &= HID_CC_RPT_NUMERIC_BITS;   \
+                                        (s)[0] = (x)
+#define HID_CC_RPT_SET_CHANNEL(s, x)    (s)[0] &= HID_CC_RPT_CHANNEL_BITS;   \
+                                        (s)[0] |= ((x) & 0x03) << 4
+#define HID_CC_RPT_SET_VOLUME_UP(s)     (s)[0] &= HID_CC_RPT_VOLUME_BITS;    \
+                                        (s)[0] |= 0x40
+#define HID_CC_RPT_SET_VOLUME_DOWN(s)   (s)[0] &= HID_CC_RPT_VOLUME_BITS;    \
+                                        (s)[0] |= 0x80
+#define HID_CC_RPT_SET_BUTTON(s, x)     (s)[1] &= HID_CC_RPT_BUTTON_BITS;    \
+                                        (s)[1] |= (x)
+#define HID_CC_RPT_SET_SELECTION(s, x)  (s)[1] &= HID_CC_RPT_SELECTION_BITS; \
+                                        (s)[1] |= ((x) & 0x03) << 4
 
 /// HID Service Attributes Indexes
 enum {
@@ -172,7 +185,6 @@ enum {
     HIDD_LE_IDX_NB,
 };
 
-
 /// Attribute Table Indexes
 enum {
     HIDD_LE_INFO_CHAR,
@@ -241,7 +253,6 @@ typedef struct {
     uint8_t report_char_cfg[HIDD_LE_NB_REPORT_INST_MAX];
 } hidd_feature_t;
 
-
 typedef struct {
     bool                        in_use;
     bool                        congest;
@@ -250,7 +261,6 @@ typedef struct {
     esp_bd_addr_t         remote_bda;
     uint32_t                  trans_id;
     uint8_t                    cur_srvc_id;
-
 } hidd_clcb_t;
 
 // HID report mapping table
@@ -280,17 +290,15 @@ typedef struct {
 } hidd_inst_t;
 
 /// Report Reference structure
-typedef struct
-{
+typedef struct {
     ///Report ID
     uint8_t report_id;
     ///Report Type
     uint8_t report_type;
-}hids_report_ref_t;
+} hids_report_ref_t;
 
 /// HID Information structure
-typedef struct
-{
+typedef struct {
     /// bcdHID
     uint16_t bcdHID;
     /// bCountryCode
