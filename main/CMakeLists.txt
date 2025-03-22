@@ -2,6 +2,7 @@ idf_component_register(
 SRCS "main.c"
      "hid_bridge.c"
      "usb/usb_hid_host.c"
+     "usb/descriptor_parser.c"
      "rgb/rgb_utils.c"
      "ble/ble_hid_device.c"
      "ble/esp_hidd_prf_api.c"
