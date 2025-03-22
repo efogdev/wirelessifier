@@ -17,7 +17,7 @@
 #define PROFILE_NUM            1
 #define PROFILE_APP_IDX        0
 
-static esp_gatts_incl_svc_desc_t incl_svc = {0};
+extern esp_gatts_incl_svc_desc_t incl_svc;
 
 // HID report mapping table
 extern hid_report_map_t hid_rpt_map[HID_NUM_REPORTS];
@@ -26,20 +26,11 @@ extern hid_report_map_t hid_rpt_map[HID_NUM_REPORTS];
 extern const uint8_t hidReportMap[];
 extern uint8_t hidReportMapLen;
 
-static uint8_t hidReportRefMouseIn[HID_REPORT_REF_LEN] =
-        {HID_RPT_ID_MOUSE_IN, HID_REPORT_TYPE_INPUT};
-
-static uint8_t hidReportRefSysCtrlIn[HID_REPORT_REF_LEN] =
-        {HID_RPT_ID_SYS_IN, HID_REPORT_TYPE_INPUT};
-
-static uint8_t hidReportRefConsumerIn[HID_REPORT_REF_LEN] =
-        {HID_RPT_ID_CC_IN, HID_REPORT_TYPE_INPUT};
-
-static uint8_t hidReportRefKeyIn[HID_REPORT_REF_LEN] =
-        {HID_RPT_ID_KEY_IN, HID_REPORT_TYPE_INPUT};
-
-static uint8_t hidReportRefFeature[HID_REPORT_REF_LEN] =
-        {HID_RPT_ID_FEATURE, HID_REPORT_TYPE_FEATURE};
+extern uint8_t hidReportRefMouseIn[HID_REPORT_REF_LEN];
+extern uint8_t hidReportRefSysCtrlIn[HID_REPORT_REF_LEN];
+extern uint8_t hidReportRefConsumerIn[HID_REPORT_REF_LEN];
+extern uint8_t hidReportRefKeyIn[HID_REPORT_REF_LEN];
+extern uint8_t hidReportRefFeature[HID_REPORT_REF_LEN];
 
 // Battery Service Attributes Indexes
 enum {

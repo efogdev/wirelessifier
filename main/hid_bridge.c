@@ -324,7 +324,46 @@ bool hid_bridge_is_ble_paused(void)
 
 esp_err_t hid_bridge_process_report(const usb_hid_report_t *report)
 {
-    // ESP_LOGD(TAG, "Processing HID report (%d fields)", report->num_fields);
+    ESP_LOGI(TAG, "Received HID report (%d fields)", report->num_fields);
+    
+    // for (int i = 0; i < report->num_fields; i++) {
+    //     const usb_hid_field_t *field = &report->fields[i];
+    //     const char *usage_page_desc = "";
+    //     const char *usage_desc = "";
+        
+    //     switch (field->attr.usage_page) {
+    //         case HID_USAGE_PAGE_GENERIC_DESKTOP:
+    //             usage_page_desc = "Generic Desktop";
+    //             switch (field->attr.usage) {
+    //                 case HID_USAGE_MOUSE: usage_desc = "Mouse"; break;
+    //                 case HID_USAGE_KEYBOARD: usage_desc = "Keyboard"; break;
+    //                 case HID_USAGE_X: usage_desc = "X"; break;
+    //                 case HID_USAGE_Y: usage_desc = "Y"; break;
+    //                 case HID_USAGE_WHEEL: usage_desc = "Wheel"; break;
+    //                 case 0x238: usage_desc = "AC Pan"; break;
+    //                 default: usage_desc = "Unknown"; break;
+    //             }
+    //             break;
+    //         case HID_USAGE_PAGE_KEYBOARD:
+    //             usage_page_desc = "Keyboard";
+    //             if (field->attr.usage >= 0xE0 && field->attr.usage <= 0xE7) {
+    //                 usage_desc = "Modifier";
+    //             } else if (field->attr.usage <= 0xA4) {
+    //                 usage_desc = "Key";
+    //             } else {
+    //                 usage_desc = "Unknown";
+    //             }
+    //             break;
+    //         default:
+    //             usage_page_desc = "Unknown";
+    //             usage_desc = "Unknown";
+    //             break;
+    //     }
+        
+    //     ESP_LOGI(TAG, "Field %d: usage_page=%s (0x%x), usage=%s (0x%x), value=%d, logical_min=%d, logical_max=%d",
+    //         i, usage_page_desc, field->attr.usage_page, usage_desc, field->attr.usage, field->values[0], 
+    //         field->attr.logical_min, field->attr.logical_max);
+    // }
 
     if (!s_hid_bridge_initialized) {
         ESP_LOGE(TAG, "HID bridge not initialized");

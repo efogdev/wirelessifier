@@ -9,6 +9,8 @@
 #include "esp_hidd_prf_api.h"
 #include "hid_device_le_prf.h"
 
+esp_gatts_incl_svc_desc_t incl_svc = {0};
+
 /// characteristic presentation information
 struct prf_char_pres_fmt {
     /// Unit (The Unit is a UUID)
@@ -25,6 +27,13 @@ struct prf_char_pres_fmt {
 
 // HID report mapping table
 hid_report_map_t hid_rpt_map[HID_NUM_REPORTS];
+
+// Report reference definitions
+uint8_t hidReportRefMouseIn[HID_REPORT_REF_LEN] = {HID_RPT_ID_MOUSE_IN, HID_REPORT_TYPE_INPUT};
+uint8_t hidReportRefSysCtrlIn[HID_REPORT_REF_LEN] = {HID_RPT_ID_SYS_IN, HID_REPORT_TYPE_INPUT};
+uint8_t hidReportRefConsumerIn[HID_REPORT_REF_LEN] = {HID_RPT_ID_CC_IN, HID_REPORT_TYPE_INPUT};
+uint8_t hidReportRefKeyIn[HID_REPORT_REF_LEN] = {HID_RPT_ID_KEY_IN, HID_REPORT_TYPE_INPUT};
+uint8_t hidReportRefFeature[HID_REPORT_REF_LEN] = {HID_RPT_ID_FEATURE, HID_REPORT_TYPE_FEATURE};
 
 static const uint16_t hid_ccc_default = 0x0100;
 
