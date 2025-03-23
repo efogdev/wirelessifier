@@ -264,6 +264,11 @@ esp_err_t ble_hid_device_init(void) {
 esp_err_t ble_hid_device_deinit(void) {
     esp_err_t ret;
 
+    if (s_accumulator_timer != NULL) {
+        xTimerDelete(s_accumulator_timer, 0);
+        s_accumulator_timer = NULL;
+    }
+
     if ((ret = esp_hidd_profile_deinit()) != ESP_OK) {
         return ret;
     }

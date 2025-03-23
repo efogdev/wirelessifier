@@ -240,8 +240,8 @@ void ws_log(const char* text) {
     const int len = snprintf(buffer, WS_SMALL_MESSAGE_LEN, "{\"type\":\"log\",\"content\":\"%s\"}", text);
     if (len > 0 && len < sizeof(buffer)) {
         ws_send_frame_to_all_clients(buffer, len);
-        free(buffer);
     }
+    free(buffer);
 }
 
 esp_err_t init_device_settings(void) {

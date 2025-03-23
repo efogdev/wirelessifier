@@ -213,7 +213,7 @@ httpd_handle_t start_webserver(void)
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.max_uri_handlers = 7;
-    config.stack_size = 6200;
+    config.stack_size = 3600;
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.lru_purge_enable = true;
     config.recv_wait_timeout = 3;
@@ -232,9 +232,8 @@ httpd_handle_t start_webserver(void)
         
         if (!has_wifi_credentials() || esp_wifi_get_mode(NULL) == WIFI_MODE_APSTA) {
             start_dns_server(&dns_task_handle);
+            httpd_register_uri_handler(server, &redirect);
         }
-
-        httpd_register_uri_handler(server, &redirect);
 
         return server;
     }
@@ -299,5 +298,5 @@ void init_web_services(void)
 {
     ESP_LOGI(HTTP_TAG, "Starting web services task");
     wifi_event_group = xEventGroupCreate();
-    xTaskCreatePinnedToCore(web_services_task, "web_services", 5200, NULL, 8, NULL, 1);
+    xTaskCreatePinnedToCore(web_services_task, "web_services", 3000, NULL, 8, NULL, 1);
 }

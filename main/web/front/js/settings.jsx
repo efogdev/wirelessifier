@@ -241,6 +241,55 @@ const App = () => {
         }, 15000);
     };
 
+    const min = 10;
+    const minp = React.useMemo(() => Math.log(min), []);
+    const maxp = React.useMemo(() => Math.log(100), []);
+    const scale = React.useMemo(() => (maxp - minp) / (100 - min), [maxp, minp]);
+    
+    const toLinear = React.useCallback((logValue) => {
+        return Math.round(((Math.log(logValue) - minp) / scale) + min);
+    }, [minp, scale, min]);
+    
+    const toLog = React.useCallback((linearValue) => {
+        return Math.round(Math.exp(minp + scale * (linearValue - min)));
+    }, [minp, scale, min]);
+
+    const handleFirmwareUpload = () => {
+        const fileInput = fileInputRef.current;
+        if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+            showStatus('Please select a firmware file', 'error');
+            return;
+        }
+
+        const file = fileInput.files[0];
+        const formData = new FormData();
+        formData.append('firmware', file);
+
+        setOtaInProgress(true);
+        setOtaProgress(0);
+        showStatus('Starting firmware upload...', 'info');
+        window.scrollTo(0, 0);
+
+        fetch('/upload', {
+            method: 'POST',
+            body: formData
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error ${response.status}`);
+                }
+                return response.text();
+            })
+            .then(data => {
+                console.log('Upload successful:', data);
+            })
+            .catch(error => {
+                console.error('Upload failed:', error);
+                setOtaInProgress(false);
+                showStatus(`Upload failed: ${error.message}`, 'error');
+            });
+    };
+
     if (loading || !connected) {
         return (
             <div id="loadingContainer">
@@ -456,30 +505,13 @@ const App = () => {
                         <div className="setting-description">
                             Global LED brightness percentage.
                         </div>
-                        {(() => {
-                            const min = 10;
-                            const minp = React.useMemo(() => Math.log(min), []);
-                            const maxp = React.useMemo(() => Math.log(100), []);
-                            const scale = React.useMemo(() => (maxp - minp) / (100 - min), [maxp, minp]);
-                            
-                            const toLinear = React.useCallback((logValue) => {
-                                return Math.round(((Math.log(logValue) - minp) / scale) + min);
-                            }, [minp, scale, min]);
-                            
-                            const toLog = React.useCallback((linearValue) => {
-                                return Math.round(Math.exp(minp + scale * (linearValue - min)));
-                            }, [minp, scale, min]);
-                            
-                            return (
-                                <input
-                                    type="range"
-                                    min="10"
-                                    max="100"
-                                    value={toLinear(settings.led.brightness)}
-                                    onChange={(e) => updateSetting('led', 'brightness', toLog(parseInt(e.target.value)))}
-                                />
-                            );
-                        })()}
+                        <input
+                            type="range"
+                            min="10"
+                            max="100"
+                            value={toLinear(settings.led.brightness)}
+                            onChange={(e) => updateSetting('led', 'brightness', toLog(parseInt(e.target.value)))}
+                        />
                     </div>
                 </div>
 
@@ -514,41 +546,7 @@ const App = () => {
                                     />
                                 </div>
                                 <button
-                                    onClick={() => {
-                                        const fileInput = fileInputRef.current;
-                                        if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
-                                            showStatus('Please select a firmware file', 'error');
-                                            return;
-                                        }
-
-                                        const file = fileInput.files[0];
-                                        const formData = new FormData();
-                                        formData.append('firmware', file);
-
-                                        setOtaInProgress(true);
-                                        setOtaProgress(0);
-                                        showStatus('Starting firmware upload...', 'info');
-                                        window.scrollTo(0, 0);
-
-                                        fetch('/upload', {
-                                            method: 'POST',
-                                            body: formData
-                                        })
-                                            .then(response => {
-                                                if (!response.ok) {
-                                                    throw new Error(`HTTP error ${response.status}`);
-                                                }
-                                                return response.text();
-                                            })
-                                            .then(data => {
-                                                console.log('Upload successful:', data);
-                                            })
-                                            .catch(error => {
-                                                console.error('Upload failed:', error);
-                                                setOtaInProgress(false);
-                                                showStatus(`Upload failed: ${error.message}`, 'error');
-                                            });
-                                    }}
+                                    onClick={handleFirmwareUpload}
                                     disabled={!connected || !fileInputRef.current?.files?.length}
                                 >
                                     Flash

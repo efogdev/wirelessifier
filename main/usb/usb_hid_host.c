@@ -82,8 +82,7 @@ esp_err_t usb_hid_host_init(const QueueHandle_t report_queue, const bool verbose
         return ESP_ERR_NO_MEM;
     }
 
-    BaseType_t task_created = xTaskCreatePinnedToCore(device_event_task, "dev_evt", 2048, NULL, 11,
-                                                      &g_device_task_handle, 1);
+    BaseType_t task_created = xTaskCreatePinnedToCore(device_event_task, "dev_evt", 2048, NULL, 15, &g_device_task_handle, 1);
     if (task_created != pdTRUE) {
         vQueueDelete(g_device_event_queue);
         return ESP_ERR_NO_MEM;
@@ -91,16 +90,23 @@ esp_err_t usb_hid_host_init(const QueueHandle_t report_queue, const bool verbose
 
     g_report_maps_mutex = xSemaphoreCreateMutexStatic(&g_report_maps_mutex_buffer);
     g_device_connected = false;
-
     const usb_host_config_t host_config = {
         .skip_phy_setup = false,
         .intr_flags = ESP_INTR_FLAG_LEVEL1,
     };
 
-    ESP_ERROR_CHECK(usb_host_install(&host_config));
-    task_created = xTaskCreatePinnedToCore(usb_lib_task, "usb_events", 2600, NULL, 12, &g_usb_events_task_handle, 1);
+    esp_err_t err = usb_host_install(&host_config);
+    if (err != ESP_OK) {
+        vTaskDelete(g_device_task_handle);
+        vQueueDelete(g_device_event_queue);
+        return err;
+    }
+
+    task_created = xTaskCreatePinnedToCore(usb_lib_task, "usb_events", 2600, NULL, 13, &g_usb_events_task_handle, 1);
     if (task_created != pdTRUE) {
         usb_host_uninstall();
+        vTaskDelete(g_device_task_handle);
+        vQueueDelete(g_device_event_queue);
         return ESP_ERR_NO_MEM;
     }
 
@@ -305,7 +311,7 @@ static void device_event_task(void *arg) {
 
 static void hid_host_device_callback(const hid_host_device_handle_t hid_device_handle,
                                      const hid_host_driver_event_t event, void *arg) {
-    usb_device_type_event_t evt = {
+    const usb_device_type_event_t evt = {
         .device_handle = hid_device_handle,
         .event = event
     };
@@ -345,7 +351,9 @@ static void usb_stats_task(void *arg) {
 
     while (1) {
         const uint32_t reports_per_sec = (s_current_rps - prev_count) / USB_STATS_INTERVAL_SEC;
-        ESP_LOGI(TAG, "USB: %lu rps", reports_per_sec);
+        if (reports_per_sec > 0) {
+            ESP_LOGI(TAG, "USB: %lu rps", reports_per_sec);
+        }
 
         prev_count = s_current_rps;
         vTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(USB_STATS_INTERVAL_SEC * 1000));
