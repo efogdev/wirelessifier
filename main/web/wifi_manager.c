@@ -547,7 +547,7 @@ static void ws_ping_task(void *pvParameters) {
         // Create JSON with system info
         char ping_data[100];
         snprintf(ping_data, sizeof(ping_data), 
-                "{\"freeHeap\":%lu,\"socTemp\":%.1f}", 
+                "{\"freeHeap\":%lu,\"socTemp\":%.1f}",
                 free_heap, temp);
         
         // Send a ping message to all connected clients
