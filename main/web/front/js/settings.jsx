@@ -331,7 +331,7 @@ const App = () => {
                     </div>
 
                     <div onClick={() => setDeviceInfoExpanded(!deviceInfoExpanded)} className="temp-display">
-                        <h3>{deviceInfoExpanded ? '' : '▼'} {systemInfo.socTemp.toFixed(0)}°C</h3>
+                        <h3>{deviceInfoExpanded ? '' : '▼'} {systemInfo.socTemp.toFixed(1)}°C</h3>
                     </div>
                 </div>
 
