@@ -1,6 +1,6 @@
 # Wirelessifier: USB-to-BLE bridge
 
-**⚠️ This project is currently in development. Functionality is very limited and not complete.**
+**⚠️ This project is currently in development. Functionality is limited.**
 
 ## Overview
 
