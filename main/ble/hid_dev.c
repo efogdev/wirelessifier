@@ -10,10 +10,12 @@ static uint8_t hid_dev_rpt_tbl_Len;
 
 #define CACHE_SIZE 8
 
-static struct {
+typedef struct __attribute__((packed)) {
     uint16_t key; // id << 8 | type
     hid_report_map_t *value;
-} cache[CACHE_SIZE];
+} cache_entry_t;
+
+static cache_entry_t cache[CACHE_SIZE];
 
 static uint8_t cache_size = 0;
 

@@ -4,12 +4,12 @@
 #include "storage.h"
 #include "hid_report_data.h"
 
-struct gatts_profile_inst {
+struct __attribute__((packed)) gatts_profile_inst {
     esp_gatts_cb_t gatts_cb;
     uint16_t gatts_if;
     uint16_t app_id;
     uint16_t conn_id;
-}  PACKED_ATTR;
+};
 
 hidd_le_env_t hidd_le_env;
 uint8_t hidProtocolMode = HID_PROTOCOL_MODE_REPORT;

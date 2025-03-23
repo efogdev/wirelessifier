@@ -22,7 +22,7 @@ static QueueHandle_t g_report_queue = NULL;
 static QueueHandle_t g_device_event_queue = NULL;
 static TaskHandle_t g_device_task_handle = NULL;
 
-typedef struct {
+typedef struct __attribute__((packed)) {
     hid_host_device_handle_t device_handle;
     hid_host_driver_event_t event;
 } usb_device_type_event_t;
@@ -332,4 +332,3 @@ static void usb_stats_task(void *arg) {
         vTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(USB_STATS_INTERVAL_SEC * 1000));
     }
 }
-

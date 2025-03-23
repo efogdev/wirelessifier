@@ -8,18 +8,14 @@
 
 #define SUPPORT_REPORT_VENDOR                 false
 #define HID_LE_PRF_TAG                        "HID_LE_PRF"
-
-/// Maximal number of HIDS that can be added in the DB
 #define HIDD_LE_NB_HIDS_INST_MAX              (1)
+#define HID_NUM_REPORTS          4
 
 #define HIDD_GREAT_VER   0x01  //Version + Subversion
 #define HIDD_SUB_VER     0x00  //Version + Subversion
 #define HIDD_VERSION     ((HIDD_GREAT_VER<<8)|HIDD_SUB_VER)  //Version + Subversion
 
 #define HID_MAX_APPS                 1
-
-#define HID_NUM_REPORTS          4
-
 #define HID_RPT_ID_MOUSE_IN      1   // Mouse input report ID
 #define HID_RPT_ID_KEY_IN        6   // Keyboard input report ID
 #define HID_RPT_ID_CC_IN         4   // Consumer Control input report ID

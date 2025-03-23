@@ -25,8 +25,7 @@
 
 static const char *DNS_TAG = "DNS";
 
-typedef struct PACKED_ATTR
-{
+typedef struct __attribute__((packed)) {
     uint16_t id;
     uint16_t flags;
     uint16_t qd_count;
@@ -40,8 +39,7 @@ typedef struct {
     uint16_t class;
 } dns_question_t;
 
-typedef struct PACKED_ATTR
-{
+typedef struct __attribute__((packed)) {
     uint16_t ptr_offset;
     uint16_t type;
     uint16_t class;
