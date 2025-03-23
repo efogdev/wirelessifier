@@ -1,4 +1,3 @@
-#pragma pack(push, 1)
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
@@ -24,13 +23,13 @@ static const char *TAG = "RGB_UTILS";
 static uint16_t s_current_fps = BASE_FPS;
 uint8_t g_rgb_brightness = 35;
 
-static uint32_t get_cycle_time_ms(const uint8_t speed) {
+__attribute__((section(".text"))) static uint32_t get_cycle_time_ms(const uint8_t speed) {
     if (speed == 0) return MAX_CYCLE_TIME_MS;
     return MIN_CYCLE_TIME_MS + ((MAX_CYCLE_TIME_MS - MIN_CYCLE_TIME_MS) * (100 - speed)) / 100;
 }
 
 // Color utility functions
-static uint32_t color_with_brightness(const uint32_t color, const uint8_t brightness) {
+__attribute__((section(".text"))) static uint32_t color_with_brightness(const uint32_t color, const uint8_t brightness) {
     uint8_t r = (color >> 16) & 0xFF;
     uint8_t g = (color >> 8) & 0xFF;
     uint8_t b = color & 0xFF;
@@ -42,7 +41,7 @@ static uint32_t color_with_brightness(const uint32_t color, const uint8_t bright
     return NP_RGB(r, g, b);
 }
 
-static uint32_t blend_colors(const uint32_t color1, const uint32_t color2, const float blend_factor) {
+__attribute__((section(".text"))) static uint32_t blend_colors(const uint32_t color1, const uint32_t color2, const float blend_factor) {
     const uint8_t r1 = (color1 >> 16) & 0xFF;
     const uint8_t g1 = (color1 >> 8) & 0xFF;
     const uint8_t b1 = color1 & 0xFF;
@@ -58,7 +57,7 @@ static uint32_t blend_colors(const uint32_t color1, const uint32_t color2, const
     return NP_RGB(r, g, b);
 }
 
-static void extract_rgb(const uint32_t color, uint8_t *r, uint8_t *g, uint8_t *b) {
+__attribute__((section(".text"))) static void extract_rgb(const uint32_t color, uint8_t *r, uint8_t *g, uint8_t *b) {
     *r = (color >> 16) & 0xFF;
     *g = (color >> 8) & 0xFF;
     *b = color & 0xFF;
@@ -82,7 +81,7 @@ typedef struct {
     bool direction_up;
 } animation_state_t;
 
-static void update_animation_state(animation_state_t *state, const led_pattern_t *pattern) {
+__attribute__((section(".text"))) static void update_animation_state(animation_state_t *state, const led_pattern_t *pattern) {
     const uint32_t current_time = pdTICKS_TO_MS(xTaskGetTickCount());
     state->cycle_time = get_cycle_time_ms(pattern->speed);
     const uint32_t elapsed = current_time - state->start_time;
@@ -99,7 +98,7 @@ typedef struct {
     status_animation_type_t animation;
 } status_led_state_t;
 
-static void update_status_led_state(status_led_state_t *state, tNeopixel* pixel) {
+__attribute__((section(".text"))) static void update_status_led_state(status_led_state_t *state, tNeopixel* pixel) {
     const uint32_t current_time = pdTICKS_TO_MS(xTaskGetTickCount());
     
     if (state->animation != WIFI_ANIM_NONE) {
@@ -193,14 +192,17 @@ static bool s_in_transition = false;
 static uint32_t s_transition_start_time = 0;
 static tNeopixel* s_previous_state = NULL;
 
-// Status LED state
-static status_led_state_t s_status_led_state = {
+// Status LED state initialization in flash
+static const status_led_state_t s_status_led_state_init __attribute__((section(".rodata"))) = {
     .color = STATUS_COLOR_OFF,
     .mode = STATUS_MODE_OFF,
     .blink_state = false,
     .last_blink_time = 0,
     .animation = WIFI_ANIM_NONE
 };
+
+// Status LED state in RAM
+static status_led_state_t s_status_led_state;
 
 static bool s_wifi_apsta_mode = false;
 static bool s_wifi_connected = false;
@@ -210,7 +212,7 @@ static void led_control_task(void *arg);
 static bool is_task_suspended = false;
 
 // Function to check if the task should be suspended and handle suspension/resumption
-static void check_and_update_task_suspension(void)
+__attribute__((section(".text"))) static void check_and_update_task_suspension(void)
 {
     bool should_suspend = false;
     
@@ -269,6 +271,7 @@ void led_control_init(const int num_leds, const int gpio_pin)
     }
     
     s_num_leds = num_leds;
+    memcpy(&s_status_led_state, &s_status_led_state_init, sizeof(status_led_state_t));
     neopixel_ctx = neopixel_Init(num_leds, gpio_pin);
     if (neopixel_ctx == NULL) {
         ESP_LOGE(TAG, "Failed to initialize NeoPixel");
@@ -387,13 +390,13 @@ void led_update_wifi_status(bool is_apsta_mode, bool is_connected)
     check_and_update_task_suspension();
 }
 
-static void update_status_led(tNeopixel* pixels)
+__attribute__((section(".text"))) static void update_status_led(tNeopixel* pixels)
 {
     pixels[0].index = 0;
     update_status_led_state(&s_status_led_state, &pixels[0]);
 }
 
-static void apply_pattern(tNeopixel* pixels, const led_pattern_t* pattern)
+__attribute__((section(".text"))) static void apply_pattern(tNeopixel* pixels, const led_pattern_t* pattern)
 {
     const int column_length = (s_num_leds - 1) / 2;
     const uint32_t current_color = s_use_secondary_color ? pattern->colors[1] : pattern->colors[0];
@@ -492,12 +495,12 @@ static void apply_pattern(tNeopixel* pixels, const led_pattern_t* pattern)
     }
 }
 
-static void blend_pixel_colors(tNeopixel* dest, const tNeopixel* src1, const tNeopixel* src2, const float blend_factor)
+__attribute__((section(".text"))) static void blend_pixel_colors(tNeopixel* dest, const tNeopixel* src1, const tNeopixel* src2, const float blend_factor)
 {
     dest->rgb = blend_colors(src1->rgb, src2->rgb, blend_factor);
 }
 
-static void led_control_task(void *arg)
+__attribute__((section(".text"))) static void led_control_task(void *arg)
 {
     if (neopixel_ctx == NULL) {
         ESP_LOGE(TAG, "NeoPixel not initialized");
@@ -543,5 +546,3 @@ static void led_control_task(void *arg)
         vTaskDelay(pdMS_TO_TICKS(1000 / s_current_fps));
     }
 }
-
-#pragma pack(pop)

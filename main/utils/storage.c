@@ -1,4 +1,3 @@
-#pragma pack(push, 1)
 #include "storage.h"
 #include <esp_log.h>
 #include <nvs_flash.h>
@@ -417,4 +416,3 @@ esp_err_t storage_set_boot_with_wifi(void) {
     return err;
 }
 
-#pragma pack(pop)

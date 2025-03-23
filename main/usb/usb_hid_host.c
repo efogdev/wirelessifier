@@ -1,4 +1,3 @@
-#pragma pack(push, 1)
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
@@ -334,4 +333,3 @@ static void usb_stats_task(void *arg) {
     }
 }
 
-#pragma pack(pop)
