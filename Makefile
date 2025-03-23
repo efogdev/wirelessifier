@@ -1,10 +1,10 @@
 build:
 	cd main/web/front && bun run build
-	idf.py build flash
+	idf.py build
 
 flash:
-	make build
-	idf.py flash
+	cd main/web/front && bun run build
+	idf.py build flash
 
-erase:
+erase-nvs:
 	parttool.py erase_partition --partition-name nvs
