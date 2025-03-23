@@ -23,6 +23,7 @@ SRCS "main.c"
      "web/front/lib/settings.js"
      "web/front/lib/react-dom.production.min.js"
      "web/front/lib/react.production.min.js"
+     "web/front/lib/opensans-regular.woff2"
   INCLUDE_DIRS "." "ble" "usb" "utils" "web" "web/front"
   REQUIRES neopixel esp_hid bt nvs_flash esp_http_server app_update json
   PRIV_REQUIRES usb)

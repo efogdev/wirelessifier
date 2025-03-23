@@ -5,6 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wirelessifier Configuration</title>
     <style>
+        @font-face {
+            font-family: 'Open Sans';
+            src: url('/lib/opensans_regular.woff2') format('woff2');
+            font-weight: normal;
+            font-style: normal;
+        }
+
         :root {
             --bg-color: #ffffff;
             --text-color: #333333;
@@ -29,11 +36,11 @@
             :root {
                 --bg-color: #1a1a1a;
                 --text-color: #ffffff;
-                --border-color: #444444;
+                --border-color: #333333;
                 --secondary-text: #aaaaaa;
                 --primary-color: #5dc162;
                 --primary-hover: #4da850;
-                --disabled-color: #555555;
+                --disabled-color: #666666;
                 --success-bg: #1e3320;
                 --success-text: #4caf50;
                 --error-bg: #3c1f1f;
@@ -48,7 +55,7 @@
         }
 
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Open Sans', sans-serif;
             max-width: 600px;
             margin: 0 auto;
             padding: 20px;
@@ -164,6 +171,12 @@
 
         input:checked + .slider:before {
             transform: translateX(26px);
+        }
+
+        select {
+            appearance: none; 
+            -webkit-appearance: none;
+            -moz-appearance: none;
         }
 
         select, input[type="number"] {
@@ -283,6 +296,49 @@
             color: var(--text-color);
             border-radius: 4px;
             box-sizing: border-box;
+        }
+
+        /* Header controls */
+        .header-controls {
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .header-controls > div {
+            vertical-align: top;
+        }
+
+        .save-button {
+            margin-top: 0;
+        }
+
+        .return-button {
+            margin-top: 0;
+            margin-left: 10px;
+            background-color: #6c757d;
+        }
+
+        .temp-display {
+            cursor: pointer;
+        }
+
+        .temp-display h3 {
+            margin-top: 8px;
+            margin-bottom: 0;
+        }
+
+        /* Device info panel */
+        .device-info-panel {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 350ms ease-in-out;
+        }
+
+        .device-info-panel.expanded {
+            padding-top: 16px;
+            max-height: 500px;
         }
     </style>
 

@@ -38,6 +38,7 @@ const App = () => {
     const [statusType, setStatusType] = React.useState('info');
     const [otaProgress, setOtaProgress] = React.useState(0);
     const [otaInProgress, setOtaInProgress] = React.useState(false);
+    const [deviceInfoExpanded, setDeviceInfoExpanded] = React.useState(false);
     const socketRef = React.useRef(null);
     const wsCheckIntervalRef = React.useRef(null);
     const fileInputRef = React.useRef(null);
@@ -319,40 +320,47 @@ const App = () => {
                     </div>
                 )}
 
-                <button onClick={saveSettings} disabled={!connected || otaInProgress || (initialSettingsRef.current && JSON.stringify(settings) === initialSettingsRef.current)}>
-                    Save & Reboot
-                </button>
-                <button onClick={() => window.location.href = '/'} style={{marginLeft: '10px', backgroundColor: '#6c757d'}}
-                        disabled={otaInProgress}>
-                    Return
-                </button>
+                <div className="header-controls">
+                    <div>
+                        <button className="save-button" onClick={saveSettings} disabled={!connected || otaInProgress || (initialSettingsRef.current && JSON.stringify(settings) === initialSettingsRef.current)}>
+                            Save & Reboot
+                        </button>
+                        <button className="return-button" onClick={() => window.location.href = '/'} disabled={otaInProgress}>
+                            Return
+                        </button>
+                    </div>
+
+                    <div onClick={() => setDeviceInfoExpanded(!deviceInfoExpanded)} className="temp-display">
+                        <h3>{deviceInfoExpanded ? '▼(but left)' : '▼'} {systemInfo.socTemp.toFixed(0)}°C</h3>
+                    </div>
+                </div>
 
                 <div className="setting-group">
-                    <h2>Device Information</h2>
+                    <div className={`device-info-panel ${deviceInfoExpanded ? 'expanded' : ''}`}>
+                        <div className="setting-item">
+                            <div className="setting-title">Firmware version</div>
+                            <div>{settings.deviceInfo.firmwareVersion}</div>
+                        </div>
 
-                    <div className="setting-item">
-                        <div className="setting-title">Firmware version</div>
-                        <div>{settings.deviceInfo.firmwareVersion}</div>
-                    </div>
+                        <div className="setting-item">
+                            <div className="setting-title">Hardware revision</div>
+                            <div>{settings.deviceInfo.hardwareVersion}</div>
+                        </div>
 
-                    <div className="setting-item">
-                        <div className="setting-title">Hardware revision</div>
-                        <div>{settings.deviceInfo.hardwareVersion}</div>
-                    </div>
+                        <div className="setting-item">
+                            <div className="setting-title">MAC address</div>
+                            <div>{settings.deviceInfo.macAddress}</div>
+                        </div>
 
-                    <div className="setting-item">
-                        <div className="setting-title">MAC address</div>
-                        <div>{settings.deviceInfo.macAddress}</div>
-                    </div>
+                        <div className="setting-item">
+                            <div className="setting-title">Free heap</div>
+                            <div>{(systemInfo.freeHeap / 1000).toFixed(0)} kb</div>
+                        </div>
 
-                    <div className="setting-item">
-                        <div className="setting-title">Free heap</div>
-                        <div>{(systemInfo.freeHeap / 1000).toFixed(0)} kb</div>
-                    </div>
-
-                    <div className="setting-item">
-                        <div className="setting-title">SoC temperature</div>
-                        <div>{systemInfo.socTemp.toFixed(0)}°C</div>
+                        <div className="setting-item">
+                            <div className="setting-title">SoC temperature</div>
+                            <div>{systemInfo.socTemp.toFixed(0)}°C</div>
+                        </div>
                     </div>
                 </div>
 
@@ -516,7 +524,7 @@ const App = () => {
                 </div>
 
                 <div className="setting-group">
-                    <h2>Firmware Update</h2>
+                    <h2>Firmware</h2>
 
                     <div className="setting-item">
                         <div className="setting-description">

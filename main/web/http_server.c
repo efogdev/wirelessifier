@@ -75,6 +75,14 @@ static esp_err_t lib_get_handler(httpd_req_t *req)
         httpd_resp_set_type(req, "application/javascript");
         httpd_resp_send(req, web_front_lib_settings_js_start, js_size);
     }
+    else if (strstr(req_uri, "opensans_regular.woff2")) {
+        extern const char web_front_lib_opensans_regular_woff2_start[] asm("_binary_opensans_regular_woff2_start");
+        extern const char web_front_lib_opensans_regular_woff2_end[] asm("_binary_opensans_regular_woff2_end");
+        const size_t js_size = (web_front_lib_opensans_regular_woff2_end - web_front_lib_opensans_regular_woff2_start) - 1;
+
+        httpd_resp_set_type(req, "font/woff2");
+        httpd_resp_send(req, web_front_lib_opensans_regular_woff2_start, js_size);
+    }
     else {
         return ESP_ERR_NOT_FOUND;
     }
