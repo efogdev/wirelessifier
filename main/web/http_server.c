@@ -15,9 +15,10 @@
 static const char *HTTP_TAG = "HTTP";
 static httpd_handle_t server = NULL;
 static TaskHandle_t dns_task_handle = NULL;
+static TaskHandle_t web_services_task_handle = NULL;
 EventGroupHandle_t wifi_event_group;
 
-#define WIFI_SSID      "AnyBLE WEB"
+#define WIFI_SSID      "Wirelessifier"
 #define WIFI_CHANNEL   1
 #define MAX_CONN       4
 
@@ -32,7 +33,6 @@ static esp_err_t root_get_handler(httpd_req_t *req)
     
     httpd_resp_set_type(req, "text/html");
     httpd_resp_send(req, web_front_index_html_start, index_html_size);
-    
     return ESP_OK;
 }
 
@@ -44,7 +44,6 @@ static esp_err_t settings_get_handler(httpd_req_t *req)
     
     httpd_resp_set_type(req, "text/html");
     httpd_resp_send(req, web_front_settings_html_start, settings_html_size);
-    
     return ESP_OK;
 }
 
@@ -124,10 +123,10 @@ extern int s_retry_num;
 
 static void event_handler(void*, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
+    if (!is_wifi_enabled()) return;
+
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
-        if (has_wifi_credentials()) {
-            esp_wifi_connect();
-        }
+        if (has_wifi_credentials()) esp_wifi_connect();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
         ESP_LOGI(HTTP_TAG, "WIFI_EVENT_STA_DISCONNECTED");
         
@@ -251,6 +250,11 @@ void stop_webserver(void)
         server = NULL;
     }
     
+    if (web_services_task_handle) {
+        vTaskDelete(web_services_task_handle);
+        web_services_task_handle = NULL;
+    }
+
     if (dns_task_handle) {
         vTaskDelete(dns_task_handle);
         dns_task_handle = NULL;
@@ -300,5 +304,5 @@ void init_web_services(void)
 {
     ESP_LOGI(HTTP_TAG, "Starting web services task");
     wifi_event_group = xEventGroupCreate();
-    xTaskCreatePinnedToCore(web_services_task, "web_services", 3000, NULL, 8, NULL, 1);
+    xTaskCreatePinnedToCore(web_services_task, "web_services", 3000, NULL, 8, &web_services_task_handle, 1);
 }

@@ -32,6 +32,7 @@ static const char *WIFI_TAG = "WIFI_MGR";
 int s_retry_num = 0;
 static bool connecting = false;
 static bool s_web_stack_disabled = false;
+static TaskHandle_t ping_task_handle = NULL;
 
 // WiFi connection status
 static bool is_connected = false;
@@ -362,23 +363,27 @@ void disable_wifi_and_web_stack(void) {
     is_connected = false;
     s_retry_num = MAX_RETRY;
 
+    // Update LED status
     led_update_wifi_status(false, false);
     led_update_status(0, 0);
-    vTaskDelay(pdMS_TO_TICKS(50));
 
+    // Send final WebSocket message before cleanup
     ws_broadcast_json("web_stack_disabled", "{}");
-    stop_webserver();
     vTaskDelay(pdMS_TO_TICKS(50));
 
+    if (ping_task_handle != NULL && eTaskGetState(ping_task_handle) != eDeleted) {
+        vTaskDelete(ping_task_handle);
+        ping_task_handle = NULL;
+    }
+
+    // Stop and cleanup web server components
+    stop_webserver(); 
+    esp_wifi_disconnect();
     esp_wifi_stop();
     esp_wifi_deinit();
-    vTaskDelay(pdMS_TO_TICKS(50));
-
-    esp_netif_destroy_default_wifi(esp_netif_get_default_netif());
-    esp_netif_destroy(esp_netif_get_default_netif());
     esp_netif_deinit();
-    vTaskDelay(pdMS_TO_TICKS(50));
 
+    // Clear boot with WiFi flag in NVS
     nvs_handle_t nvs_handle;
     const esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
     if (err == ESP_OK) {
@@ -388,8 +393,17 @@ void disable_wifi_and_web_stack(void) {
         ESP_LOGI(WIFI_TAG, "Cleared boot with WiFi flag");
     }
 
+    // Final LED status update
     led_update_wifi_status(false, false);
     led_update_status(0, 0);
+
+    // Free any global buffers
+    if (wifi_event_group) {
+        vEventGroupDelete(wifi_event_group);
+        wifi_event_group = NULL;
+    }
+
+    ESP_LOGI(WIFI_TAG, "WiFi and web stack disabled and cleaned up");
 }
 
 // Reboot the device
@@ -549,8 +563,6 @@ static void ws_ping_task(void *pvParameters) {
 
 // Start the WebSocket ping task
 void start_ws_ping_task(void) {
-    static TaskHandle_t ping_task_handle = NULL;
-    
     // Only create the task if it doesn't already exist
     if (ping_task_handle == NULL) {
         const BaseType_t result = xTaskCreatePinnedToCore(ws_ping_task,
