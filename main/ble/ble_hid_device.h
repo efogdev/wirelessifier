@@ -3,12 +3,12 @@
 #include <stdbool.h>
 #include "esp_err.h"
 
-typedef struct {
+typedef struct __attribute__((packed)) {
     uint8_t modifier;
     uint32_t keycodes;
 } keyboard_report_t;
 
-typedef struct {
+typedef struct __attribute__((packed)) {
     uint8_t buttons;
     uint16_t x;
     uint16_t y;

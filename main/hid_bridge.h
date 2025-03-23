@@ -7,6 +7,12 @@
 extern "C" {
 #endif
 
+#define USB_HOST_MAX_INTERFACES     4
+#define USB_HID_MAX_RAW_REPORT_SIZE 48
+#define MAX_REPORT_FIELDS 64
+#define MAX_COLLECTION_DEPTH 8
+#define MAX_REPORTS_PER_INTERFACE 8
+
 // HID Report Types
 #define HID_TYPE_INPUT       1
 #define HID_TYPE_OUTPUT      2
@@ -205,12 +211,6 @@ typedef uint8_t keyboard_cmd_t;
 typedef uint8_t mouse_cmd_t;
 typedef uint8_t consumer_cmd_t;
 typedef uint8_t key_mask_t;
-
-#define USB_HOST_MAX_INTERFACES     4
-#define USB_HID_MAX_RAW_REPORT_SIZE 64
-#define MAX_REPORT_FIELDS 64
-#define MAX_COLLECTION_DEPTH 10
-#define MAX_REPORTS_PER_INTERFACE 10
 
 typedef struct {
     hid_host_device_handle_t handle;

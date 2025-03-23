@@ -45,7 +45,7 @@ typedef union {
     /**
 	 * @brief ESP_HIDD_EVENT_INIT_FINISH
 	 */
-    struct hidd_init_finish_evt_param {
+    struct __attribute__((packed)) hidd_init_finish_evt_param {
         esp_hidd_init_state_t state;				/*!< Initial status */
         esp_gatt_if_t gatts_if;
     } init_finish;							      /*!< HID callback param of ESP_HIDD_EVENT_INIT_FINISH */
@@ -53,14 +53,14 @@ typedef union {
     /**
 	 * @brief ESP_HIDD_EVENT_DEINIT_FINISH
 	 */
-    struct hidd_deinit_finish_evt_param {
+    struct __attribute__((packed)) hidd_deinit_finish_evt_param {
         esp_hidd_deinit_state_t state;				/*!< De-initial status */
     } deinit_finish;								/*!< HID callback param of ESP_HIDD_EVENT_DEINIT_FINISH */
 
     /**
      * @brief ESP_HIDD_EVENT_CONNECT
 	 */
-    struct hidd_connect_evt_param {
+    struct __attribute__((packed)) hidd_connect_evt_param {
         uint16_t conn_id;
         esp_bd_addr_t remote_bda;                   /*!< HID Remote bluetooth connection index */
     } connect;									    /*!< HID callback param of ESP_HIDD_EVENT_CONNECT */
@@ -68,14 +68,14 @@ typedef union {
     /**
      * @brief ESP_HIDD_EVENT_DISCONNECT
 	 */
-    struct hidd_disconnect_evt_param {
+    struct __attribute__((packed)) hidd_disconnect_evt_param {
         esp_bd_addr_t remote_bda;                   /*!< HID Remote bluetooth device address */
     } disconnect;									/*!< HID callback param of ESP_HIDD_EVENT_DISCONNECT */
 
     /**
      * @brief ESP_HIDD_EVENT_BLE_VENDOR_REPORT_WRITE_EVT
 	 */
-    struct hidd_vendor_write_evt_param {
+    struct __attribute__((packed)) hidd_vendor_write_evt_param {
         uint16_t conn_id;                           /*!< HID connection index */
         uint16_t report_id;                         /*!< HID report index */
         uint16_t length;                            /*!< data length */
@@ -85,7 +85,7 @@ typedef union {
     /**
      * @brief ESP_HIDD_EVENT_BLE_LED_REPORT_WRITE_EVT
      */
-    struct hidd_led_write_evt_param {
+    struct __attribute__((packed)) hidd_led_write_evt_param {
         uint16_t conn_id;
         uint8_t report_id;
         uint8_t length;

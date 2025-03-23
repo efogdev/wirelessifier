@@ -30,7 +30,7 @@ typedef enum {
 } led_animation_type_t;
 
 // LED pattern structure
-typedef struct {
+typedef struct __attribute__((packed)) {
     uint32_t colors[2];           // Primary and secondary colors (for alternating patterns)
     led_animation_type_t type;    // Animation type
     uint8_t trail_length;         // Length of the trail for running light (1-255)

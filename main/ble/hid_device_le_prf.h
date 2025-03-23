@@ -231,7 +231,7 @@ enum {
 #define HIDD_LE_CLEANUP_FNCT        (NULL)
 
 /// HIDD Features structure
-typedef struct {
+typedef struct __attribute__((packed)) {
     /// Service Features
     uint8_t svc_features;
     /// Number of Report Char. instances to add in the database
@@ -240,7 +240,7 @@ typedef struct {
     uint8_t report_char_cfg[HIDD_LE_NB_REPORT_INST_MAX];
 } hidd_feature_t;
 
-typedef struct {
+typedef struct __attribute__((packed)) {
     bool in_use;
     bool congest;
     uint16_t conn_id;
@@ -251,7 +251,7 @@ typedef struct {
 } hidd_clcb_t;
 
 // HID report mapping table
-typedef struct {
+typedef struct __attribute__((packed)) {
     uint16_t handle; // Handle of report characteristic
     uint16_t cccdHandle; // Handle of CCCD for report characteristic
     uint8_t id; // Report ID
@@ -259,7 +259,7 @@ typedef struct {
     uint8_t mode; // Protocol mode (report or boot)
 } hidRptMap_t;
 
-typedef struct {
+typedef struct __attribute__((packed)) {
     /// hidd profile id
     uint8_t app_id;
     /// Notified handle
@@ -277,7 +277,7 @@ typedef struct {
 } hidd_inst_t;
 
 /// Report Reference structure
-typedef struct {
+typedef struct __attribute__((packed)) {
     ///Report ID
     uint8_t report_id;
     ///Report Type
@@ -285,7 +285,7 @@ typedef struct {
 } hids_report_ref_t;
 
 /// HID Information structure
-typedef struct {
+typedef struct __attribute__((packed)) {
     /// bcdHID
     uint16_t bcdHID;
     /// bCountryCode
@@ -295,7 +295,7 @@ typedef struct {
 } hids_hid_info_t;
 
 /* service engine control block */
-typedef struct {
+typedef struct __attribute__((packed)) {
     hidd_clcb_t hidd_clcb[HID_MAX_APPS]; /* connection link*/
     esp_gatt_if_t gatt_if;
     bool enabled;

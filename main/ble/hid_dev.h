@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-typedef struct
+typedef struct __attribute__((packed))
 {
   uint16_t    handle;           // Handle of report characteristic
   uint16_t    cccdHandle;       // Handle of CCCD for report characteristic
@@ -17,7 +17,7 @@ typedef struct
   uint8_t     mode;             // Protocol mode (report or boot)
 } hid_report_map_t;
 
-typedef struct
+typedef struct __attribute__((packed))
 {
   uint32_t    idleTimeout;      // Idle timeout in milliseconds
   uint8_t     hidFlags;         // HID feature flags
