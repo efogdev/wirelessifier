@@ -68,8 +68,16 @@ esp_err_t usb_hid_host_init(const QueueHandle_t report_queue, const bool verbose
     }
 
     if (verbose) {
-        ESP_ERROR_CHECK(task_monitor_init());
-        ESP_ERROR_CHECK(task_monitor_start());
+        esp_err_t err = task_monitor_init();
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to init task monitor: %d", err);
+            return err;
+        }
+        err = task_monitor_start();
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to start task monitor: %d", err);
+            return err;
+        }
 
         xTaskCreatePinnedToCore(usb_stats_task, "usb_stats", 2048, NULL, 5, &g_stats_task_handle, 1);
     }
@@ -228,13 +236,21 @@ static void hid_host_interface_callback(const hid_host_device_handle_t hid_devic
                                         const hid_host_interface_event_t event, void *arg) {
     static size_t data_length = 0;
     static hid_host_dev_params_t dev_params;
+    esp_err_t err;
 
-    ESP_ERROR_CHECK(hid_host_device_get_params(hid_device_handle, &dev_params));
+    err = hid_host_device_get_params(hid_device_handle, &dev_params);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to get device params: %d", err);
+        return;
+    }
+
     switch (event) {
         case HID_HOST_INTERFACE_EVENT_INPUT_REPORT:
-            ESP_ERROR_CHECK(
-                hid_host_device_get_raw_input_report_data(hid_device_handle, cur_if_evt_data, sizeof(cur_if_evt_data), &
-                    data_length));
+            err = hid_host_device_get_raw_input_report_data(hid_device_handle, cur_if_evt_data, sizeof(cur_if_evt_data), &data_length);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to get raw input report: %d", err);
+                return;
+            }
             process_report(cur_if_evt_data, data_length, dev_params.iface_num);
             break;
 
@@ -245,7 +261,10 @@ static void hid_host_interface_callback(const hid_host_device_handle_t hid_devic
             last_report_info = NULL;
             last_report_id = 0;
             last_interface = 0;
-            ESP_ERROR_CHECK(hid_host_device_close(hid_device_handle));
+            err = hid_host_device_close(hid_device_handle);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to close device: %d", err);
+            }
             break;
 
         case HID_HOST_INTERFACE_EVENT_TRANSFER_ERROR:
@@ -260,11 +279,16 @@ static void hid_host_interface_callback(const hid_host_device_handle_t hid_devic
 
 static void device_event_task(void *arg) {
     usb_device_type_event_t evt;
+    esp_err_t err;
 
     while (1) {
         if (xQueueReceive(g_device_event_queue, &evt, portMAX_DELAY) == pdTRUE) {
             hid_host_dev_params_t dev_params;
-            ESP_ERROR_CHECK(hid_host_device_get_params(evt.device_handle, &dev_params));
+            err = hid_host_device_get_params(evt.device_handle, &dev_params);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to get device params: %d", err);
+                continue;
+            }
 
             if (evt.event == HID_HOST_DRIVER_EVENT_CONNECTED) {
                 const hid_host_device_config_t dev_config = {
@@ -272,10 +296,24 @@ static void device_event_task(void *arg) {
                     .callback_arg = NULL
                 };
 
-                ESP_ERROR_CHECK(hid_host_device_open(evt.device_handle, &dev_config));
-                ESP_ERROR_CHECK(hid_class_request_set_protocol(evt.device_handle, HID_REPORT_PROTOCOL_REPORT));
+                err = hid_host_device_open(evt.device_handle, &dev_config);
+                if (err != ESP_OK) {
+                    ESP_LOGE(TAG, "Failed to open device: %d", err);
+                    continue;
+                }
+
+                err = hid_class_request_set_protocol(evt.device_handle, HID_REPORT_PROTOCOL_REPORT);
+                if (err != ESP_OK) {
+                    ESP_LOGE(TAG, "Failed to set protocol: %d", err);
+                    continue;
+                }
+
                 if (HID_PROTOCOL_KEYBOARD == dev_params.proto) {
-                    ESP_ERROR_CHECK(hid_class_request_set_idle(evt.device_handle, 0, 0));
+                    err = hid_class_request_set_idle(evt.device_handle, 0, 0);
+                    if (err != ESP_OK) {
+                        ESP_LOGE(TAG, "Failed to set idle: %d", err);
+                        continue;
+                    }
                 }
 
                 size_t desc_len;
@@ -299,7 +337,11 @@ static void device_event_task(void *arg) {
                     }
                 }
 
-                ESP_ERROR_CHECK(hid_host_device_start(evt.device_handle));
+                err = hid_host_device_start(evt.device_handle);
+                if (err != ESP_OK) {
+                    ESP_LOGE(TAG, "Failed to start device: %d", err);
+                    continue;
+                }
                 g_device_connected = true;
             } else {
                 ESP_LOGI(TAG, "Unknown device event, subclass = %d, proto = %s, iface = %d",
@@ -321,12 +363,22 @@ static void hid_host_device_callback(const hid_host_device_handle_t hid_device_h
 
 static void usb_lib_task(void *arg) {
     ESP_LOGI(TAG, "USB Library task started");
+    esp_err_t err;
+
     while (1) {
         uint32_t event_flags;
-        usb_host_lib_handle_events(portMAX_DELAY, &event_flags);
+        err = usb_host_lib_handle_events(portMAX_DELAY, &event_flags);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "USB host lib handle events failed: %d", err);
+            continue;
+        }
+
         if (event_flags & USB_HOST_LIB_EVENT_FLAGS_NO_CLIENTS) {
             ESP_LOGI(TAG, "No more clients, freeing USB devices");
-            ESP_ERROR_CHECK(usb_host_device_free_all());
+            err = usb_host_device_free_all();
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to free all USB devices: %d", err);
+            }
             break;
         }
     }
@@ -341,7 +393,10 @@ static void usb_lib_task(void *arg) {
         g_device_event_queue = NULL;
     }
     vTaskDelay(10);
-    ESP_ERROR_CHECK(usb_host_uninstall());
+    err = usb_host_uninstall();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to uninstall USB host: %d", err);
+    }
     vTaskDelete(NULL);
 }
 
