@@ -456,13 +456,30 @@ const App = () => {
                         <div className="setting-description">
                             Global LED brightness percentage.
                         </div>
-                        <input
-                            type="range"
-                            min="0"
-                            max="100"
-                            value={settings.led.brightness}
-                            onChange={(e) => updateSetting('led', 'brightness', parseInt(e.target.value))}
-                        />
+                        {(() => {
+                            const min = 10;
+                            const minp = React.useMemo(() => Math.log(min), []);
+                            const maxp = React.useMemo(() => Math.log(100), []);
+                            const scale = React.useMemo(() => (maxp - minp) / (100 - min), [maxp, minp]);
+                            
+                            const toLinear = React.useCallback((logValue) => {
+                                return Math.round(((Math.log(logValue) - minp) / scale) + min);
+                            }, [minp, scale, min]);
+                            
+                            const toLog = React.useCallback((linearValue) => {
+                                return Math.round(Math.exp(minp + scale * (linearValue - min)));
+                            }, [minp, scale, min]);
+                            
+                            return (
+                                <input
+                                    type="range"
+                                    min="10"
+                                    max="100"
+                                    value={toLinear(settings.led.brightness)}
+                                    onChange={(e) => updateSetting('led', 'brightness', toLog(parseInt(e.target.value)))}
+                                />
+                            );
+                        })()}
                     </div>
                 </div>
 
