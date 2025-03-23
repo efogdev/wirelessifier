@@ -25,7 +25,7 @@
 
 static const char *DNS_TAG = "DNS";
 
-typedef struct __attribute__((__packed__))
+typedef struct PACKED_ATTR
 {
     uint16_t id;
     uint16_t flags;
@@ -40,7 +40,7 @@ typedef struct {
     uint16_t class;
 } dns_question_t;
 
-typedef struct __attribute__((__packed__))
+typedef struct PACKED_ATTR
 {
     uint16_t ptr_offset;
     uint16_t type;
@@ -50,7 +50,7 @@ typedef struct __attribute__((__packed__))
     uint32_t ip_addr;
 } dns_answer_t;
 
-static inline char *parse_dns_name(char *raw_name, char *parsed_name, const size_t parsed_name_max_len)  // Made inline for performance
+static char *parse_dns_name(char *raw_name, char *parsed_name, const size_t parsed_name_max_len)  // Made  for performance
 {
     char *label = raw_name;
     char *name_itr = parsed_name;
@@ -142,16 +142,14 @@ static void dns_server_task(void *pvParameters)
 
     char rx_buffer[DNS_MAX_LEN];  // Using defined max length
     char addr_str[DNS_NAME_MAX_LEN];  // Using defined max length
-    int addr_family;
-    int ip_protocol;
 
     while (1) {
         struct sockaddr_in dest_addr;
         dest_addr.sin_addr.s_addr = htonl(INADDR_ANY);
         dest_addr.sin_family = AF_INET;
         dest_addr.sin_port = htons(DNS_PORT);
-        addr_family = AF_INET;
-        ip_protocol = IPPROTO_IP;
+        int addr_family = AF_INET;
+        int ip_protocol = IPPROTO_IP;
         inet_ntoa_r(dest_addr.sin_addr, addr_str, sizeof(addr_str) - 1);
 
         const int sock = socket(addr_family, SOCK_DGRAM, ip_protocol);
@@ -176,31 +174,25 @@ static void dns_server_task(void *pvParameters)
                 close(sock);
                 break;
             }
+
             // Data received
-            else {
-                // Get the sender's ip address as string
-                inet_ntoa_r(source_addr.sin_addr.s_addr, addr_str, sizeof(addr_str) - 1);
+            // Get the sender's ip address as string
+            inet_ntoa_r(source_addr.sin_addr.s_addr, addr_str, sizeof(addr_str) - 1);
 
-                char reply[DNS_MAX_LEN];
-                const int reply_len = parse_dns_request(rx_buffer, len, reply, DNS_MAX_LEN);
+            char reply[DNS_MAX_LEN];
+            const int reply_len = parse_dns_request(rx_buffer, len, reply, DNS_MAX_LEN);
 
-                if (reply_len > 0) {
-                    err = sendto(sock, reply, reply_len, 0, (struct sockaddr *)&source_addr, sizeof(source_addr));
-                    if (err < 0) {
-                        ESP_LOGE(DNS_TAG, "Error sending DNS response: errno %d", errno);
-                        break;
-                    }
+            if (reply_len > 0) {
+                err = sendto(sock, reply, reply_len, 0, (struct sockaddr *)&source_addr, sizeof(source_addr));
+                if (err < 0) {
+                    ESP_LOGE(DNS_TAG, "Error sending DNS response: errno %d", errno);
+                    break;
                 }
             }
-            vTaskDelay(pdMS_TO_TICKS(32));
+            vTaskDelay(pdMS_TO_TICKS(12));
         }
 
-        if (sock != -1) {
-            ESP_LOGE(DNS_TAG, "Shutting down socket");
-            shutdown(sock, 0);
-            close(sock);
-        }
-        vTaskDelay(pdMS_TO_TICKS(32));
+        vTaskDelay(pdMS_TO_TICKS(12));
     }
     vTaskDelete(NULL);
 }
@@ -208,5 +200,5 @@ static void dns_server_task(void *pvParameters)
 void start_dns_server(TaskHandle_t *dns_task_handle)
 {
     vTaskDelay(pdMS_TO_TICKS(350));
-    xTaskCreatePinnedToCore(&dns_server_task, "dns_server", 2400, NULL, 5, dns_task_handle, 1);
+    xTaskCreatePinnedToCore(&dns_server_task, "dns_server", 2400, NULL, 3, dns_task_handle, 1);
 }

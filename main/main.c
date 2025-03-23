@@ -14,11 +14,11 @@
 #include "usb/usb_hid_host.h"
 #include "ble_hid_device.h"
 #include "hid_bridge.h"
-#include "rgb/rgb_utils.h"
+#include "utils/rgb_leds.h"
 #include "utils/storage.h"
 #include "web/http_server.h"
 
-#define VERBOSE 0
+#define VERBOSE 1
 #define GPIO_RESET_PIN GPIO_NUM_16
 #define GPIO_WS2812B_PIN GPIO_NUM_38
 #define GPIO_BUTTON_SW4 GPIO_NUM_13

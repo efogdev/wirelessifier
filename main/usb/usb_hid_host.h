@@ -1,4 +1,5 @@
 #pragma once
+#pragma pack(push, 1)
 
 // Utility macro for getting minimum of two values
 #ifndef MIN
@@ -133,3 +134,6 @@ uint8_t usb_hid_host_get_num_fields(uint8_t report_id, uint8_t interface_num);
 #ifdef __cplusplus
 }
 #endif
+
+#pragma pack(pop)
+

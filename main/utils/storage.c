@@ -1,3 +1,4 @@
+#pragma pack(push, 1)
 #include "storage.h"
 #include <esp_log.h>
 #include <nvs_flash.h>
@@ -8,8 +9,8 @@
 #include <esp_mac.h>
 #include "../const.h"
 
-#define MAX_CACHE_SIZE 32
-#define MAX_PATH_LENGTH 64
+#define MAX_CACHE_SIZE 12
+#define MAX_PATH_LENGTH 48
 
 typedef enum {
     CACHE_TYPE_STRING,
@@ -415,3 +416,5 @@ esp_err_t storage_set_boot_with_wifi(void) {
     nvs_close(nvs_handle);
     return err;
 }
+
+#pragma pack(pop)

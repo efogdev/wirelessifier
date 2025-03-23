@@ -215,9 +215,6 @@ void init_websocket(const httpd_handle_t server_handle) {
     
     ESP_LOGI(WS_TAG, "Registering WebSocket handler");
     httpd_register_uri_handler(server, &ws);
-    
-    ESP_LOGI(WS_TAG, "Initializing device settings");
-    init_global_settings();
 }
 
 void ws_queue_message(const char *data) {

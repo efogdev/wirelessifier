@@ -9,14 +9,14 @@ struct gatts_profile_inst {
     uint16_t gatts_if;
     uint16_t app_id;
     uint16_t conn_id;
-};
+}  PACKED_ATTR;
 
 hidd_le_env_t hidd_le_env;
 uint8_t hidProtocolMode = HID_PROTOCOL_MODE_REPORT;
 
 static void hid_add_id_tbl(void);
 
-void esp_hidd_prf_cb_hdl(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
+static void __attribute__((section(".iram1.text"))) esp_hidd_prf_cb_hdl(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
                          esp_ble_gatts_cb_param_t *param) {
     switch (event) {
         case ESP_GATTS_REG_EVT: {
@@ -36,13 +36,11 @@ void esp_hidd_prf_cb_hdl(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
                     (hidd_le_env.hidd_cb)(ESP_BAT_EVENT_REG, &hidd_param);
                 }
             }
-
             break;
         }
-        case ESP_GATTS_CONF_EVT: {
-            break;
-        }
+        case ESP_GATTS_CONF_EVT:
         case ESP_GATTS_CREATE_EVT:
+        case ESP_GATTS_CLOSE_EVT:
             break;
         case ESP_GATTS_CONNECT_EVT: {
             esp_hidd_cb_param_t cb_param = {0};
@@ -73,8 +71,6 @@ void esp_hidd_prf_cb_hdl(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
             hidd_clcb_dealloc(param->disconnect.conn_id);
             break;
         }
-        case ESP_GATTS_CLOSE_EVT:
-            break;
         case ESP_GATTS_WRITE_EVT: {
             esp_hidd_cb_param_t cb_param = {0};
             if (param->write.handle == hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_REPORT_LED_OUT_VAL]) {
@@ -108,7 +104,6 @@ void esp_hidd_prf_cb_hdl(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
             }
             break;
         }
-
         default:
             break;
     }
@@ -118,11 +113,7 @@ void hidd_le_create_service(const esp_gatt_if_t gatts_if) {
     esp_ble_gatts_create_attr_tab(bas_att_db, gatts_if, BAS_IDX_NB, 0);
 }
 
-void hidd_le_init(void) {
-    memset(&hidd_le_env, 0, sizeof(hidd_le_env_t));
-}
-
-void hidd_clcb_alloc(const uint16_t conn_id, esp_bd_addr_t bda) {
+void __attribute__((section(".iram1.text"))) hidd_clcb_alloc(const uint16_t conn_id, esp_bd_addr_t bda) {
     uint8_t i_clcb = 0;
     hidd_clcb_t *p_clcb = NULL;
 
@@ -137,30 +128,28 @@ void hidd_clcb_alloc(const uint16_t conn_id, esp_bd_addr_t bda) {
     }
 }
 
-bool hidd_clcb_dealloc(uint16_t conn_id) {
+bool __attribute__((section(".iram1.text"))) hidd_clcb_dealloc(uint16_t conn_id) {
     uint8_t i_clcb = 0;
     hidd_clcb_t *p_clcb = NULL;
     for (i_clcb = 0, p_clcb = hidd_le_env.hidd_clcb; i_clcb < HID_MAX_APPS; i_clcb++, p_clcb++) {
         memset(p_clcb, 0, sizeof(hidd_clcb_t));
         return true;
     }
-
     return false;
 }
 
-static struct gatts_profile_inst heart_rate_profile_tab[PROFILE_NUM] = {
+static struct gatts_profile_inst hid_profile_tab[PROFILE_NUM] = {
     [PROFILE_APP_IDX] = {
         .gatts_cb = esp_hidd_prf_cb_hdl,
         .gatts_if = ESP_GATT_IF_NONE,
     },
-
 };
 
-static void gatts_event_handler(const esp_gatts_cb_event_t event, const esp_gatt_if_t gatts_if,
+static void __attribute__((section(".iram1.text"))) gatts_event_handler(const esp_gatts_cb_event_t event, const esp_gatt_if_t gatts_if,
                                 esp_ble_gatts_cb_param_t *param) {
     if (event == ESP_GATTS_REG_EVT) {
         if (param->reg.status == ESP_GATT_OK) {
-            heart_rate_profile_tab[PROFILE_APP_IDX].gatts_if = gatts_if;
+            hid_profile_tab[PROFILE_APP_IDX].gatts_if = gatts_if;
         } else {
             ESP_LOGI(HID_LE_PRF_TAG, "Reg app failed, app_id %04x, status %d",
                      param->reg.app_id,
@@ -169,18 +158,15 @@ static void gatts_event_handler(const esp_gatts_cb_event_t event, const esp_gatt
         }
     }
 
-    do {
-        for (int idx = 0; idx < PROFILE_NUM; idx++) {
-            if (gatts_if == ESP_GATT_IF_NONE ||
-                gatts_if == heart_rate_profile_tab[idx].gatts_if) {
-                if (heart_rate_profile_tab[idx].gatts_cb) {
-                    heart_rate_profile_tab[idx].gatts_cb(event, gatts_if, param);
-                }
+    for (int idx = 0; idx < PROFILE_NUM; idx++) {
+        if (gatts_if == ESP_GATT_IF_NONE ||
+            gatts_if == hid_profile_tab[idx].gatts_if) {
+            if (hid_profile_tab[idx].gatts_cb) {
+                hid_profile_tab[idx].gatts_cb(event, gatts_if, param);
             }
         }
-    } while (0);
+    }
 }
-
 
 esp_err_t hidd_register_cb(void) {
     return esp_ble_gatts_register_callback(gatts_event_handler);
@@ -206,7 +192,7 @@ void hidd_get_attr_value(const uint16_t handle, uint16_t *length, uint8_t **valu
     }
 }
 
-static void hid_add_id_tbl(void) {
+static void __attribute__((section(".iram1.text"))) hid_add_id_tbl(void) {
     // Mouse input report
     hid_rpt_map[0].id = hidReportRefMouseIn[0];
     hid_rpt_map[0].type = hidReportRefMouseIn[1];

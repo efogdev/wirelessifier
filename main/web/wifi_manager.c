@@ -15,7 +15,7 @@
 #include "http_server.h"
 #include "dns_server.h"
 #include "../utils/temp_sensor.h"
-#include "../rgb/rgb_utils.h"
+#include "../utils/rgb_leds.h"
 
 static const char *WIFI_TAG = "WIFI_MGR";
 

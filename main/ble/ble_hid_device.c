@@ -156,7 +156,6 @@ esp_err_t ble_hid_device_init(void) {
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
-    init_global_settings();
 
     char mode_str[16] = {0};
     storage_get_string_setting("power.highSpeedSubmode", mode_str, sizeof(mode_str));

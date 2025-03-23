@@ -10,7 +10,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "nvs_flash.h"
-#include "../rgb/rgb_utils.h"
+#include "../utils/rgb_leds.h"
 
 static const char *HTTP_TAG = "HTTP";
 static httpd_handle_t server = NULL;
@@ -19,7 +19,7 @@ EventGroupHandle_t wifi_event_group;
 
 #define WIFI_SSID      "AnyBLE WEB"
 #define WIFI_CHANNEL   1
-#define MAX_CONN       3
+#define MAX_CONN       4
 
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT      BIT1
