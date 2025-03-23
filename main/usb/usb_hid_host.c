@@ -40,11 +40,21 @@ static report_map_t g_interface_report_maps[USB_HOST_MAX_INTERFACES] = {0};
 static bool g_verbose = false;
 static uint8_t g_field_counts[USB_HOST_MAX_INTERFACES][MAX_REPORTS_PER_INTERFACE] = {0};
 
+static report_info_t *last_report_info = NULL;
+static int16_t last_report_id = -1;
+static int16_t last_interface = -1;
+
 static void usb_lib_task(void *arg);
+
 static void usb_stats_task(void *arg);
+
 static void device_event_task(void *arg);
-static void hid_host_device_callback(hid_host_device_handle_t hid_device_handle, hid_host_driver_event_t event, void *arg);
-static void hid_host_interface_callback(hid_host_device_handle_t hid_device_handle, hid_host_interface_event_t event, void *arg);
+
+static void hid_host_device_callback(hid_host_device_handle_t hid_device_handle, hid_host_driver_event_t event,
+                                     void *arg);
+
+static void hid_host_interface_callback(hid_host_device_handle_t hid_device_handle, hid_host_interface_event_t event,
+                                        void *arg);
 
 uint8_t usb_hid_host_get_num_fields(const uint8_t report_id, const uint8_t interface_num) {
     return g_field_counts[interface_num][report_id];
@@ -150,11 +160,12 @@ bool usb_hid_host_device_connected(void) {
 static void process_report(const uint8_t *const data, const size_t length, const uint8_t interface_num) {
     s_current_rps++;
     if (!data || !g_report_queue || length <= 1 || interface_num >= USB_HOST_MAX_INTERFACES) {
-        ESP_LOGE(TAG, "Invalid parameters: data=%p, queue=%p, len=%d, iface=%u", data, g_report_queue, length, interface_num);
+        ESP_LOGE(TAG, "Invalid parameters: data=%p, queue=%p, len=%d, iface=%u", data, g_report_queue, length,
+                 interface_num);
         return;
     }
 
-    const report_map_t *const report_map = &g_interface_report_maps[interface_num];
+    report_map_t *const report_map = &g_interface_report_maps[interface_num];
     const uint8_t *report_data = data;
     size_t report_length = length;
     static uint8_t report_id = 0;
@@ -166,14 +177,19 @@ static void process_report(const uint8_t *const data, const size_t length, const
         report_id = report_map->report_ids[0];
     }
 
-    const report_info_t *report_info = NULL;
-    for (int i = 0; i < report_map->num_reports; i++) {
-        if (report_map->report_ids[i] == report_id) {
-            report_info = &report_map->reports[i];
-            break;
+    if (last_report_info == NULL || last_report_id == -1 || last_interface == -1 || last_report_id != report_id ||
+        last_interface != interface_num) {
+        for (int i = 0; i < report_map->num_reports; i++) {
+            if (report_map->report_ids[i] == report_id) {
+                last_report_info = &report_map->reports[i];
+                last_report_id = report_id;
+                last_interface = interface_num;
+                break;
+            }
         }
     }
 
+    const report_info_t *report_info = last_report_info;
     if (!report_info) {
         ESP_LOGW(TAG, "Unknown report ID %d for interface %d", report_id, interface_num);
         return;
@@ -183,7 +199,7 @@ static void process_report(const uint8_t *const data, const size_t length, const
     g_report.report_id = report_id;
     g_report.type = USB_HID_FIELD_TYPE_INPUT;
     g_report.num_fields = report_info->num_fields;
-    g_report.raw_len = MIN(report_length, sizeof(g_report.raw));
+    g_report.raw_len = report_length;
     g_report.fields = g_fields;
 
     const report_field_info_t *const field_info = report_info->fields;
@@ -220,6 +236,9 @@ static void hid_host_interface_callback(const hid_host_device_handle_t hid_devic
             ESP_LOGI(TAG, "HID Device Disconnected - Interface: %d", dev_params.iface_num);
             g_device_connected = false;
             memset(g_field_counts[dev_params.iface_num], 0, sizeof(g_field_counts[dev_params.iface_num]));
+            last_report_info = NULL;
+            last_report_id = 0;
+            last_interface = 0;
             ESP_ERROR_CHECK(hid_host_device_close(hid_device_handle));
             break;
 
