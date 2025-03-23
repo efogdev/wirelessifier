@@ -32,7 +32,7 @@ uint8_t hidReportRefFeature[HID_REPORT_REF_LEN] = {HID_RPT_ID_FEATURE, HID_REPOR
 static const uint16_t hid_ccc_default = 0x0100;
 
 // HID Report Map characteristic value
-const uint8_t hidReportMap[] = {
+const uint8_t hidReportMap[] __attribute__((section(".rodata"))) = {
     // Mouse Report Descriptor
     0x05, 0x01, // Usage Page (Generic Desktop)
     0x09, 0x02, // Usage (Mouse)
@@ -168,7 +168,7 @@ static const uint8_t char_prop_read_write = ESP_GATT_CHAR_PROP_BIT_WRITE | ESP_G
 static const uint8_t char_prop_read_notify = ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_NOTIFY;
 
 /// Full HRS Database Description - Used to add attributes into the database
-const esp_gatts_attr_db_t bas_att_db[BAS_IDX_NB] =
+const esp_gatts_attr_db_t bas_att_db[BAS_IDX_NB] __attribute__((section(".rodata"))) =
 {
     // Battery Service Declaration
     [BAS_IDX_SVC] = {
@@ -309,7 +309,7 @@ esp_gatts_attr_db_t hidd_le_gatt_db[HIDD_LE_IDX_NB] =
             ESP_UUID_LEN_16, (uint8_t *) &hid_proto_mode_uuid,
             (ESP_GATT_PERM_READ_ENCRYPTED | ESP_GATT_PERM_WRITE_ENCRYPTED),
             sizeof(uint8_t), sizeof(hidProtocolMode),
-            (uint8_t *) &hidProtocolMode
+            (&hidProtocolMode)
         }
     },
     [HIDD_LE_IDX_REPORT_MOUSE_IN_CHAR] = {

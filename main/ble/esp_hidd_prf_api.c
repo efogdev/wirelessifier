@@ -4,10 +4,7 @@
 #include <string.h>
 #include "esp_log.h"
 
-// HID keyboard input report length
 #define HID_KEYBOARD_IN_RPT_LEN     32
-
-// HID mouse input report length
 #define HID_MOUSE_IN_RPT_LEN        7
 
 esp_err_t esp_hidd_register_callbacks(esp_hidd_event_cb_t callbacks) {
@@ -37,7 +34,7 @@ esp_err_t esp_hidd_profile_init(void) {
         ESP_LOGE(HID_LE_PRF_TAG, "HID device profile already initialized");
         return ESP_FAIL;
     }
-    // Reset the hid device target environment
+
     memset(&hidd_le_env, 0, sizeof(hidd_le_env_t));
     hidd_le_env.enabled = true;
     return ESP_OK;
@@ -57,7 +54,6 @@ esp_err_t esp_hidd_profile_deinit(void) {
         return ESP_FAIL;
     }
 
-    /* register the HID device profile to the BTA_GATTS module*/
     esp_ble_gatts_app_unregister(hidd_le_env.gatt_if);
     hidd_le_env.enabled = false;
 

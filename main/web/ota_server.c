@@ -18,7 +18,7 @@ static char ota_write_data[BUFFSIZE + 1] = {0};
 extern void ws_log(const char* text);
 extern void ws_broadcast_json(const char *type, const char *content);
 
-static void report_ota_progress(int progress) {
+static void report_ota_progress(const int progress) {
     char progress_str[32];
     snprintf(progress_str, sizeof(progress_str), "{\"progress\":%d}", progress);
     ws_broadcast_json("ota_progress", progress_str);
@@ -69,12 +69,12 @@ static esp_err_t handle_ota_upload(httpd_req_t *req) {
     ESP_LOGI(OTA_TAG, "Writing to partition subtype %d at offset 0x%" PRIx32,
              update_partition->subtype, update_partition->address);
 
-    int total_size = req->content_len;
+    const int total_size = req->content_len;
     int remaining = total_size;
     int received = 0;
 
     while (remaining > 0) {
-        int recv_len = MIN(remaining, BUFFSIZE);
+        const int recv_len = MIN(remaining, BUFFSIZE);
         if ((received = httpd_req_recv(req, ota_write_data, recv_len)) <= 0) {
             if (received == HTTPD_SOCK_ERR_TIMEOUT) {
                 continue;
@@ -116,7 +116,7 @@ static esp_err_t handle_ota_upload(httpd_req_t *req) {
         remaining -= received;
         
         // Report progress every 10%
-        int progress = ((total_size - remaining) * 100) / total_size;
+        const int progress = ((total_size - remaining) * 100) / total_size;
         if (progress / 10 != last_progress / 10) {
             last_progress = progress;
             report_ota_progress(progress);
@@ -152,7 +152,7 @@ static esp_err_t handle_ota_upload(httpd_req_t *req) {
 }
 
 static esp_err_t ota_upload_handler(httpd_req_t *req) {
-    esp_err_t err = handle_ota_upload(req);
+    const esp_err_t err = handle_ota_upload(req);
     if (err != ESP_OK) {
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OTA update failed");
     }
@@ -166,7 +166,7 @@ static const httpd_uri_t ota_upload = {
     .user_ctx = NULL
 };
 
-void init_ota_server(httpd_handle_t server) {
+void init_ota_server(const httpd_handle_t server) {
     ESP_LOGI(OTA_TAG, "Registering OTA upload handler");
     httpd_register_uri_handler(server, &ota_upload);
 }

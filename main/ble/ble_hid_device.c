@@ -72,7 +72,7 @@ static esp_ble_adv_params_t hidd_adv_params = {
     .adv_filter_policy = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
 };
 
-static void hidd_event_callback(const esp_hidd_cb_event_t event, const esp_hidd_cb_param_t *param) {
+static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *param) {
     switch (event) {
         case ESP_HIDD_EVENT_REG_FINISH: {
             if (param->init_finish.state == ESP_HIDD_INIT_OK) {
@@ -222,7 +222,7 @@ esp_err_t ble_hid_device_init(void) {
     }
 
     esp_ble_gap_register_callback(gap_event_handler);
-    esp_hidd_register_callbacks((esp_hidd_event_cb_t) hidd_event_callback);
+    esp_hidd_register_callbacks(hidd_event_callback);
 
     esp_ble_auth_req_t auth_req = ESP_LE_AUTH_REQ_SC_MITM_BOND;
     esp_ble_io_cap_t iocap = ESP_IO_CAP_NONE; //set the IO capability to No output No input

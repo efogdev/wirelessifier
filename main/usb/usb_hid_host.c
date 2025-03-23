@@ -41,16 +41,10 @@ static bool g_verbose = false;
 static uint8_t g_field_counts[USB_HOST_MAX_INTERFACES][MAX_REPORTS_PER_INTERFACE] = {0};
 
 static void usb_lib_task(void *arg);
-
 static void usb_stats_task(void *arg);
-
 static void device_event_task(void *arg);
-
-static void hid_host_device_callback(hid_host_device_handle_t hid_device_handle, hid_host_driver_event_t event,
-                                     void *arg);
-
-static void hid_host_interface_callback(hid_host_device_handle_t hid_device_handle, hid_host_interface_event_t event,
-                                        void *arg);
+static void hid_host_device_callback(hid_host_device_handle_t hid_device_handle, hid_host_driver_event_t event, void *arg);
+static void hid_host_interface_callback(hid_host_device_handle_t hid_device_handle, hid_host_interface_event_t event, void *arg);
 
 uint8_t usb_hid_host_get_num_fields(const uint8_t report_id, const uint8_t interface_num) {
     return g_field_counts[interface_num][report_id];

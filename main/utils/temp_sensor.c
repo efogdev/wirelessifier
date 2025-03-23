@@ -7,7 +7,7 @@ static temperature_sensor_handle_t temp_sensor = NULL;
 esp_err_t temp_sensor_init(void)
 {
     // Initialize temperature sensor
-    temperature_sensor_config_t temp_sensor_config = TEMPERATURE_SENSOR_CONFIG_DEFAULT(10, 50);
+    const temperature_sensor_config_t temp_sensor_config = TEMPERATURE_SENSOR_CONFIG_DEFAULT(10, 50);
     esp_err_t ret = temperature_sensor_install(&temp_sensor_config, &temp_sensor);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to install temperature sensor: %s", esp_err_to_name(ret));
@@ -37,7 +37,7 @@ esp_err_t temp_sensor_get_temperature(float *temperature)
         return ESP_ERR_INVALID_ARG;
     }
 
-    esp_err_t ret = temperature_sensor_get_celsius(temp_sensor, temperature);
+    const esp_err_t ret = temperature_sensor_get_celsius(temp_sensor, temperature);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to read temperature: %s", esp_err_to_name(ret));
     }

@@ -50,14 +50,14 @@ typedef struct __attribute__((__packed__))
     uint32_t ip_addr;
 } dns_answer_t;
 
-static inline char *parse_dns_name(char *raw_name, char *parsed_name, size_t parsed_name_max_len)  // Made inline for performance
+static inline char *parse_dns_name(char *raw_name, char *parsed_name, const size_t parsed_name_max_len)  // Made inline for performance
 {
     char *label = raw_name;
     char *name_itr = parsed_name;
     int name_len = 0;
 
     do {
-        int sub_name_len = *label;
+        const int sub_name_len = *label;
 
         name_len += (sub_name_len + 1);
         if (name_len > parsed_name_max_len) {
@@ -74,7 +74,7 @@ static inline char *parse_dns_name(char *raw_name, char *parsed_name, size_t par
     return label + 1;
 }
 
-static int parse_dns_request(const char *req, size_t req_len, char *dns_reply, size_t dns_reply_max_len)
+static int parse_dns_request(const char *req, const size_t req_len, char *dns_reply, const size_t dns_reply_max_len)
 {
     if (req_len > dns_reply_max_len) {
         return -1;
@@ -95,10 +95,10 @@ static int parse_dns_request(const char *req, size_t req_len, char *dns_reply, s
     // Set question response flag
     header->flags |= QR_FLAG;
 
-    uint16_t qd_count = ntohs(header->qd_count);
+    const uint16_t qd_count = ntohs(header->qd_count);
     header->an_count = htons(qd_count);
 
-    int reply_len = qd_count * sizeof(dns_answer_t) + req_len;
+    const int reply_len = qd_count * sizeof(dns_answer_t) + req_len;
     if (reply_len > dns_reply_max_len) {
         return -1;
     }
@@ -115,9 +115,9 @@ static int parse_dns_request(const char *req, size_t req_len, char *dns_reply, s
             return -1;
         }
 
-        dns_question_t *question = (dns_question_t *)(name_end_ptr);
-        uint16_t qd_type = ntohs(question->type);
-        uint16_t qd_class = ntohs(question->class);
+        const dns_question_t *question = (dns_question_t *)(name_end_ptr);
+        const uint16_t qd_type = ntohs(question->type);
+        const uint16_t qd_class = ntohs(question->class);
 
         if (qd_type == QD_TYPE_A) {
             dns_answer_t *answer = (dns_answer_t *)cur_ans_ptr;
@@ -154,7 +154,7 @@ static void dns_server_task(void *pvParameters)
         ip_protocol = IPPROTO_IP;
         inet_ntoa_r(dest_addr.sin_addr, addr_str, sizeof(addr_str) - 1);
 
-        int sock = socket(addr_family, SOCK_DGRAM, ip_protocol);
+        const int sock = socket(addr_family, SOCK_DGRAM, ip_protocol);
         if (sock < 0) {
             ESP_LOGE(DNS_TAG, "Unable to create socket: errno %d", errno);
             break;
@@ -168,7 +168,7 @@ static void dns_server_task(void *pvParameters)
         while (1) {
             struct sockaddr_in source_addr;
             socklen_t socklen = sizeof(source_addr);
-            int len = recvfrom(sock, rx_buffer, sizeof(rx_buffer) - 1, 0, (struct sockaddr *)&source_addr, &socklen);
+            const int len = recvfrom(sock, rx_buffer, sizeof(rx_buffer) - 1, 0, (struct sockaddr *)&source_addr, &socklen);
 
             // Error occurred during receiving
             if (len < 0) {
@@ -182,7 +182,7 @@ static void dns_server_task(void *pvParameters)
                 inet_ntoa_r(source_addr.sin_addr.s_addr, addr_str, sizeof(addr_str) - 1);
 
                 char reply[DNS_MAX_LEN];
-                int reply_len = parse_dns_request(rx_buffer, len, reply, DNS_MAX_LEN);
+                const int reply_len = parse_dns_request(rx_buffer, len, reply, DNS_MAX_LEN);
 
                 if (reply_len > 0) {
                     err = sendto(sock, reply, reply_len, 0, (struct sockaddr *)&source_addr, sizeof(source_addr));

@@ -70,21 +70,21 @@ esp_err_t connect_wifi_with_stored_credentials(void) {
 
     // Configure WiFi
     wifi_config_t wifi_config = {0};
-    strlcpy((char*)wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid));
-    strlcpy((char*)wifi_config.sta.password, password, sizeof(wifi_config.sta.password));
+    strlcpy((char *)wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid));
+    strlcpy((char *)wifi_config.sta.password, password, sizeof(wifi_config.sta.password));
     
     ESP_LOGI(WIFI_TAG, "Connecting to %s...", ssid);
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     
     // Use esp_err_t to handle the return value instead of ESP_ERROR_CHECK
-    esp_err_t connect_err = esp_wifi_connect();
+    const esp_err_t connect_err = esp_wifi_connect();
     if (connect_err != ESP_OK) {
         ESP_LOGE(WIFI_TAG, "Failed to connect to WiFi: %s", esp_err_to_name(connect_err));
         return connect_err;
     }
     
     // Wait for connection or failure
-    EventBits_t bits = xEventGroupWaitBits(wifi_event_group,
+    const EventBits_t bits = xEventGroupWaitBits(wifi_event_group,
         WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdFALSE, pdFALSE, portMAX_DELAY);
 
     if (bits & WIFI_CONNECTED_BIT) {
@@ -214,7 +214,7 @@ void process_wifi_scan_results(void) {
         char ssid_escaped[64] = {0};
         
         // Simple JSON escaping for SSID
-        for (int j = 0, k = 0; j < strlen((char*)ap_records[i].ssid) && k < 63; j++) {
+        for (int j = 0, k = 0; j < strlen((const char *)ap_records[i].ssid) && k < 63; j++) {
             if (ap_records[i].ssid[j] == '"' || ap_records[i].ssid[j] == '\\') {
                 ssid_escaped[k++] = '\\';
             }
@@ -247,7 +247,7 @@ esp_err_t scan_wifi_networks(void) {
     esp_wifi_scan_stop();
     
     // Configure scan
-    wifi_scan_config_t scan_config = {
+    const wifi_scan_config_t scan_config = {
         .ssid = NULL,
         .bssid = NULL,
         .channel = 0,
@@ -258,7 +258,7 @@ esp_err_t scan_wifi_networks(void) {
     };
     
     // Start scan asynchronously - results will be processed in the WIFI_EVENT_SCAN_DONE event handler
-    esp_err_t ret = esp_wifi_scan_start(&scan_config, false);
+    const esp_err_t ret = esp_wifi_scan_start(&scan_config, false);
     if (ret != ESP_OK) {
         ESP_LOGE(WIFI_TAG, "Failed to start WiFi scan: %s", esp_err_to_name(ret));
         return ret;
@@ -285,11 +285,11 @@ esp_err_t connect_to_wifi(const char* ssid, const char* password) {
     
     // Configure WiFi
     wifi_config_t wifi_config = {0};
-    strlcpy((char*)wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid));
+    strlcpy((char *)wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid));
     
     if (password) {
         wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
-        strlcpy((char*)wifi_config.sta.password, password, sizeof(wifi_config.sta.password));
+        strlcpy((char *)wifi_config.sta.password, password, sizeof(wifi_config.sta.password));
     }
     
     ESP_LOGI(WIFI_TAG, "Connecting to %s...", ssid);
@@ -298,14 +298,14 @@ esp_err_t connect_to_wifi(const char* ssid, const char* password) {
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     
     // Use esp_err_t to handle the return value instead of ESP_ERROR_CHECK
-    esp_err_t connect_err = esp_wifi_connect();
+    const esp_err_t connect_err = esp_wifi_connect();
     if (connect_err != ESP_OK) {
         ESP_LOGE(WIFI_TAG, "Failed to connect to WiFi: %s", esp_err_to_name(connect_err));
         return connect_err;
     }
     
     // Wait for connection or failure
-    EventBits_t bits = xEventGroupWaitBits(wifi_event_group,
+    const EventBits_t bits = xEventGroupWaitBits(wifi_event_group,
         WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdFALSE, pdFALSE, 40000 / portTICK_PERIOD_MS);
     
     connecting = false;
@@ -377,7 +377,7 @@ void disable_wifi_and_web_stack(void) {
     
     // Clear one-time boot flag to prevent auto-starting WiFi on next boot
     nvs_handle_t nvs_handle;
-    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
+    const esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
     if (err == ESP_OK) {
         nvs_set_u8(nvs_handle, NVS_KEY_BOOT_WITH_WIFI, 0);
         nvs_commit(nvs_handle);
@@ -400,7 +400,7 @@ void reboot_device(bool keep_wifi) {
     
     // Set or clear the boot with WiFi flag based on user choice
     nvs_handle_t nvs_handle;
-    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
+    const esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
     if (err == ESP_OK) {
         nvs_set_u8(nvs_handle, NVS_KEY_BOOT_WITH_WIFI, keep_wifi ? 1 : 0);
         nvs_commit(nvs_handle);
@@ -508,7 +508,7 @@ static void ws_ping_task(void *pvParameters) {
     
     while (1) {
         // Get free heap size
-        uint32_t free_heap = esp_get_free_heap_size();
+        const uint32_t free_heap = esp_get_free_heap_size();
         
         // Get SoC temperature
         float temp = 0;
@@ -537,7 +537,7 @@ void start_ws_ping_task(void) {
     
     // Only create the task if it doesn't already exist
     if (ping_task_handle == NULL) {
-        BaseType_t result = xTaskCreatePinnedToCore(ws_ping_task,
+        const BaseType_t result = xTaskCreatePinnedToCore(ws_ping_task,
             "ws_ping_task", WS_PING_TASK_STACK_SIZE, NULL, WS_PING_TASK_PRIORITY, &ping_task_handle, 0);
         
         if (result != pdPASS) {

@@ -10,77 +10,64 @@ static const char *WS_TAG = "WS";
 static httpd_handle_t server = NULL;
 
 #define MAX_CLIENTS CONFIG_LWIP_MAX_LISTENING_TCP
-#define WS_MAX_MESSAGE_LEN 1024  // Maximum message length to prevent excessive allocations
+#define WS_MAX_MESSAGE_LEN 512  
+#define WS_SMALL_MESSAGE_LEN 128
 
-// Static buffers for client handling
-static int client_fds[CONFIG_LWIP_MAX_LISTENING_TCP];
-static httpd_ws_frame_t broadcast_frame = {
-    .final = true,
-    .fragmented = false,
-    .type = HTTPD_WS_TYPE_TEXT
-};
+typedef struct {
+    int *fds;
+    int *failed;
+    int failed_count;
+    size_t max_clients;
+    httpd_ws_frame_t frame;
+} ws_client_ctx_t;
 
-// Track clients that have failed to receive messages
-static int failed_clients[CONFIG_LWIP_MAX_LISTENING_TCP];
-static int failed_clients_count = 0;
+static ws_client_ctx_t *client_ctx = NULL;
 
-// Helper function to check if a client is in the failed list
-static bool is_failed_client(int fd) {
-    for (int i = 0; i < failed_clients_count; i++) {
-        if (failed_clients[i] == fd) {
+static bool is_failed_client(const int fd) {
+    if (!client_ctx) return false;
+    for (int i = 0; i < client_ctx->failed_count; i++) {
+        if (client_ctx->failed[i] == fd) {
             return true;
         }
     }
     return false;
 }
 
-// Helper function to add a client to the failed list
-static void add_failed_client(int fd) {
-    // Check if already in the list
-    if (is_failed_client(fd)) {
-        return;
-    }
+static void add_failed_client(const int fd) {
+    if (!client_ctx) return;
+    if (is_failed_client(fd)) return;
     
-    // Add to the list if there's space
-    if (failed_clients_count < CONFIG_LWIP_MAX_LISTENING_TCP) {
-        failed_clients[failed_clients_count++] = fd;
+    if (client_ctx->failed_count < client_ctx->max_clients) {
+        client_ctx->failed[client_ctx->failed_count++] = fd;
     }
 }
 
 esp_err_t ws_send_frame_to_all_clients(const char *data, const size_t len) {
-    if (!server) {
+    if (!server || !client_ctx) {
         return ESP_FAIL;
     }
 
-    static size_t max_clients = CONFIG_LWIP_MAX_LISTENING_TCP;
-    size_t fds = max_clients;
-
-    const esp_err_t ret = httpd_get_client_list(server, &fds, client_fds);
+    size_t fds = client_ctx->max_clients;
+    const esp_err_t ret = httpd_get_client_list(server, &fds, client_ctx->fds);
     if (ret != ESP_OK) {
         return ret;
     }
 
-    broadcast_frame.payload = (uint8_t*)data;
-    broadcast_frame.len = len;
+    client_ctx->frame.payload = (uint8_t*)data;
+    client_ctx->frame.len = len;
 
     for (int i = 0; i < fds; i++) {
-        // Skip clients that have previously failed
-        if (is_failed_client(client_fds[i])) {
+        if (is_failed_client(client_ctx->fds[i])) {
             continue;
         }
         
-        const int client_info = httpd_ws_get_fd_info(server, client_fds[i]);
+        const int client_info = httpd_ws_get_fd_info(server, client_ctx->fds[i]);
         if (client_info == HTTPD_WS_CLIENT_WEBSOCKET) {
-            esp_err_t err = httpd_ws_send_frame_async(server, client_fds[i], &broadcast_frame);
+            const esp_err_t err = httpd_ws_send_frame_async(server, client_ctx->fds[i], &client_ctx->frame);
             if (err != ESP_OK) {
-                ESP_LOGW(WS_TAG, "Failed to send WS frame to client %d, error: %d", client_fds[i], err);
-                
-                // Close the connection for any send error to clean up resources
-                httpd_sess_trigger_close(server, client_fds[i]);
-                ESP_LOGI(WS_TAG, "Closed connection to client %d after send error", client_fds[i]);
-                
-                // Add to failed clients list to avoid future send attempts
-                add_failed_client(client_fds[i]);
+                ESP_LOGW(WS_TAG, "Failed to send WS frame to client %d", client_ctx->fds[i]);
+                httpd_sess_trigger_close(server, client_ctx->fds[i]);
+                add_failed_client(client_ctx->fds[i]);
             }
         }
     }
@@ -99,19 +86,16 @@ void ws_broadcast_json(const char *type, const char *content) {
 }
 
 
-// Forward declarations
 extern void process_wifi_ws_message(const char* message);
 static void process_settings_ws_message(const char* message);
 
-// Helper function to remove a client from the failed list
-static void remove_failed_client(int fd) {
-    for (int i = 0; i < failed_clients_count; i++) {
-        if (failed_clients[i] == fd) {
-            // Move the last element to this position (if not already the last)
-            if (i < failed_clients_count - 1) {
-                failed_clients[i] = failed_clients[failed_clients_count - 1];
+static void remove_failed_client(const int fd) {
+    for (int i = 0; i < client_ctx->failed_count; i++) {
+        if (client_ctx->failed[i] == fd) {
+            if (i < client_ctx->failed_count - 1) {
+                client_ctx->failed[i] = client_ctx->failed[client_ctx->failed_count - 1];
             }
-            failed_clients_count--;
+            client_ctx->failed_count--;
             break;
         }
     }
@@ -120,14 +104,10 @@ static void remove_failed_client(int fd) {
 static esp_err_t ws_handler(httpd_req_t *req) {
     if (req->method == HTTP_GET) {
         ESP_LOGI(WS_TAG, "Handshake done, the new connection was opened");
-        
-        // Register the socket with the server
-        int sockfd = httpd_req_to_sockfd(req);
+
+        const int sockfd = httpd_req_to_sockfd(req);
         if (sockfd != -1) {
             ESP_LOGI(WS_TAG, "New WebSocket client connected: %d", sockfd);
-            
-            // Remove this socket from failed clients list if it was there
-            // (in case the same file descriptor is reused for a new connection)
             remove_failed_client(sockfd);
         }
         
@@ -135,7 +115,7 @@ static esp_err_t ws_handler(httpd_req_t *req) {
     }
 
     httpd_ws_frame_t ws_pkt;
-    static uint8_t frame_buffer[WS_MAX_MESSAGE_LEN];  // Fixed buffer for frame data
+    static uint8_t frame_buffer[WS_MAX_MESSAGE_LEN];
     memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
     ws_pkt.type = HTTPD_WS_TYPE_TEXT;
     
@@ -143,16 +123,14 @@ static esp_err_t ws_handler(httpd_req_t *req) {
     if (ret != ESP_OK) {
         ESP_LOGE(WS_TAG, "httpd_ws_recv_frame failed with %d", ret);
         if (ret == ESP_ERR_INVALID_STATE || ret == HTTPD_SOCK_ERR_FAIL) {
-            // Client likely disconnected
-            int sockfd = httpd_req_to_sockfd(req);
+            const int sockfd = httpd_req_to_sockfd(req);
             ESP_LOGI(WS_TAG, "Client %d appears to be disconnected, closing session", sockfd);
             
-            // Add to failed clients list to avoid future send attempts
             if (sockfd != -1) {
                 add_failed_client(sockfd);
             }
             
-            return ESP_FAIL; // This will trigger connection closure
+            return ESP_FAIL;
         }
         return ret;
     }
@@ -163,38 +141,33 @@ static esp_err_t ws_handler(httpd_req_t *req) {
         if (ret != ESP_OK) {
             ESP_LOGE(WS_TAG, "httpd_ws_recv_frame failed with %d", ret);
             if (ret == ESP_ERR_INVALID_STATE || ret == HTTPD_SOCK_ERR_FAIL) {
-                // Client likely disconnected
-                int sockfd = httpd_req_to_sockfd(req);
+                const int sockfd = httpd_req_to_sockfd(req);
                 ESP_LOGI(WS_TAG, "Client %d appears to be disconnected during frame receive, closing session", sockfd);
                 
-                // Add to failed clients list to avoid future send attempts
                 if (sockfd != -1) {
                     add_failed_client(sockfd);
                 }
                 
-                return ESP_FAIL; // This will trigger connection closure
+                return ESP_FAIL; 
             }
             return ret;
         }
-        frame_buffer[ws_pkt.len] = '\0';  // Null terminate
+        frame_buffer[ws_pkt.len] = '\0';
         ESP_LOGI(WS_TAG, "Got packet with message: %s", frame_buffer);
         
-        // Process the message for both settings and WiFi
-        process_settings_ws_message((const char*)frame_buffer);
-        process_wifi_ws_message((const char*)frame_buffer);
-        
-        // Echo the message back
-        esp_err_t send_ret = httpd_ws_send_frame(req, &ws_pkt);
+        process_settings_ws_message((const char *)frame_buffer);
+        process_wifi_ws_message((const char *)frame_buffer);
+
+        const esp_err_t send_ret = httpd_ws_send_frame(req, &ws_pkt);
         if (send_ret != ESP_OK) {
             ESP_LOGW(WS_TAG, "Failed to echo WS frame, error: %d. Closing connection.", send_ret);
-            
-            // Add to failed clients list to avoid future send attempts
-            int sockfd = httpd_req_to_sockfd(req);
+
+            const int sockfd = httpd_req_to_sockfd(req);
             if (sockfd != -1) {
                 add_failed_client(sockfd);
             }
             
-            return ESP_FAIL; // This will trigger connection closure
+            return ESP_FAIL;
         }
         ret = send_ret;
     } else if (ws_pkt.len >= WS_MAX_MESSAGE_LEN) {
@@ -213,15 +186,36 @@ static const httpd_uri_t ws = {
     .is_websocket = true
 };
 
-void init_websocket(httpd_handle_t server_handle) {
+void init_websocket(const httpd_handle_t server_handle) {
     server = server_handle;
+    
+    client_ctx = calloc(1, sizeof(ws_client_ctx_t));
+    if (!client_ctx) {
+        ESP_LOGE(WS_TAG, "Failed to allocate client context");
+        return;
+    }
+    
+    client_ctx->max_clients = CONFIG_LWIP_MAX_LISTENING_TCP;
+    client_ctx->fds = calloc(client_ctx->max_clients, sizeof(int));
+    client_ctx->failed = calloc(client_ctx->max_clients, sizeof(int));
+    
+    if (!client_ctx->fds || !client_ctx->failed) {
+        ESP_LOGE(WS_TAG, "Failed to allocate client arrays");
+        free(client_ctx->fds);
+        free(client_ctx->failed);
+        free(client_ctx);
+        client_ctx = NULL;
+        return;
+    }
+    
+    client_ctx->failed_count = 0;
+    client_ctx->frame.final = true;
+    client_ctx->frame.fragmented = false;
+    client_ctx->frame.type = HTTPD_WS_TYPE_TEXT;
+    
     ESP_LOGI(WS_TAG, "Registering WebSocket handler");
     httpd_register_uri_handler(server, &ws);
     
-    // Initialize client tracking
-    failed_clients_count = 0;
-    
-    // Initialize device settings
     ESP_LOGI(WS_TAG, "Initializing device settings");
     init_global_settings();
 }
@@ -234,9 +228,8 @@ void ws_queue_message(const char *data) {
         ESP_LOGW(WS_TAG, "Message too long, truncating");
         len = WS_MAX_MESSAGE_LEN - 1;
     }
-    
-    // Send directly instead of queuing
-    esp_err_t err = ws_send_frame_to_all_clients(data, len);
+
+    const esp_err_t err = ws_send_frame_to_all_clients(data, len);
     if (err != ESP_OK) {
         ESP_LOGW(WS_TAG, "Failed to send message to clients: %s", esp_err_to_name(err));
     }
@@ -244,26 +237,25 @@ void ws_queue_message(const char *data) {
 
 void ws_log(const char* text) {
     if (!text) return;
-    static char buffer[WS_MAX_MESSAGE_LEN];
-    const int len = snprintf(buffer, sizeof(buffer), "{\"type\":\"log\",\"content\":\"%s\"}", text);
+    char *buffer = malloc(WS_SMALL_MESSAGE_LEN);
+    if (!buffer) return;
+    
+    const int len = snprintf(buffer, WS_SMALL_MESSAGE_LEN, "{\"type\":\"log\",\"content\":\"%s\"}", text);
     if (len > 0 && len < sizeof(buffer)) {
         ws_send_frame_to_all_clients(buffer, len);
+        free(buffer);
     }
 }
 
-// Initialize device settings from NVS or defaults
 esp_err_t init_device_settings(void) {
-    // Use the storage module to initialize settings
     return init_global_settings();
 }
 
-// Process settings-related WebSocket messages
-// Function to remove all bonded BLE devices
 static void remove_all_bonded_devices(void)
 {
     int dev_num = esp_ble_get_bond_device_num();
 
-    esp_ble_bond_dev_t *dev_list = (esp_ble_bond_dev_t *)malloc(sizeof(esp_ble_bond_dev_t) * dev_num);
+    esp_ble_bond_dev_t *dev_list = malloc(sizeof(esp_ble_bond_dev_t) * dev_num);
     esp_ble_get_bond_device_list(&dev_num, dev_list);
     for (int i = 0; i < dev_num; i++) {
         esp_ble_remove_bond_device(dev_list[i].bd_addr);
@@ -272,18 +264,15 @@ static void remove_all_bonded_devices(void)
     free(dev_list);
 }
 
-// Check if lowPowerMode setting has changed
 static bool has_low_power_mode_changed(const char* new_settings_json, bool* new_value) {
     if (!new_settings_json || !new_value) return false;
     
-    // Parse the new settings JSON
     cJSON *root = cJSON_Parse(new_settings_json);
     if (!root) {
         ESP_LOGE(WS_TAG, "Error parsing new settings JSON");
         return false;
     }
     
-    // Get the power object
     cJSON *power_obj = cJSON_GetObjectItem(root, "power");
     if (!power_obj) {
         ESP_LOGE(WS_TAG, "power object not found in new settings");
@@ -291,7 +280,6 @@ static bool has_low_power_mode_changed(const char* new_settings_json, bool* new_
         return false;
     }
     
-    // Get the lowPowerMode value
     cJSON *low_power_mode = cJSON_GetObjectItem(power_obj, "lowPowerMode");
     if (!low_power_mode || !cJSON_IsBool(low_power_mode)) {
         ESP_LOGE(WS_TAG, "lowPowerMode not found or not a boolean in new settings");
@@ -299,35 +287,29 @@ static bool has_low_power_mode_changed(const char* new_settings_json, bool* new_
         return false;
     }
     
-    // Get the new value
     *new_value = cJSON_IsTrue(low_power_mode);
     
-    // Get the current value
     bool current_value = false;
-    esp_err_t err = storage_get_bool_setting("power.lowPowerMode", &current_value);
+    const esp_err_t err = storage_get_bool_setting("power.lowPowerMode", &current_value);
     
     cJSON_Delete(root);
     
-    // If we couldn't get the current value, assume it's changed
     if (err != ESP_OK) {
         return true;
     }
     
-    // Return true if the value has changed
     return *new_value != current_value;
 }
 
 static void process_settings_ws_message(const char* message) {
     if (!message) return;
     
-    // Parse JSON message
     cJSON *root = cJSON_Parse(message);
     if (!root) {
         ESP_LOGE(WS_TAG, "Error parsing JSON message");
         return;
     }
     
-    // Get message type
     cJSON *type_obj = cJSON_GetObjectItem(root, "type");
     if (!type_obj || !cJSON_IsString(type_obj)) {
         ESP_LOGE(WS_TAG, "Missing or invalid 'type' field in message");
@@ -337,14 +319,11 @@ static void process_settings_ws_message(const char* message) {
     
     const char *type = type_obj->valuestring;
     
-    // Special handling for wifi_check_saved type
     if (strcmp(type, "wifi_check_saved") == 0) {
-        // This type doesn't need a command field
         cJSON_Delete(root);
         return;
     }
     
-    // Get command for command type messages
     if (strcmp(type, "command") == 0) {
         cJSON *command_obj = cJSON_GetObjectItem(root, "command");
         if (!command_obj || !cJSON_IsString(command_obj)) {
@@ -369,7 +348,6 @@ static void process_settings_ws_message(const char* message) {
                 return;
             }
             
-            // Convert content to string
             char *new_settings = cJSON_PrintUnformatted(content_obj);
             if (!new_settings) {
                 ESP_LOGE(WS_TAG, "Error converting settings to string");
@@ -377,35 +355,26 @@ static void process_settings_ws_message(const char* message) {
                 return;
             }
             
-            // Check if lowPowerMode has changed
             bool new_low_power_mode = false;
             bool low_power_mode_changed = has_low_power_mode_changed(new_settings, &new_low_power_mode);
+
+            const esp_err_t err = storage_update_settings(new_settings);
             
-            // Save settings using the storage module
-            esp_err_t err = storage_update_settings(new_settings);
-            
-            // Send response based on result
             if (err == ESP_OK) {
-                // Send success response
                 ws_broadcast_json("settings_update_status", "{\"success\":true}");
                 
-                // If lowPowerMode has changed, disconnect BLE and unbond all devices
                 if (low_power_mode_changed) {
                     ESP_LOGI(WS_TAG, "lowPowerMode changed to %s, disconnecting BLE and unbonding devices", 
                              new_low_power_mode ? "true" : "false");
                     
-                    // Deinitialize BLE HID device (disconnects)
                     ble_hid_device_deinit();
                     
-                    // Remove all bonded devices
                     remove_all_bonded_devices();
                     
-                    // Reinitialize BLE HID device
                     ble_hid_device_init();
                     ble_hid_device_start_advertising();
                 }
             } else {
-                // Send error response
                 char error_msg[100];
                 snprintf(error_msg, sizeof(error_msg), "{\"success\":false,\"error\":\"%s\"}", esp_err_to_name(err));
                 ws_broadcast_json("settings_update_status", error_msg);

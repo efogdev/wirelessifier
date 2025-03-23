@@ -11,7 +11,7 @@
 #include "storage.h"
 
 static const char *TAG = "RGB_UTILS";
-#define BASE_FPS 90
+#define BASE_FPS 120
 static uint16_t s_current_fps = BASE_FPS;
 uint8_t g_rgb_brightness = 35;
 
@@ -28,7 +28,7 @@ typedef enum {
     BATTERY_CHARGE_LEVEL_LOW,
 } status_animation_type_t;
 
-static const led_pattern_t led_patterns[] = {
+static const led_pattern_t led_patterns[] __attribute__((section(".rodata"))) = {
     // IDLE 
     {
         .colors = {NP_RGB(255, 0, 0), 0},
@@ -105,17 +105,16 @@ static uint32_t s_last_wifi_blink_time = 0;
 #define STATUS_BLINK_PERIOD_MS 500
 static uint32_t s_last_blink_time = 0;
 
-// Function prototypes
 static void update_status_led(tNeopixel* pixels);
 static void update_wifi_status_led(tNeopixel* pixels);
-static inline void apply_pattern(tNeopixel* pixels, const led_pattern_t* pattern);
+static  void apply_pattern(tNeopixel* pixels, const led_pattern_t* pattern);
 
-static inline uint32_t get_cycle_time_ms(uint8_t speed) {
+static  uint32_t get_cycle_time_ms(const uint8_t speed) {
     if (speed == 0) return MAX_CYCLE_TIME_MS;
     return MIN_CYCLE_TIME_MS + ((MAX_CYCLE_TIME_MS - MIN_CYCLE_TIME_MS) * (100 - speed)) / 100;
 }
 
-static inline float get_animation_progress(uint32_t current_time, uint32_t cycle_time) {
+static  float get_animation_progress(const uint32_t current_time, const uint32_t cycle_time) {
     const uint32_t elapsed = current_time - s_animation_start_time;
     return (float)(elapsed % cycle_time) / cycle_time;
 }
@@ -189,7 +188,7 @@ static void update_fps_from_settings(void)
     }
 }
 
-void led_control_init(int num_leds, int gpio_pin)
+void led_control_init(const int num_leds, const int gpio_pin)
 {
     // Get LED brightness from settings
     int brightness;
@@ -317,7 +316,7 @@ void led_update_pattern(bool usb_connected, bool ble_connected, bool ble_paused)
     check_and_update_task_suspension();
 }
 
-void led_update_status(uint32_t color, uint8_t mode)
+void led_update_status(const uint32_t color, const uint8_t mode)
 {
     // Disable WiFi animation when setting a regular status
     s_wifi_animation = WIFI_ANIM_NONE;
@@ -438,7 +437,7 @@ static void update_status_led(tNeopixel* pixels)
     }
 }
 
-static inline void apply_pattern(tNeopixel* pixels, const led_pattern_t* pattern)
+static  void apply_pattern(tNeopixel* pixels, const led_pattern_t* pattern)
 {
     const int column_length = (s_num_leds - 1) / 2;
     const uint32_t current_color = s_use_secondary_color ? pattern->colors[1] : pattern->colors[0];
@@ -548,7 +547,7 @@ static inline void apply_pattern(tNeopixel* pixels, const led_pattern_t* pattern
     }
 }
 
-static void blend_colors(tNeopixel* dest, const tNeopixel* src1, const tNeopixel* src2, float blend_factor)
+static void blend_colors(tNeopixel* dest, const tNeopixel* src1, const tNeopixel* src2, const float blend_factor)
 {
     // Extract RGB components
     const uint8_t r1 = (src1->rgb >> 16) & 0xFF;

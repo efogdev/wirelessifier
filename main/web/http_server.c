@@ -17,35 +17,33 @@ static httpd_handle_t server = NULL;
 static TaskHandle_t dns_task_handle = NULL;
 EventGroupHandle_t wifi_event_group;
 
-// Default WiFi configuration
 #define WIFI_SSID      "AnyBLE WEB"
 #define WIFI_CHANNEL   1
-#define MAX_CONN       4
+#define MAX_CONN       3
 
-// Event bits
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT      BIT1
 
 static esp_err_t root_get_handler(httpd_req_t *req)
 {
-    extern const uint8_t web_front_index_html_start[] asm("_binary_index_min_html_start");
-    extern const uint8_t web_front_index_html_end[] asm("_binary_index_min_html_end");
+    extern const char web_front_index_html_start[] asm("_binary_index_min_html_start");
+    extern const char web_front_index_html_end[] asm("_binary_index_min_html_end");
     const size_t index_html_size = (web_front_index_html_end - web_front_index_html_start);
     
     httpd_resp_set_type(req, "text/html");
-    httpd_resp_send(req, (const char*)web_front_index_html_start, index_html_size);
+    httpd_resp_send(req, web_front_index_html_start, index_html_size);
     
     return ESP_OK;
 }
 
 static esp_err_t settings_get_handler(httpd_req_t *req)
 {
-    extern const uint8_t web_front_settings_html_start[] asm("_binary_settings_min_html_start");
-    extern const uint8_t web_front_settings_html_end[] asm("_binary_settings_min_html_end");
+    extern const char web_front_settings_html_start[] asm("_binary_settings_min_html_start");
+    extern const char web_front_settings_html_end[] asm("_binary_settings_min_html_end");
     const size_t settings_html_size = (web_front_settings_html_end - web_front_settings_html_start);
     
     httpd_resp_set_type(req, "text/html");
-    httpd_resp_send(req, (const char*)web_front_settings_html_start, settings_html_size);
+    httpd_resp_send(req, web_front_settings_html_start, settings_html_size);
     
     return ESP_OK;
 }
@@ -55,28 +53,28 @@ static esp_err_t lib_get_handler(httpd_req_t *req)
     const char *req_uri = req->uri;
     
     if (strstr(req_uri, "react.production.min.js")) {
-        extern const uint8_t web_front_lib_react_production_min_js_start[] asm("_binary_react_production_min_js_start");
-        extern const uint8_t web_front_lib_react_production_min_js_end[] asm("_binary_react_production_min_js_end");
+        extern const char web_front_lib_react_production_min_js_start[] asm("_binary_react_production_min_js_start");
+        extern const char web_front_lib_react_production_min_js_end[] asm("_binary_react_production_min_js_end");
         const size_t js_size = (web_front_lib_react_production_min_js_end - web_front_lib_react_production_min_js_start) - 1;
         
         httpd_resp_set_type(req, "application/javascript");
-        httpd_resp_send(req, (const char*)web_front_lib_react_production_min_js_start, js_size);
+        httpd_resp_send(req, web_front_lib_react_production_min_js_start, js_size);
     } 
     else if (strstr(req_uri, "react-dom.production.min.js")) {
-        extern const uint8_t web_front_lib_react_dom_production_min_js_start[] asm("_binary_react_dom_production_min_js_start");
-        extern const uint8_t web_front_lib_react_dom_production_min_js_end[] asm("_binary_react_dom_production_min_js_end");
+        extern const char web_front_lib_react_dom_production_min_js_start[] asm("_binary_react_dom_production_min_js_start");
+        extern const char web_front_lib_react_dom_production_min_js_end[] asm("_binary_react_dom_production_min_js_end");
         const size_t js_size = (web_front_lib_react_dom_production_min_js_end - web_front_lib_react_dom_production_min_js_start) - 1;
         
         httpd_resp_set_type(req, "application/javascript");
-        httpd_resp_send(req, (const char*)web_front_lib_react_dom_production_min_js_start, js_size);
+        httpd_resp_send(req, web_front_lib_react_dom_production_min_js_start, js_size);
     }
     else if (strstr(req_uri, "settings.js")) {
-        extern const uint8_t web_front_lib_settings_js_start[] asm("_binary_settings_js_start");
-        extern const uint8_t web_front_lib_settings_js_end[] asm("_binary_settings_js_end");
+        extern const char web_front_lib_settings_js_start[] asm("_binary_settings_js_start");
+        extern const char web_front_lib_settings_js_end[] asm("_binary_settings_js_end");
         const size_t js_size = (web_front_lib_settings_js_end - web_front_lib_settings_js_start) - 1;
         
         httpd_resp_set_type(req, "application/javascript");
-        httpd_resp_send(req, (const char*)web_front_lib_settings_js_start, js_size);
+        httpd_resp_send(req, web_front_lib_settings_js_start, js_size);
     }
     else {
         return ESP_ERR_NOT_FOUND;
@@ -122,14 +120,9 @@ static const httpd_uri_t redirect = {
     .user_ctx = NULL
 };
 
-// External reference to retry counter
 extern int s_retry_num;
 
-// Forward declaration for the scan completion handler
-extern void process_wifi_scan_results(void);
-
-static void event_handler(void* arg, esp_event_base_t event_base,
-    int32_t event_id, void* event_data)
+static void event_handler(void*, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         if (has_wifi_credentials()) {
@@ -141,7 +134,6 @@ static void event_handler(void* arg, esp_event_base_t event_base,
         wifi_mode_t mode;
         esp_wifi_get_mode(&mode);
         
-        // Only attempt reconnection if WiFi is still enabled (not in AP mode)
         if (mode == WIFI_MODE_STA || mode == WIFI_MODE_APSTA) {
             s_retry_num++;
             
@@ -160,12 +152,12 @@ static void event_handler(void* arg, esp_event_base_t event_base,
         ESP_LOGI(HTTP_TAG, "WIFI_EVENT_SCAN_DONE");
         process_wifi_scan_results();
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
-        s_retry_num = 0;
-        
-        ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
+        const ip_event_got_ip_t* event = event_data;
         char ip_str[16];
         snprintf(ip_str, sizeof(ip_str), IPSTR, IP2STR(&event->ip_info.ip));
         ESP_LOGI(HTTP_TAG, "Got IP: %s", ip_str);
+
+        s_retry_num = 0;
         xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
         update_wifi_connection_status(true, ip_str);
     }
@@ -176,14 +168,12 @@ void init_wifi_apsta(void)
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
-    // Always create both netifs regardless of credentials
     esp_netif_create_default_wifi_ap();
     esp_netif_create_default_wifi_sta();
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
-    // Register event handlers
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL));
 
@@ -199,20 +189,17 @@ void init_wifi_apsta(void)
 
     bool is_apsta_mode = false;
     if (has_wifi_credentials()) {
-        // Use STA mode when credentials exist
         ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
         ESP_LOGI(HTTP_TAG, "WiFi initialized in STA mode.");
         is_apsta_mode = false;
     } else {
-        // Use APSTA mode when no credentials
         ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
         ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
         ESP_LOGI(HTTP_TAG, "WiFi initialized in APSTA mode.");
         is_apsta_mode = true;
     }
 
-    // Initialize WiFi status LED
-    led_update_wifi_status(is_apsta_mode, false);  // Initially not connected
+    led_update_wifi_status(is_apsta_mode, false);
 
     ESP_ERROR_CHECK(esp_wifi_start());
 }
@@ -235,26 +222,18 @@ httpd_handle_t start_webserver(void)
     ESP_LOGI(HTTP_TAG, "Starting server on port: '%d'", config.server_port);
     
     if (httpd_start(&server, &config) == ESP_OK) {
-        // Register URI handlers
         httpd_register_uri_handler(server, &root);
         httpd_register_uri_handler(server, &settings);
         httpd_register_uri_handler(server, &lib);
 
-        // Initialize websocket server
         init_websocket(server);
-        
-        // Start WebSocket ping task
         start_ws_ping_task();
-        
-        // Initialize OTA server
         init_ota_server(server);
         
-        // Start DNS server for captive portal if in AP mode
         if (!has_wifi_credentials() || esp_wifi_get_mode(NULL) == WIFI_MODE_APSTA) {
             start_dns_server(&dns_task_handle);
         }
 
-        // Other
         httpd_register_uri_handler(server, &redirect);
 
         return server;
@@ -281,7 +260,6 @@ static void web_services_task(void *pvParameters)
 {
     ESP_LOGI(HTTP_TAG, "Initializing web services in task");
     
-    // Initialize NVS
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
@@ -289,21 +267,16 @@ static void web_services_task(void *pvParameters)
     }
     ESP_ERROR_CHECK(ret);
     
-    // Initialize WiFi AP+STA
     init_wifi_apsta();
-    
-    // Check if we have stored WiFi credentials
     if (has_wifi_credentials()) {
-        // Try to connect with stored credentials
         ESP_LOGI(HTTP_TAG, "Found stored WiFi credentials, attempting to connect");
-    
-        EventBits_t bits = xEventGroupWaitBits(wifi_event_group,
+
+        const EventBits_t bits = xEventGroupWaitBits(wifi_event_group,
             WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdFALSE, pdFALSE, 10000 / portTICK_PERIOD_MS);
 
         if (bits & WIFI_FAIL_BIT) {
-            // Set one-time boot flag to start with WiFi and reboot
             nvs_handle_t nvs_handle;
-            esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
+            const esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
             if (err == ESP_OK) {
                 nvs_set_u8(nvs_handle, NVS_KEY_BOOT_WITH_WIFI, 1);
                 nvs_commit(nvs_handle);
@@ -316,12 +289,9 @@ static void web_services_task(void *pvParameters)
 
     }
     
-    // Start the web server
     start_webserver();
-    
-    // Task should remain running to keep the web server alive
     while (1) {
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(123456));
     }
 }
 

@@ -35,11 +35,10 @@ void task_monitor_increment_usb_report_counter(void)
 
 static esp_err_t print_real_time_stats(const TickType_t xTicksToWait)
 {
-    UBaseType_t start_array_size, end_array_size;
     uint32_t start_run_time, end_run_time;
 
     // Get current task states
-    start_array_size = uxTaskGetSystemState(start_array, MAX_TASKS, &start_run_time);
+    const UBaseType_t start_array_size = uxTaskGetSystemState(start_array, MAX_TASKS, &start_run_time);
     if (start_array_size == 0 || start_array_size > MAX_TASKS) {
         return ESP_ERR_INVALID_SIZE;
     }
@@ -47,13 +46,13 @@ static esp_err_t print_real_time_stats(const TickType_t xTicksToWait)
     vTaskDelay(xTicksToWait);
 
     // Get post delay task states
-    end_array_size = uxTaskGetSystemState(end_array, MAX_TASKS, &end_run_time);
+    const UBaseType_t end_array_size = uxTaskGetSystemState(end_array, MAX_TASKS, &end_run_time);
     if (end_array_size == 0 || end_array_size > MAX_TASKS) {
         return ESP_ERR_INVALID_SIZE;
     }
 
     // Calculate total_elapsed_time in units of run time stats clock period.
-    uint32_t total_elapsed_time = (end_run_time - start_run_time);
+    const uint32_t total_elapsed_time = (end_run_time - start_run_time);
     if (total_elapsed_time == 0) {
         return ESP_ERR_INVALID_STATE;
     }
@@ -74,14 +73,14 @@ static esp_err_t print_real_time_stats(const TickType_t xTicksToWait)
         }
         //Check if matching task found
         if (k >= 0) {
-            uint32_t task_elapsed_time = end_array[k].ulRunTimeCounter - start_array[i].ulRunTimeCounter;
-            uint32_t percentage_time = (task_elapsed_time * 100UL) / (total_elapsed_time * portNUM_PROCESSORS);
+            const uint32_t task_elapsed_time = end_array[k].ulRunTimeCounter - start_array[i].ulRunTimeCounter;
+            const uint32_t percentage_time = (task_elapsed_time * 100UL) / (total_elapsed_time * portNUM_PROCESSORS);
             // Convert microseconds to milliseconds
-            uint32_t task_elapsed_ms = task_elapsed_time / 1000;
+            const uint32_t task_elapsed_ms = task_elapsed_time / 1000;
             
             // Calculate free stack space and percentage
-            UBaseType_t stack_high_water = end_array[k].usStackHighWaterMark;
-            UBaseType_t bytes_free = stack_high_water * sizeof(StackType_t);
+            const UBaseType_t stack_high_water = end_array[k].usStackHighWaterMark;
+            const UBaseType_t bytes_free = stack_high_water * sizeof(StackType_t);
             
             ESP_LOGI(TAG, "%-16s| %9"PRIu32" ms | %2"PRIu32"%% | %d ",
                     start_array[i].pcTaskName, task_elapsed_ms, percentage_time, bytes_free);
@@ -108,7 +107,7 @@ static void monitor_task(void *pvParameter)
         ESP_LOGI(TAG, "");
 
         // Get and print heap info
-        size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+        const size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
         ESP_LOGI(TAG, "Free heap: %d kb", free_heap / 1024);
         
         // Get and print temperature
@@ -140,6 +139,6 @@ esp_err_t task_monitor_start(void)
         return ESP_ERR_INVALID_STATE;
     }
 
-    BaseType_t ret = xTaskCreatePinnedToCore(monitor_task, "monitor", 2048, NULL, STATS_TASK_PRIO, &monitor_task_handle, 1);
+    const BaseType_t ret = xTaskCreatePinnedToCore(monitor_task, "monitor", 2048, NULL, STATS_TASK_PRIO, &monitor_task_handle, 1);
     return (ret == pdPASS) ? ESP_OK : ESP_FAIL;
 }

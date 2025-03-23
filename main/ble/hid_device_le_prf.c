@@ -200,7 +200,7 @@ void hidd_get_attr_value(const uint16_t handle, uint16_t *length, uint8_t **valu
     const hidd_inst_t *hidd_inst = &hidd_le_env.hidd_inst;
     if (hidd_inst->att_tbl[HIDD_LE_IDX_HID_INFO_VAL] <= handle &&
         hidd_inst->att_tbl[HIDD_LE_IDX_REPORT_REP_REF] >= handle) {
-        esp_ble_gatts_get_attr_value(handle, length, (const uint8_t **) value);
+        esp_ble_gatts_get_attr_value(handle, length, (const uint8_t **)value);
     } else {
         ESP_LOGE(HID_LE_PRF_TAG, "%s error:Invalid handle value.", __func__);
     }
