@@ -16,6 +16,7 @@
             --bg-color: #ffffff;
             --text-color: #333333;
             --border-color: #dddddd;
+            --separator-color: #dddddd;
             --secondary-text: #666666;
             --primary-color: #4CAF50;
             --primary-hover: #45a049;
@@ -37,6 +38,7 @@
                 --bg-color: #1a1a1a;
                 --text-color: #ffffff;
                 --border-color: #333333;
+                --separator-color: #33333300;
                 --secondary-text: #aaaaaa;
                 --primary-color: #5dc162;
                 --primary-hover: #4da850;
@@ -104,7 +106,8 @@
         .setting-group {
             margin-bottom: 20px;
             padding-bottom: 15px;
-            border-bottom: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--separator-color);
+            opacity: 85%;
         }
 
         .setting-group:last-child {
@@ -288,6 +291,10 @@
             margin: 15px 0;
         }
 
+        .file-input-container button {
+            margin-right: 12px;
+        }
+
         .file-input-container input[type="file"] {
             width: 100%;
             padding: 8px;
@@ -333,7 +340,7 @@
         .device-info-panel {
             max-height: 0;
             overflow: hidden;
-            transition: max-height 350ms ease-in-out;
+            transition: all 200ms ease-in-out;
         }
 
         .device-info-panel.expanded {

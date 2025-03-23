@@ -199,7 +199,7 @@ const App = () => {
             content: settings
         }));
 
-        showStatus('Saving settings...', 'info');
+        showStatus('Saving settings…', 'info');
     };
 
     const updateSetting = (category, key, value) => {
@@ -268,7 +268,7 @@ const App = () => {
 
         setOtaInProgress(true);
         setOtaProgress(0);
-        showStatus('Starting firmware upload...', 'info');
+        showStatus('Starting firmware upload…', 'info');
         window.scrollTo(0, 0);
 
         fetch('/upload', {
@@ -295,7 +295,7 @@ const App = () => {
         return (
             <div id="loadingContainer">
                 <div className="spinner"></div>
-                <p>{connected ? 'Loading settings' : 'Waiting for connection...'}</p>
+                <p>{connected ? 'Loading settings' : 'Waiting for connection…'}</p>
             </div>
         );
     }
@@ -331,7 +331,7 @@ const App = () => {
                     </div>
 
                     <div onClick={() => setDeviceInfoExpanded(!deviceInfoExpanded)} className="temp-display">
-                        <h3>{deviceInfoExpanded ? '▼(but left)' : '▼'} {systemInfo.socTemp.toFixed(0)}°C</h3>
+                        <h3>{deviceInfoExpanded ? '' : '▼'} {systemInfo.socTemp.toFixed(0)}°C</h3>
                     </div>
                 </div>
 
@@ -528,8 +528,9 @@ const App = () => {
 
                     <div className="setting-item">
                         <div className="setting-description">
-                            Upload a new firmware file to update the device. 
-                            The device will reboot after a successful update.
+                            Upload a new firmware file (.bin) to update the device.
+                            It will reboot after the successful update.
+                            Faulty firmware will be rolled back automatically.
                         </div>
 
                         {otaInProgress ? (
@@ -542,7 +543,7 @@ const App = () => {
                                         {otaProgress}%
                                     </div>
                                 </div>
-                                <p>Uploading firmware...</p>
+                                <p>Uploading firmware…</p>
                             </div>
                         ) : (
                             <div>
@@ -551,14 +552,18 @@ const App = () => {
                                         type="file"
                                         ref={fileInputRef}
                                         accept=".bin"
+                                        style={{ display: 'none' }}
                                     />
+                                    <button onClick={() => fileInputRef.current?.click()}>
+                                        Choose file…
+                                    </button>
+                                    <button
+                                        onClick={handleFirmwareUpload}
+                                        disabled={!connected || !fileInputRef.current?.files?.length}
+                                    >
+                                        Flash
+                                    </button>
                                 </div>
-                                <button
-                                    onClick={handleFirmwareUpload}
-                                    disabled={!connected || !fileInputRef.current?.files?.length}
-                                >
-                                    Flash
-                                </button>
                             </div>
                         )}
                     </div>
