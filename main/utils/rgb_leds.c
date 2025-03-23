@@ -218,8 +218,8 @@ __attribute__((section(".text"))) static void check_and_update_task_suspension(v
     
     if (s_led_pattern >= 0 && s_led_pattern < sizeof(led_patterns)/sizeof(led_patterns[0])) {
         const led_pattern_t* pattern = &led_patterns[s_led_pattern];
-        bool only_zero_color = (pattern->colors[0] == 0);
-        bool status_led_off = (s_status_led_state.mode == STATUS_MODE_OFF) && 
+        const bool only_zero_color = (pattern->colors[0] == 0);
+        const bool status_led_off = (s_status_led_state.mode == STATUS_MODE_OFF) &&
                             (s_status_led_state.animation == WIFI_ANIM_NONE);
         
         should_suspend = only_zero_color && status_led_off;
@@ -327,11 +327,11 @@ void led_update_pattern(const bool usb_connected, const bool ble_connected, cons
     }
     
     if (s_in_wakeup_debounce) {
-        if ((current_time - s_wakeup_debounce_start_time) < WAKEUP_DEBOUNCE_MS) {
+        if (current_time - s_wakeup_debounce_start_time < WAKEUP_DEBOUNCE_MS) {
             return;
-        } else {
-            s_in_wakeup_debounce = false;
         }
+
+        s_in_wakeup_debounce = false;
     }
     
     if (new_pattern != s_led_pattern) {

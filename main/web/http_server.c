@@ -144,10 +144,13 @@ static void event_handler(void*, esp_event_base_t event_base, int32_t event_id, 
                 ESP_LOGI(HTTP_TAG, "Failed to connect after %d attempts", MAX_RETRY);
                 xEventGroupSetBits(wifi_event_group, WIFI_FAIL_BIT);
             }
+
+            if (is_wifi_enabled()) {
+                update_wifi_connection_status(false, NULL);
+            }
         }
         
         xEventGroupClearBits(wifi_event_group, WIFI_CONNECTED_BIT);
-        update_wifi_connection_status(false, NULL);
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_SCAN_DONE) {
         ESP_LOGI(HTTP_TAG, "WIFI_EVENT_SCAN_DONE");
         process_wifi_scan_results();
@@ -200,7 +203,6 @@ void init_wifi_apsta(void)
     }
 
     led_update_wifi_status(is_apsta_mode, false);
-
     ESP_ERROR_CHECK(esp_wifi_start());
 }
 

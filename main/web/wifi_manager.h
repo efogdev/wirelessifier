@@ -104,6 +104,14 @@ void update_wifi_connection_status(bool connected, const char* ip);
 bool is_wifi_connected(void);
 
 /**
+ * @brief Check if WiFi and web stack are enabled
+ *
+ * @return true if yes
+ * @return false if not
+ */
+bool is_wifi_enabled(void);
+
+/**
  * @brief Start the WebSocket ping task
  * 
  * This task sends periodic ping messages to all connected WebSocket clients

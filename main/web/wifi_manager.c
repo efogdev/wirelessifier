@@ -360,22 +360,26 @@ void disable_wifi_and_web_stack(void) {
  
     s_web_stack_disabled = true;
     is_connected = false;
-    s_retry_num = MAX_RETRY; // Prevent further reconnection attempts
-    
-    // Send confirmation message before stopping services
-    ws_broadcast_json("web_stack_disabled", "{}");
-    vTaskDelay(pdMS_TO_TICKS(100)); // Give time for the message to be sent
+    s_retry_num = MAX_RETRY;
 
-    // Stop web server and related services (HTTP, WebSocket, OTA, DNS)
+    led_update_wifi_status(false, false);
+    led_update_status(0, 0);
+
+    ws_broadcast_json("web_stack_disabled", "{}");
+    vTaskDelay(pdMS_TO_TICKS(50));
+
     stop_webserver();
-    
-    // Stop WiFi
+    vTaskDelay(pdMS_TO_TICKS(50));
+
     esp_wifi_disconnect();
     esp_wifi_stop();
+    vTaskDelay(pdMS_TO_TICKS(50));
 
-    led_update_status(0, 0);
-    
-    // Clear one-time boot flag to prevent auto-starting WiFi on next boot
+    esp_wifi_deinit();
+    esp_netif_destroy_default_wifi(esp_netif_get_default_netif());
+    esp_netif_destroy(esp_netif_get_default_netif());
+    esp_netif_deinit();
+
     nvs_handle_t nvs_handle;
     const esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
     if (err == ESP_OK) {
@@ -384,6 +388,9 @@ void disable_wifi_and_web_stack(void) {
         nvs_close(nvs_handle);
         ESP_LOGI(WIFI_TAG, "Cleared boot with WiFi flag");
     }
+
+    led_update_wifi_status(false, false);
+    led_update_status(0, 0);
 }
 
 // Reboot the device
@@ -479,6 +486,7 @@ void process_wifi_ws_message(const char* message) {
 // Update connection status based on events
 void update_wifi_connection_status(bool connected, const char* ip) {
     if (s_web_stack_disabled) {
+        led_update_wifi_status(false, false);
         led_update_status(0, 0);
         return;
     }
@@ -502,11 +510,20 @@ bool is_wifi_connected(void) {
     return is_connected;
 }
 
+bool is_wifi_enabled(void) {
+    return !s_web_stack_disabled;
+}
+
 // WebSocket ping task function
 static void ws_ping_task(void *pvParameters) {
     ESP_LOGI(WIFI_TAG, "WebSocket ping task started");
     
     while (1) {
+        if (s_web_stack_disabled || !is_connected) {
+            vTaskDelay(pdMS_TO_TICKS(WS_PING_INTERVAL_MS));
+            continue;
+        }
+
         // Get free heap size
         const uint32_t free_heap = esp_get_free_heap_size();
         
