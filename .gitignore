@@ -5,3 +5,5 @@ build
 .idea
 cmake-build-debug
 **/node_modules
+*.min.html
+*.js
