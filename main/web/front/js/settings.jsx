@@ -204,24 +204,6 @@ const App = () => {
 
     const updateSetting = (category, key, value) => {
         setSettings(prevSettings => {
-            if (category === 'power') {
-                if (key === 'sleepTimeout') {
-                    if (value < 20 || value > 1800) {
-                        showStatus('Sleep timeout must be between 20 and 1800 seconds.', 'error');
-                        return prevSettings;
-                    }
-                }
-                if (key === 'deepSleepTimeout') {
-                    if (value < 20 || value > 99999) {
-                        showStatus('Deep sleep timeout must be between 20 and 99999 seconds.', 'error');
-                        return prevSettings;
-                    }
-                    if (prevSettings.power.separateSleepTimeouts && value <= prevSettings.power.sleepTimeout) {
-                        showStatus('Deep sleep timeout must be greater than sleep timeout.', 'error');
-                        return prevSettings;
-                    }
-                }
-            }
             return {
                 ...prevSettings,
                 [category]: {
@@ -454,7 +436,7 @@ const App = () => {
                             </label>
                         </div>
 
-                        <div className="setting-item">
+                        <div className={`setting-item ${settings.power.deepSleep ? 'animate-visible' : 'animate-hidden'}`}>
                             <div className="setting-title">Separate sleep timeouts</div>
                             <div className="setting-description">
                                 If disabled, the device will go into the deep sleep immediately after entering light sleep.
@@ -481,7 +463,7 @@ const App = () => {
                             </div>
                             <input
                                 type="number"
-                                min="0"
+                                min="20"
                                 max="3600"
                                 value={settings.power.sleepTimeout}
                                 onChange={(e) => updateSetting('power', 'sleepTimeout', parseInt(e.target.value))}
@@ -496,7 +478,7 @@ const App = () => {
                             </div>
                             <input
                                 type="number"
-                                min="0"
+                                min="20"
                                 max="3600"
                                 value={settings.power.deepSleepTimeout}
                                 onChange={(e) => updateSetting('power', 'deepSleepTimeout', parseInt(e.target.value))}
