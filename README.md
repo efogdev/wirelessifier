@@ -1,4 +1,4 @@
-# ESP32-S3 HID Bridge
+# Wirelessifier: USB-to-BLE bridge
 
 **⚠️ This project is currently in development. Functionality is very limited and not complete.**
 
@@ -8,18 +8,17 @@ This project implements a Human Interface Device (HID) bridge using the ESP32-S3
 
 ## Features
 
-- USB HID Host: Connects to USB keyboards and mice
-- BLE HID Device: Emulates Bluetooth keyboard and mouse
-- Power Management: Implements light sleep mode for battery efficiency
-- RGB LED Indicators: Shows connection status
-- Web Configuration Interface: Configure device settings via WiFi
-- OTA Updates: Update firmware over-the-air
+- Acts as USB HID Host
+- Acts as BLE keyboard and mouse
+- Implements light and deep sleep modes for battery efficiency
+- Comprehensive status info with RGB LED array
+- Web configuration interface via WiFi
+- OTA updates
 
 ## Requirements
 
 - ESP-IDF v5.5 (Espressif IoT Development Framework)
-- Compatible USB HID devices (keyboards, mice)
-- The custom PCB
+- The Wirelessifier PCB
 
 ## Building and Flashing
 
@@ -28,16 +27,16 @@ Make sure you have ESP-IDF installed and properly set up.
 
 ```bash
 # Build the project
-idf.py build
+make build
 
-# Flash to your ESP32-S3
-idf.py -p (PORT) flash
+# Flash 
+make flash
 ```
 
 ## Usage
 
-1. Connect a USB HID device (keyboard or mouse) to the ESP32-S3 USB port
-2. The device will automatically start advertising as a BLE HID device
+1. The device will automatically start advertising as a BLE HID device
+2. Connect a USB HID device (keyboard or mouse) to the ESP32-S3 USB port
 3. Pair with the BLE device from your computer or mobile device
 4. Input from the USB device will be forwarded to the connected BLE host
 
@@ -45,15 +44,8 @@ idf.py -p (PORT) flash
 
 To access the web configuration interface:
 1. Hold the SW1 button during boot
-2. Connect to the ESP32-S3 WiFi access point
-3. Navigate to the configuration page in your web browser
-
-## Power Management
-
-The device implements power-saving features:
-- Automatically enters light sleep mode after 30 seconds of inactivity
-- Wakes up on USB HID input
-- BLE stack is paused during inactivity to save power
+2. Connect to the open access point
+3. Navigate to 192.168.4.1 in your web browser
 
 ## License
 
