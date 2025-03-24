@@ -9,3 +9,4 @@ cmake-build-debug
 *.js
 .venv
 *.ttf
+.cache

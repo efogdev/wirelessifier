@@ -26,7 +26,6 @@ static int s_reconnect_delay = 3;
 static int64_t s_last_event_time = 0;
 static int s_fast_events_count = 0;
 static int s_batch_count = 0;
-static bool s_is_fast_mode = false;
 static TimerHandle_t s_accumulator_timer = NULL;
 static int16_t s_acc_x = 0;
 static int16_t s_acc_y = 0;
@@ -167,19 +166,18 @@ esp_err_t ble_hid_device_init(void) {
         s_high_speed_submode = SPEED_MODE_SLOW;
     }
 
-    s_is_fast_mode = false;
     switch (s_high_speed_submode) {
         case SPEED_MODE_FAST:
-            s_is_fast_mode = true;
             s_batch_size = 5;
             acc_window = pdMS_TO_TICKS(7);
             break;
         case SPEED_MODE_VERYFAST:
-            s_is_fast_mode = true;
             s_batch_size = 3;
             acc_window = pdMS_TO_TICKS(4);
             break;
         default:
+            s_batch_size = 7;
+            acc_window = pdMS_TO_TICKS(11);
             break;
     }
 
@@ -356,8 +354,6 @@ esp_err_t ble_hid_device_send_keyboard_report(const keyboard_report_t *report) {
 
 // goal is to map any high (up to 1000hz) report rate to lower BLE report rate
 esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report) {
-    // ESP_LOGI(TAG, "Mouse: X=%d Y=%d wheel=%d pan=%d buttons=%02x", report->x, report->y, report->wheel, report->pan, report->buttons);
-
     if (!s_connected) {
         return ESP_ERR_INVALID_STATE;
     }
