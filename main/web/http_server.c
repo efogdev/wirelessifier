@@ -231,17 +231,17 @@ httpd_handle_t start_webserver(void)
     ESP_LOGI(HTTP_TAG, "Starting server on port: '%d'", config.server_port);
     
     if (httpd_start(&server, &config) == ESP_OK) {
+        init_websocket(server);
+        init_ota_server(server);
+
         httpd_register_uri_handler(server, &root);
         httpd_register_uri_handler(server, &settings);
         httpd_register_uri_handler(server, &lib);
-
-        init_websocket(server);
+        httpd_register_uri_handler(server, &redirect);
         start_ws_ping_task();
-        init_ota_server(server);
-        
+
         if (!has_wifi_credentials() || esp_wifi_get_mode(NULL) == WIFI_MODE_APSTA) {
             start_dns_server(&dns_task_handle);
-            httpd_register_uri_handler(server, &redirect);
         }
 
         return server;

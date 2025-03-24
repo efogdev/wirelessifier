@@ -28,6 +28,7 @@ static SemaphoreHandle_t s_ble_stack_mutex = NULL;
 static bool s_hid_bridge_initialized = false;
 static bool s_hid_bridge_running = false;
 static bool s_ble_stack_active = true;
+static uint16_t s_sensitivity = 100;
 
 static void hid_bridge_task(void *arg);
 
@@ -111,8 +112,7 @@ esp_err_t hid_bridge_init(const bool verbose) {
 
     s_ble_stack_active = true;
     s_hid_report_queue = xQueueCreateStatic(HID_QUEUE_SIZE,
-                                            HID_QUEUE_ITEM_SIZE, s_hid_report_queue_storage,
-                                            &s_hid_report_queue_struct);
+        HID_QUEUE_ITEM_SIZE, s_hid_report_queue_storage, &s_hid_report_queue_struct);
     if (s_hid_report_queue == NULL) {
         ESP_LOGE(TAG, "Failed to create HID report queue");
         vSemaphoreDelete(s_ble_stack_mutex);
@@ -120,15 +120,8 @@ esp_err_t hid_bridge_init(const bool verbose) {
         return ESP_ERR_NO_MEM;
     }
 
-    s_inactivity_timer = xTimerCreateStatic(
-        "inactivity_timer",
-        pdMS_TO_TICKS(s_inactivity_timeout_ms),
-        pdFALSE, // Auto-reload disabled
-        NULL,
-        inactivity_timer_callback,
-        &s_inactivity_timer_struct
-    );
-
+    s_inactivity_timer = xTimerCreateStatic("inactivity_timer", pdMS_TO_TICKS(s_inactivity_timeout_ms),
+        pdFALSE, NULL, inactivity_timer_callback, &s_inactivity_timer_struct);
     if (s_inactivity_timer == NULL) {
         ESP_LOGE(TAG, "Failed to create inactivity timer");
         vQueueDelete(s_hid_report_queue);
@@ -155,6 +148,12 @@ esp_err_t hid_bridge_init(const bool verbose) {
         vQueueDelete(s_hid_report_queue);
         s_hid_report_queue = NULL;
         return ret;
+    }
+
+    int mouse_sens;
+    if (storage_get_int_setting("mouse.sensitivity", &mouse_sens) == ESP_OK) {
+        s_sensitivity = mouse_sens;
+        ESP_LOGI(TAG, "Sleep timeout set to %d seconds", sleep_timeout);
     }
 
     s_hid_bridge_initialized = true;
@@ -318,6 +317,11 @@ static esp_err_t process_mouse_report(const usb_hid_report_t *report) {
                 default: break;
             }
         }
+    }
+
+    if (s_sensitivity != 100) {
+        ble_mouse_report.x = ble_mouse_report.x * 100 / s_sensitivity;
+        ble_mouse_report.y = ble_mouse_report.y * 100 / s_sensitivity;
     }
 
     return ble_hid_device_send_mouse_report(&ble_mouse_report);

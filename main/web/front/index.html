@@ -586,7 +586,7 @@
         // Check WebSocket activity
         function checkWebSocketActivity() {
             const now = Date.now();
-            if (!isConnectedToWifi && now - lastMessageTime > 3500) {
+            if (!isConnectedToWifi && now - lastMessageTime > 5000) {
                 // Show loading screen with reconnecting message
                 loadingContainer.classList.remove('hidden');
                 mainContainer.classList.add('hidden');

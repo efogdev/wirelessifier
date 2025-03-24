@@ -31,6 +31,9 @@ const App = () => {
         connectivity: {
             bleTxPower: 'low',
             bleReconnectDelay: 3,
+        },
+        mouse: {
+            sensitivity: 100,
         }
     });
 
@@ -488,7 +491,26 @@ const App = () => {
                 </div>
 
                 <div className="setting-group">
-                    <h2>Visuals</h2>
+                    <h2>Miscellaneous</h2>
+
+                    <div className="setting-item">
+                        <div className="setting-title">Mouse sensitivity</div>
+                        <div className="setting-description">
+                            For pointer devices, it's possible to apply the sensitity modifer on the device layer instead of your OS.
+                            However, it is recommended to use OS settings and keep this preference untouched.
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <input
+                                type="range"
+                                min="50"
+                                max="300"
+                                value={settings.mouse.sensitivity}
+                                onChange={(e) => updateSetting('mouse', 'sensitivity', parseInt(e.target.value))}
+                                style={{ flex: 1 }}
+                            />
+                            <span style={{ minWidth: '60px' }}>{settings.mouse.sensitivity}%</span>
+                        </div>
+                    </div>
 
                     <div className="setting-item">
                         <div className="setting-title">Brightness</div>

@@ -22,7 +22,7 @@ static const char *WIFI_TAG = "WIFI_MGR";
 // WebSocket ping task parameters
 #define WS_PING_TASK_STACK_SIZE 2600
 #define WS_PING_TASK_PRIORITY 6
-#define WS_PING_INTERVAL_MS 125
+#define WS_PING_INTERVAL_MS 250
 
 // NVS keys
 #define NVS_NAMESPACE "wifi_config"
@@ -305,7 +305,6 @@ esp_err_t connect_to_wifi(const char* ssid, const char* password) {
         return connect_err;
     }
     
-    // Wait for connection or failure
     const EventBits_t bits = xEventGroupWaitBits(wifi_event_group,
         WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdFALSE, pdFALSE, 40000 / portTICK_PERIOD_MS);
     
@@ -313,46 +312,33 @@ esp_err_t connect_to_wifi(const char* ssid, const char* password) {
 
     if (bits & WIFI_CONNECTED_BIT) {
         ESP_LOGI(WIFI_TAG, "Connected to %s", ssid);
-        
-        // Save credentials if connection successful
         save_wifi_credentials(ssid, password ? password : "");
-        
-        // Send success status
         char status_json[128];
         snprintf(status_json, sizeof(status_json), 
                 "{\"connected\":true,\"ip\":\"%s\",\"attempt\":%d}", 
                 connected_ip, s_retry_num);
         ws_broadcast_json("wifi_connect_status", status_json);
-        
-        // Set one-time boot flag to start with WiFi regardless of SW4 state
         storage_set_boot_with_wifi();
-        vTaskDelay(pdMS_TO_TICKS(100));
-        esp_restart();
+        vTaskDelay(pdMS_TO_TICKS(500));
+        esp_restart();}
 
-        return ESP_OK;
-    } else if (bits & WIFI_FAIL_BIT) {
+    if (bits & WIFI_FAIL_BIT) {
+        char status_json[64];
+        snprintf(status_json, sizeof(status_json), 
+                "{\"connected\":false,\"attempt\":%d}",
+                s_retry_num);
+        ws_broadcast_json("wifi_connect_status", status_json);
         ESP_LOGI(WIFI_TAG, "Failed to connect to %s", ssid);
-        
-        // Send failure status
-        char status_json[64];
-        snprintf(status_json, sizeof(status_json), 
-                "{\"connected\":false,\"attempt\":%d}", 
-                s_retry_num);
-        ws_broadcast_json("wifi_connect_status", status_json);
-        
         return ESP_FAIL;
-    } else {
-        ESP_LOGE(WIFI_TAG, "Connection timeout");
-        
-        // Send timeout status
-        char status_json[64];
-        snprintf(status_json, sizeof(status_json), 
-                "{\"connected\":false,\"attempt\":%d}", 
-                s_retry_num);
-        ws_broadcast_json("wifi_connect_status", status_json);
-        
-        return ESP_ERR_TIMEOUT;
     }
+
+    char status_json[64];
+    snprintf(status_json, sizeof(status_json),
+             "{\"connected\":false,\"attempt\":%d}",
+             s_retry_num);
+    ws_broadcast_json("wifi_connect_status", status_json);
+    ESP_LOGE(WIFI_TAG, "Connection timeout");
+    return ESP_ERR_TIMEOUT;
 }
 
 // Disable WiFi and web stack
@@ -369,7 +355,7 @@ void disable_wifi_and_web_stack(void) {
 
     // Send final WebSocket message before cleanup
     ws_broadcast_json("web_stack_disabled", "{}");
-    vTaskDelay(pdMS_TO_TICKS(50));
+    vTaskDelay(pdMS_TO_TICKS(250));
 
     if (ping_task_handle != NULL && eTaskGetState(ping_task_handle) != eDeleted) {
         vTaskDelete(ping_task_handle);
@@ -409,16 +395,9 @@ void disable_wifi_and_web_stack(void) {
 // Reboot the device
 void reboot_device(bool keep_wifi) {
     ESP_LOGI(WIFI_TAG, "Rebooting device, keep_wifi=%d", keep_wifi);
-    
-    // Send confirmation message before rebooting
-    ws_broadcast_json("log", "\"Rebooting device...\"");
-    
-    // Send reboot message to trigger UI update
     ws_broadcast_json("reboot", "{}");
+    vTaskDelay(pdMS_TO_TICKS(250)); // Give time for the messages to be sent
     
-    vTaskDelay(pdMS_TO_TICKS(20)); // Give time for the messages to be sent
-    
-    // Set or clear the boot with WiFi flag based on user choice
     nvs_handle_t nvs_handle;
     const esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
     if (err == ESP_OK) {
@@ -428,10 +407,7 @@ void reboot_device(bool keep_wifi) {
         ESP_LOGI(WIFI_TAG, "%s boot with WiFi flag", keep_wifi ? "Set" : "Cleared");
     }
     
-    // Small delay to ensure NVS write completes
     vTaskDelay(pdMS_TO_TICKS(20));
-    
-    // Reboot
     esp_restart();
 }
 
@@ -447,21 +423,15 @@ void process_wifi_ws_message(const char* message) {
         scan_wifi_networks();
     }
     else if (strstr(message, "\"type\":\"reboot\"")) {
-        // Extract keepWifi parameter
         bool keep_wifi = false;
         if (strstr(message, "\"keepWifi\":true")) {
             keep_wifi = true;
         }
         
-        // Reboot the device
         reboot_device(keep_wifi);
     }
     else if (strstr(message, "\"type\":\"disable_web_stack\"")) {
-        // Send acknowledgment before disabling
-        ws_broadcast_json("log", "\"Disabling WiFi and web stack...\"");
         vTaskDelay(pdMS_TO_TICKS(500)); // Give time for the message to be sent
-        
-        // Disable WiFi and web stack
         disable_wifi_and_web_stack();
     }
     else if (strstr(message, "\"type\":\"wifi_connect\"")) {
@@ -494,7 +464,6 @@ void process_wifi_ws_message(const char* message) {
     }
 }
 
-// Update connection status based on events
 void update_wifi_connection_status(bool connected, const char* ip) {
     if (s_web_stack_disabled) {
         led_update_wifi_status(false, false);
@@ -507,12 +476,10 @@ void update_wifi_connection_status(bool connected, const char* ip) {
         strlcpy(connected_ip, ip, sizeof(connected_ip));
     }
     
-    // Get current WiFi mode
     wifi_mode_t mode;
     esp_wifi_get_mode(&mode);
     bool is_apsta_mode = (mode == WIFI_MODE_APSTA);
     
-    // Update WiFi status LED
     led_update_wifi_status(is_apsta_mode, connected);
 }
 
@@ -537,10 +504,8 @@ static void ws_ping_task(void *pvParameters) {
         static float temp = 0;
         temp_sensor_get_temperature(&temp);
         
-        static char ping_data[64];
-        snprintf(ping_data, sizeof(ping_data), 
-                "{\"heap\":%lu,\"temp\":%.1f}",
-                free_heap, temp);
+        char ping_data[64];
+        snprintf(ping_data, sizeof(ping_data), "{\"heap\":%lu,\"temp\":%.1f}", free_heap, temp);
         
         ws_broadcast_json("ping", ping_data);
         vTaskDelay(pdMS_TO_TICKS(WS_PING_INTERVAL_MS));

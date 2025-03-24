@@ -188,7 +188,6 @@ static const httpd_uri_t ws = {
 
 void init_websocket(const httpd_handle_t server_handle) {
     server = server_handle;
-    
     client_ctx = calloc(1, sizeof(ws_client_ctx_t));
     if (!client_ctx) {
         ESP_LOGE(WS_TAG, "Failed to allocate client context");
@@ -233,15 +232,17 @@ void ws_queue_message(const char *data) {
 }
 
 void ws_log(const char* text) {
-    if (!text) return;
-    char *buffer = malloc(WS_SMALL_MESSAGE_LEN);
-    if (!buffer) return;
-    
-    const int len = snprintf(buffer, WS_SMALL_MESSAGE_LEN, "{\"type\":\"log\",\"content\":\"%s\"}", text);
-    if (len > 0 && len < sizeof(buffer)) {
-        ws_send_frame_to_all_clients(buffer, len);
-    }
-    free(buffer);
+    // NOOP
+
+    // if (!text) return;
+    // char *buffer = malloc(WS_SMALL_MESSAGE_LEN);
+    // if (!buffer) return;
+    //
+    // const int len = snprintf(buffer, WS_SMALL_MESSAGE_LEN, "{\"type\":\"log\",\"content\":\"%s\"}", text);
+    // if (len > 0 && len < sizeof(buffer)) {
+    //     ws_send_frame_to_all_clients(buffer, len);
+    // }
+    // free(buffer);
 }
 
 esp_err_t init_device_settings(void) {

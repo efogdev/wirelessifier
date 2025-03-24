@@ -57,12 +57,12 @@ static esp_err_t handle_ota_upload(httpd_req_t *req) {
     last_progress = 0;
 
     ESP_LOGI(OTA_TAG, "Starting OTA update...");
-    ws_log("Starting OTA update...");
+    // ws_log("Starting OTA update...");
 
     const esp_partition_t *running = esp_ota_get_running_partition();
     update_partition = esp_ota_get_next_update_partition(running);
     if (update_partition == NULL) {
-        ws_log("Error: No OTA partition available");
+        // ws_log("Error: No OTA partition available");
         return ESP_FAIL;
     }
 
@@ -79,7 +79,7 @@ static esp_err_t handle_ota_upload(httpd_req_t *req) {
             if (received == HTTPD_SOCK_ERR_TIMEOUT) {
                 continue;
             }
-            ws_log("Error: Failed to receive file");
+            // ws_log("Error: Failed to receive file");
             return ESP_FAIL;
         }
 
@@ -88,11 +88,11 @@ static esp_err_t handle_ota_upload(httpd_req_t *req) {
             if (received > sizeof(esp_image_header_t) + sizeof(esp_image_segment_header_t) + sizeof(esp_app_desc_t)) {
                 memcpy(&new_app_info, &ota_write_data[sizeof(esp_image_header_t) + sizeof(esp_image_segment_header_t)], sizeof(esp_app_desc_t));
                 ESP_LOGI(OTA_TAG, "New firmware version: %s", new_app_info.version);
-                ws_log("Validating firmware image...");
+                // ws_log("Validating firmware image...");
                 
                 err = validate_image_header(&new_app_info);
                 if (err != ESP_OK) {
-                    ws_log("Error: Invalid firmware image");
+                    // ws_log("Error: Invalid firmware image");
                     return err;
                 }
 
@@ -100,7 +100,7 @@ static esp_err_t handle_ota_upload(httpd_req_t *req) {
 
                 err = esp_ota_begin(update_partition, OTA_WITH_SEQUENTIAL_WRITES, &update_handle);
                 if (err != ESP_OK) {
-                    ws_log("Error: Failed to begin OTA update");
+                    // ws_log("Error: Failed to begin OTA update");
                     return err;
                 }
             }
@@ -108,7 +108,7 @@ static esp_err_t handle_ota_upload(httpd_req_t *req) {
 
         err = esp_ota_write(update_handle, ota_write_data, received);
         if (err != ESP_OK) {
-            ws_log("Error: Failed to write OTA data");
+            // ws_log("Error: Failed to write OTA data");
             esp_ota_abort(update_handle);
             return err;
         }
@@ -125,20 +125,20 @@ static esp_err_t handle_ota_upload(httpd_req_t *req) {
 
     err = esp_ota_end(update_handle);
     if (err != ESP_OK) {
-        ws_log("Error: Failed to complete OTA update");
+        // ws_log("Error: Failed to complete OTA update");
         if (err == ESP_ERR_OTA_VALIDATE_FAILED) {
-            ws_log("Image validation failed, image is corrupted");
+            // ws_log("Image validation failed, image is corrupted");
         }
         return err;
     }
 
     err = esp_ota_set_boot_partition(update_partition);
     if (err != ESP_OK) {
-        ws_log("Error: Failed to set boot partition");
+        // ws_log("Error: Failed to set boot partition");
         return err;
     }
 
-    ws_log("OTA update successful! Rebooting...");
+    // ws_log("OTA update successful! Rebooting...");
     
     // Send success response before reboot
     httpd_resp_set_status(req, "200 OK");
