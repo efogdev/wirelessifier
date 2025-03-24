@@ -367,7 +367,7 @@ const App = () => {
                         >
                             <option value="slow">±133 rps</option>
                             <option value="fast">≤275 rps</option>
-                            <option value="veryfast">≤400 rps</option>
+                            <option value="veryfast">≤375 rps</option>
                         </select>
                     </div>
 
