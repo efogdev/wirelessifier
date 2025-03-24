@@ -366,8 +366,8 @@ const App = () => {
                             onChange={(e) => updateSetting('power', 'highSpeedSubmode', e.target.value)}
                         >
                             <option value="slow">±125 rps</option>
-                            <option value="fast">≤165 rps</option>
-                            <option value="veryfast">±250 rps</option>
+                            <option value="fast">±160 rps</option>
+                            <option value="veryfast">±240 rps</option>
                         </select>
                     </div>
 
