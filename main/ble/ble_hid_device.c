@@ -144,6 +144,11 @@ static void ble_stats_task(void *arg) {
     TickType_t last_wake_time = xTaskGetTickCount();
     uint16_t s_prev_rps = 0;
     while (1) {
+        if (!s_connected) {
+            vTaskDelay(pdMS_TO_TICKS(100));
+            continue;
+        }
+
         const uint32_t reports_per_sec = (s_current_rps - s_prev_rps) / BLE_STATS_INTERVAL_SEC;
         if (reports_per_sec > 0) {
             ESP_LOGI(TAG, "BLE: %lu rps", reports_per_sec);
@@ -288,6 +293,10 @@ esp_err_t ble_hid_device_deinit(void) {
     if (s_accumulator_timer != NULL) {
         xTimerDelete(s_accumulator_timer, 0);
         s_accumulator_timer = NULL;
+    }
+
+    if (s_stats_task_handle != NULL) {
+        vTaskDelete(s_stats_task_handle);
     }
 
     esp_err_t ret;
