@@ -314,6 +314,9 @@ static esp_err_t process_mouse_report(const usb_hid_report_t *report) {
                 case HID_USAGE_WHEEL:
                     ble_mouse_report.wheel = value;
                 break;
+                case 0x238:
+                    ble_mouse_report.pan = value;
+                break;
                 default: break;
             }
         }

@@ -39,6 +39,9 @@ static int g_field_values[MAX_REPORT_FIELDS];
 static report_map_t g_interface_report_maps[USB_HOST_MAX_INTERFACES] = {0};
 static bool g_verbose = false;
 static uint8_t g_field_counts[USB_HOST_MAX_INTERFACES][MAX_REPORTS_PER_INTERFACE] = {0};
+static usb_host_client_handle_t client_hdl;
+static uint8_t client_addr;
+static bool usb_host_dev_connected = false;
 
 static report_info_t *last_report_info = NULL;
 static int16_t last_report_id = -1;
@@ -56,9 +59,61 @@ static void hid_host_device_callback(hid_host_device_handle_t hid_device_handle,
 static void hid_host_interface_callback(hid_host_device_handle_t hid_device_handle, hid_host_interface_event_t event,
                                         void *arg);
 
+static void control_transfer_cb(usb_transfer_t *transfer) {
+    usb_host_transfer_free(transfer);
+}
+
+static void send_linux_like_control_transfers() {
+    ESP_LOGI(TAG, "Pretending to be Linux");
+
+    usb_device_handle_t dev_hdl;
+    esp_err_t err = usb_host_device_open(client_hdl, client_addr, &dev_hdl);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to open device");
+        return;
+    }
+
+    for (int i = 0; i < 3; i++) {
+        usb_transfer_t *transfer;
+        err = usb_host_transfer_alloc(sizeof(usb_setup_packet_t) + 0xFF, 0, &transfer);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to allocate transfer: %s", esp_err_to_name(err));
+            continue;
+        }
+        
+        // Setup packet for GET_DESCRIPTOR (Device)
+        usb_setup_packet_t *setup = (usb_setup_packet_t *)transfer->data_buffer;
+        setup->bmRequestType = 0x80;  // Device to Host, Standard, Device
+        setup->bRequest = 0x06;       // GET_DESCRIPTOR
+        setup->wValue = (0x01 << 8);  // Device Descriptor
+        setup->wIndex = 0;
+        setup->wLength = 0xFF;        // Set to 0xFF for Linux detection
+        
+        transfer->num_bytes = sizeof(usb_setup_packet_t) + 0xFF;
+        transfer->device_handle = dev_hdl;
+        transfer->bEndpointAddress = 0;  // Control endpoint
+        transfer->callback = control_transfer_cb;
+        transfer->context = NULL;
+        
+        err = usb_host_transfer_submit_control(client_hdl, transfer);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to submit control transfer: %s", esp_err_to_name(err));
+            usb_host_transfer_free(transfer);
+        } else {
+            vTaskDelay(pdMS_TO_TICKS(25));
+        }
+    }
+
+    usb_host_client_deregister(client_hdl);
+    // usb_host_device_close(client_hdl, dev_hdl);
+    ESP_LOGI(TAG, "I'm Arch btw");
+}
+
 uint8_t usb_hid_host_get_num_fields(const uint8_t report_id, const uint8_t interface_num) {
     return g_field_counts[interface_num][report_id];
 }
+
+static void client_event_callback(const usb_host_client_event_msg_t * event_msg, void*);
 
 esp_err_t usb_hid_host_init(const QueueHandle_t report_queue, const bool verbose) {
     ESP_LOGI(TAG, "Initializing USB HID Host");
@@ -103,7 +158,7 @@ esp_err_t usb_hid_host_init(const QueueHandle_t report_queue, const bool verbose
         .intr_flags = ESP_INTR_FLAG_LEVEL1,
     };
 
-    esp_err_t err = usb_host_install(&host_config);
+    const esp_err_t err = usb_host_install(&host_config);
     if (err != ESP_OK) {
         vTaskDelete(g_device_task_handle);
         vQueueDelete(g_device_event_queue);
@@ -118,6 +173,21 @@ esp_err_t usb_hid_host_init(const QueueHandle_t report_queue, const bool verbose
         return ESP_ERR_NO_MEM;
     }
 
+    const usb_host_client_config_t client_config = {
+        .is_synchronous = false,
+        .max_num_event_msg = 5,
+        .async = {
+            .callback_arg = NULL,
+            .client_event_callback = client_event_callback,
+        }
+    };
+
+    const esp_err_t ret = usb_host_client_register(&client_config, &client_hdl);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to register client: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
     const hid_host_driver_config_t hid_host_config = {
         .create_background_task = true,
         .task_priority = 12,
@@ -126,15 +196,7 @@ esp_err_t usb_hid_host_init(const QueueHandle_t report_queue, const bool verbose
         .callback = hid_host_device_callback,
         .callback_arg = NULL
     };
-
-    const esp_err_t ret = hid_host_install(&hid_host_config);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to install HID host driver: %d", ret);
-        vTaskDelete(g_usb_events_task_handle);
-        usb_host_uninstall();
-        return ret;
-    }
-
+    ESP_ERROR_CHECK(hid_host_install(&hid_host_config));
     ESP_LOGI(TAG, "USB HID Host initialized successfully");
     return ESP_OK;
 }
@@ -277,6 +339,16 @@ static void hid_host_interface_callback(const hid_host_device_handle_t hid_devic
     }
 }
 
+static void client_event_callback(const usb_host_client_event_msg_t *event_msg, void *arg) {
+    ESP_LOGI(TAG, "HID Client Event Received: %d", event_msg->event);
+
+    if (event_msg->event == USB_HOST_CLIENT_EVENT_NEW_DEV) {
+        client_addr = event_msg->new_dev.address;
+        send_linux_like_control_transfers();
+        usb_host_dev_connected = true;
+    }
+}
+
 static void device_event_task(void *arg) {
     usb_device_type_event_t evt;
     esp_err_t err;
@@ -291,6 +363,12 @@ static void device_event_task(void *arg) {
             }
 
             if (evt.event == HID_HOST_DRIVER_EVENT_CONNECTED) {
+                uint8_t try = 0;
+                while (!usb_host_dev_connected && try < 100) {
+                    vTaskDelay(pdMS_TO_TICKS(20));
+                    try++;
+                }
+
                 const hid_host_device_config_t dev_config = {
                     .callback = hid_host_interface_callback,
                     .callback_arg = NULL
@@ -371,6 +449,10 @@ static void usb_lib_task(void *arg) {
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "USB host lib handle events failed: %d", err);
             continue;
+        }
+
+        if (client_hdl != NULL) {
+            usb_host_client_handle_events(client_hdl, 0);
         }
 
         if (event_flags & USB_HOST_LIB_EVENT_FLAGS_NO_CLIENTS) {
