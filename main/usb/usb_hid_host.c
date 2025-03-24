@@ -31,7 +31,6 @@ static bool g_device_connected = false;
 static TaskHandle_t g_usb_events_task_handle = NULL;
 static TaskHandle_t g_stats_task_handle = NULL;
 static uint16_t s_current_rps = 0;
-static uint16_t s_prev_rps = 0;
 static StaticSemaphore_t g_report_maps_mutex_buffer;
 static SemaphoreHandle_t g_report_maps_mutex;
 static usb_hid_report_t g_report;
@@ -486,8 +485,9 @@ static void usb_lib_task(void *arg) {
 static void usb_stats_task(void *arg) {
     TickType_t last_wake_time = xTaskGetTickCount();
 
+    uint16_t s_prev_rps = 0;
     while (1) {
-        const uint32_t reports_per_sec = (s_current_rps - s_prev_rps) / USB_STATS_INTERVAL_SEC;
+        const uint16_t reports_per_sec = (s_current_rps - s_prev_rps) / USB_STATS_INTERVAL_SEC;
         if (reports_per_sec > 0) {
             ESP_LOGI(TAG, "USB: %lu rps", reports_per_sec);
         }
