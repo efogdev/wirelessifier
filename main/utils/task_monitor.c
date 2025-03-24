@@ -12,7 +12,7 @@
 #include "hid_bridge.h"
 #include "temp_sensor.h"
 
-static const char *TAG = "TaskMonitor";
+static const char *TAG = "mon";
 
 static uint32_t g_usb_report_counter = 0;
 
