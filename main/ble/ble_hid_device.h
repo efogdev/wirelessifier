@@ -20,7 +20,7 @@ typedef struct __attribute__((packed)) {
  * @brief Initialize BLE HID device
  * @return ESP_OK on success
  */
-esp_err_t ble_hid_device_init(void);
+esp_err_t ble_hid_device_init(bool verbose);
 
 /**
  * @brief Deinitialize BLE HID device

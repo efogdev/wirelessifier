@@ -249,55 +249,18 @@ esp_err_t init_device_settings(void) {
     return init_global_settings();
 }
 
-static void remove_all_bonded_devices(void)
-{
-    int dev_num = esp_ble_get_bond_device_num();
-
-    esp_ble_bond_dev_t *dev_list = malloc(sizeof(esp_ble_bond_dev_t) * dev_num);
-    esp_ble_get_bond_device_list(&dev_num, dev_list);
-    for (int i = 0; i < dev_num; i++) {
-        esp_ble_remove_bond_device(dev_list[i].bd_addr);
-    }
-
-    free(dev_list);
-}
-
-static bool has_low_power_mode_changed(const char* new_settings_json, bool* new_value) {
-    if (!new_settings_json || !new_value) return false;
-    
-    cJSON *root = cJSON_Parse(new_settings_json);
-    if (!root) {
-        ESP_LOGE(WS_TAG, "Error parsing new settings JSON");
-        return false;
-    }
-    
-    cJSON *power_obj = cJSON_GetObjectItem(root, "power");
-    if (!power_obj) {
-        ESP_LOGE(WS_TAG, "power object not found in new settings");
-        cJSON_Delete(root);
-        return false;
-    }
-    
-    cJSON *low_power_mode = cJSON_GetObjectItem(power_obj, "lowPowerMode");
-    if (!low_power_mode || !cJSON_IsBool(low_power_mode)) {
-        ESP_LOGE(WS_TAG, "lowPowerMode not found or not a boolean in new settings");
-        cJSON_Delete(root);
-        return false;
-    }
-    
-    *new_value = cJSON_IsTrue(low_power_mode);
-    
-    bool current_value = false;
-    const esp_err_t err = storage_get_bool_setting("power.lowPowerMode", &current_value);
-    
-    cJSON_Delete(root);
-    
-    if (err != ESP_OK) {
-        return true;
-    }
-    
-    return *new_value != current_value;
-}
+// static void remove_all_bonded_devices(void)
+// {
+//     int dev_num = esp_ble_get_bond_device_num();
+//
+//     esp_ble_bond_dev_t *dev_list = malloc(sizeof(esp_ble_bond_dev_t) * dev_num);
+//     esp_ble_get_bond_device_list(&dev_num, dev_list);
+//     for (int i = 0; i < dev_num; i++) {
+//         esp_ble_remove_bond_device(dev_list[i].bd_addr);
+//     }
+//
+//     free(dev_list);
+// }
 
 static void process_settings_ws_message(const char* message) {
     if (!message) return;
@@ -352,26 +315,10 @@ static void process_settings_ws_message(const char* message) {
                 cJSON_Delete(root);
                 return;
             }
-            
-            bool new_low_power_mode = false;
-            bool low_power_mode_changed = has_low_power_mode_changed(new_settings, &new_low_power_mode);
 
             const esp_err_t err = storage_update_settings(new_settings);
-            
             if (err == ESP_OK) {
                 ws_broadcast_json("settings_update_status", "{\"success\":true}");
-                
-                if (low_power_mode_changed) {
-                    ESP_LOGI(WS_TAG, "lowPowerMode changed to %s, disconnecting BLE and unbonding devices", 
-                             new_low_power_mode ? "true" : "false");
-                    
-                    ble_hid_device_deinit();
-                    
-                    remove_all_bonded_devices();
-                    
-                    ble_hid_device_init();
-                    ble_hid_device_start_advertising();
-                }
             } else {
                 char error_msg[100];
                 snprintf(error_msg, sizeof(error_msg), "{\"success\":false,\"error\":\"%s\"}", esp_err_to_name(err));

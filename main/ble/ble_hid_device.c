@@ -19,6 +19,9 @@
 #define HIGH_SPEED_DEVICE_THRESHOLD_EVENTS 5
 
 static const char *TAG = "BLE_HID";
+#define BLE_STATS_INTERVAL_SEC  2
+static uint32_t s_current_rps = 0;
+static TaskHandle_t s_stats_task_handle = NULL;
 static uint16_t s_conn_id = 0;
 static bool s_connected = false;
 static bool s_is_high_speed = false;
@@ -32,7 +35,8 @@ static int16_t s_acc_y = 0;
 static int8_t s_acc_wheel = 0;
 static int8_t s_acc_pan = 0;
 static uint8_t s_acc_buttons = 0;
-static uint8_t s_batch_size = 3; // for veryfast profile
+static uint8_t s_batch_size = 3;
+static bool g_verbose = false;
 typedef enum {
     SPEED_MODE_SLOW = 0,
     SPEED_MODE_FAST,
@@ -136,6 +140,21 @@ static void gap_event_handler(const esp_gap_ble_cb_event_t event, esp_ble_gap_cb
     }
 }
 
+static void ble_stats_task(void *arg) {
+    uint32_t prev_count = 0;
+    TickType_t last_wake_time = xTaskGetTickCount();
+
+    while (1) {
+        const uint32_t reports_per_sec = (s_current_rps - prev_count) / BLE_STATS_INTERVAL_SEC;
+        if (reports_per_sec > 0) {
+            ESP_LOGI(TAG, "BLE: %lu rps", reports_per_sec);
+        }
+
+        prev_count = s_current_rps;
+        vTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(BLE_STATS_INTERVAL_SEC * 1000));
+    }
+}
+
 static void accumulator_timer_callback(TimerHandle_t timer) {
     if (s_acc_x != 0 || s_acc_y != 0 || s_acc_wheel != 0 || s_acc_pan != 0 || s_acc_buttons != 0) {
         esp_hidd_send_mouse_value(s_conn_id, s_acc_buttons, s_acc_x, s_acc_y, s_acc_wheel, s_acc_pan);
@@ -148,7 +167,8 @@ static void accumulator_timer_callback(TimerHandle_t timer) {
 
 static TickType_t acc_window = pdMS_TO_TICKS(8);
 
-esp_err_t ble_hid_device_init(void) {
+esp_err_t ble_hid_device_init(const bool verbose) {
+    g_verbose = verbose;
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
@@ -222,6 +242,10 @@ esp_err_t ble_hid_device_init(void) {
 
     esp_ble_gap_register_callback(gap_event_handler);
     esp_hidd_register_callbacks(hidd_event_callback);
+
+    if (g_verbose) {
+        xTaskCreatePinnedToCore(ble_stats_task, "ble_stats", 2048, NULL, 5, &s_stats_task_handle, 1);
+    }
 
     esp_ble_auth_req_t auth_req = ESP_LE_AUTH_REQ_SC_MITM_BOND;
     esp_ble_io_cap_t iocap = ESP_IO_CAP_NONE; //set the IO capability to No output No input
@@ -341,7 +365,7 @@ esp_err_t ble_hid_device_send_keyboard_report(const keyboard_report_t *report) {
     }
 
     uint8_t keys[6] = {0};
-    uint32_t mask = report->keycodes;
+    const uint32_t mask = report->keycodes;
     int key_count = 0;
 
     for (int i = 0; i < 32 && key_count < 6; i++) {
@@ -350,6 +374,7 @@ esp_err_t ble_hid_device_send_keyboard_report(const keyboard_report_t *report) {
         }
     }
 
+    s_current_rps++;
     esp_hidd_send_keyboard_value(s_conn_id, report->modifier, keys, key_count);
     return ESP_OK;
 }
@@ -368,6 +393,7 @@ esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report) {
 
         if (s_acc_buttons != report->buttons || s_batch_count >= s_batch_size) {
             esp_hidd_send_mouse_value(s_conn_id, report->buttons, s_acc_x, s_acc_y, s_acc_wheel, s_acc_pan);
+            s_current_rps++;
 
             s_acc_buttons = report->buttons;
             if (s_batch_count >= s_batch_size) {
@@ -390,6 +416,7 @@ esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report) {
         s_batch_count++;
     } else {
         esp_hidd_send_mouse_value(s_conn_id, report->buttons, report->x, report->y, report->wheel, report->pan);
+        s_current_rps++;
 
         if (s_accumulator_timer != NULL) {
             xTimerDelete(s_accumulator_timer, 0);
