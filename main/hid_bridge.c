@@ -320,8 +320,8 @@ static esp_err_t process_mouse_report(const usb_hid_report_t *report) {
     }
 
     if (s_sensitivity != 100) {
-        ble_mouse_report.x = (int16_t)(((int32_t)ble_mouse_report.x * s_sensitivity) / 100);
-        ble_mouse_report.y = (int16_t)(((int32_t)ble_mouse_report.y * s_sensitivity) / 100);
+        ble_mouse_report.x = (int32_t)(int16_t)ble_mouse_report.x * s_sensitivity / 100;
+        ble_mouse_report.y = (int32_t)(int16_t)ble_mouse_report.y * s_sensitivity / 100;
     }
 
     return ble_hid_device_send_mouse_report(&ble_mouse_report);
