@@ -14,8 +14,6 @@
 
 static const char *TAG = "mon";
 
-static uint32_t g_usb_report_counter = 0;
-
 #define STATS_TICKS         pdMS_TO_TICKS(1000)
 #define MAX_TASKS           32
 #define STATS_TASK_PRIO     3
@@ -24,13 +22,8 @@ static TaskStatus_t start_array[MAX_TASKS];
 static TaskStatus_t end_array[MAX_TASKS];
 static TaskHandle_t monitor_task_handle = NULL;
 
-#define HEADER_FORMAT " Task (core %d)  |     Took |     | Free, bytes "
-#define HEADER_SEPARATOR "----------------|----------|-----|-------------"
-
-void task_monitor_increment_usb_report_counter(void)
-{
-    g_usb_report_counter++;
-}
+#define HEADER_FORMAT " Task (core %d)  |     Took |     | Free "
+#define HEADER_SEPARATOR "----------------|----------|-----|------"
 
 static void print_core_tasks(UBaseType_t start_array_size, UBaseType_t end_array_size, 
                            uint32_t total_elapsed_time, uint8_t core_id)
@@ -97,10 +90,12 @@ static esp_err_t print_real_time_stats(const TickType_t xTicksToWait)
         return ESP_ERR_INVALID_STATE;
     }
 
-    vTaskDelay(pdMS_TO_TICKS(8));
+    vTaskDelay(1);
+    ESP_LOGI(TAG, "");
+    ESP_LOGI(TAG, "     === Task monitor reporting ===");
     ESP_LOGI(TAG, "");
     print_core_tasks(start_array_size, end_array_size, total_elapsed_time, 0);
-    vTaskDelay(pdMS_TO_TICKS(8));
+    vTaskDelay(1);
     ESP_LOGI(TAG, "");
     print_core_tasks(start_array_size, end_array_size, total_elapsed_time, 1);
     ESP_LOGI(TAG, "");
@@ -111,8 +106,6 @@ static esp_err_t print_real_time_stats(const TickType_t xTicksToWait)
 static void monitor_task(void *pvParameter)
 {
     while (1) {
-        ESP_LOGI(TAG, "");
-        ESP_LOGI(TAG, "        === Task monitor reporting ===");
         float tsens_value = 0;
         if (temp_sensor_get_temperature(&tsens_value) != ESP_OK) {
             ESP_LOGE(TAG, "Failed to read temperature");

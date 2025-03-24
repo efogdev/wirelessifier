@@ -30,8 +30,8 @@ typedef struct __attribute__((packed)) {
 static bool g_device_connected = false;
 static TaskHandle_t g_usb_events_task_handle = NULL;
 static TaskHandle_t g_stats_task_handle = NULL;
-static uint32_t s_current_rps = 0;
-static uint32_t s_prev_rps = 0;
+static uint16_t s_current_rps = 0;
+static uint16_t s_prev_rps = 0;
 static StaticSemaphore_t g_report_maps_mutex_buffer;
 static SemaphoreHandle_t g_report_maps_mutex;
 static usb_hid_report_t g_report;
@@ -166,7 +166,7 @@ esp_err_t usb_hid_host_init(const QueueHandle_t report_queue, const bool verbose
         return err;
     }
 
-    task_created = xTaskCreatePinnedToCore(usb_lib_task, "usb_events", 2600, NULL, 13, &g_usb_events_task_handle, 1);
+    task_created = xTaskCreatePinnedToCore(usb_lib_task, "usb_events", 1860, NULL, 13, &g_usb_events_task_handle, 1);
     if (task_created != pdTRUE) {
         usb_host_uninstall();
         vTaskDelete(g_device_task_handle);

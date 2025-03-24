@@ -232,7 +232,7 @@ esp_err_t hid_bridge_start(void) {
         return ESP_OK;
     }
 
-    const BaseType_t task_created = xTaskCreatePinnedToCore(hid_bridge_task, "hid_bridge", 2600, NULL, 14,
+    const BaseType_t task_created = xTaskCreatePinnedToCore(hid_bridge_task, "hid_bridge", 2360, NULL, 14,
                                                       &s_hid_bridge_task_handle, 1);
     if (task_created != pdTRUE) {
         ESP_LOGE(TAG, "Failed to create HID bridge task");
