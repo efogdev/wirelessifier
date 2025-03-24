@@ -7,6 +7,7 @@
 #include <nvs_flash.h>
 #include <nvs.h>
 #include <storage.h>
+#include <cJSON.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -411,56 +412,61 @@ void reboot_device(bool keep_wifi) {
 }
 
 void process_wifi_ws_message(const char* message) {
-    // Simple JSON parsing - in a real application, use a proper JSON parser
-    if (strstr(message, "\"type\":\"wifi_check_saved\"")) {
+    cJSON *root = cJSON_Parse(message);
+    if (!root) {
+        ESP_LOGE(WIFI_TAG, "Failed to parse JSON message");
+        return;
+    }
+
+    cJSON *type = cJSON_GetObjectItem(root, "type");
+    if (!type || !type->valuestring) {
+        cJSON_Delete(root);
+        return;
+    }
+
+    if (strcmp(type->valuestring, "wifi_check_saved") == 0) {
         bool has_creds = has_wifi_credentials();
         char status_json[32];
         snprintf(status_json, sizeof(status_json), "%s", has_creds ? "true" : "false");
         ws_broadcast_json("wifi_saved_credentials", status_json);
     }
-    else if (strstr(message, "\"type\":\"wifi_scan\"")) {
+    else if (strcmp(type->valuestring, "wifi_scan") == 0) {
         scan_wifi_networks();
     }
-    else if (strstr(message, "\"type\":\"reboot\"")) {
-        bool keep_wifi = false;
-        if (strstr(message, "\"keepWifi\":true")) {
-            keep_wifi = true;
-        }
-        
+    else if (strcmp(type->valuestring, "reboot") == 0) {
+        cJSON *keepWifi = cJSON_GetObjectItem(root, "keepWifi");
+        bool keep_wifi = keepWifi && cJSON_IsTrue(keepWifi);
         reboot_device(keep_wifi);
     }
-    else if (strstr(message, "\"type\":\"disable_web_stack\"")) {
-        vTaskDelay(pdMS_TO_TICKS(500)); // Give time for the message to be sent
-        disable_wifi_and_web_stack();
+    else if (strcmp(type->valuestring, "disable_web_stack") == 0) {
+        vTaskDelay(pdMS_TO_TICKS(500));
+        // disable_wifi_and_web_stack();
+        esp_restart(); // because no memory freed when disabling web stack for some reason (ToDo)
     }
-    else if (strstr(message, "\"type\":\"wifi_connect\"")) {
-        char ssid[33] = {0};
-        char password[65] = {0};
-        
-        // ToDo proper extraction
-        const char* ssid_start = strstr(message, "\"ssid\":\"");
-        const char* pass_start = strstr(message, "\"password\":\"");
-        
-        if (ssid_start) {
-            ssid_start += 8; // Skip "ssid":"
-            const char* ssid_end = strchr(ssid_start, '"');
-            if (ssid_end && (ssid_end - ssid_start < 33)) {
-                memcpy(ssid, ssid_start, ssid_end - ssid_start);
-            }
+    else if (strcmp(type->valuestring, "wifi_connect") == 0) {
+        cJSON *content = cJSON_GetObjectItem(root, "content");
+        if (!content) {
+            cJSON_Delete(root);
+            return;
         }
-        
-        if (pass_start) {
-            pass_start += 12; // Skip "password":"
-            const char* pass_end = strchr(pass_start, '"');
-            if (pass_end && (pass_end - pass_start < 65)) {
-                memcpy(password, pass_start, pass_end - pass_start);
-            }
+
+        cJSON *ssid_json = cJSON_GetObjectItem(content, "ssid");
+        cJSON *password_json = cJSON_GetObjectItem(content, "password");
+
+        if (!ssid_json || !ssid_json->valuestring) {
+            cJSON_Delete(root);
+            return;
         }
-        
+
+        const char *ssid = ssid_json->valuestring;
+        const char *password = password_json ? password_json->valuestring : "";
+
         if (strlen(ssid) > 0) {
             connect_to_wifi(ssid, password);
         }
     }
+
+    cJSON_Delete(root);
 }
 
 void update_wifi_connection_status(bool connected, const char* ip) {
@@ -494,7 +500,7 @@ static void ws_ping_task(void *pvParameters) {
     ESP_LOGI(WIFI_TAG, "WebSocket ping task started");
     
     while (1) {
-        if (s_web_stack_disabled || !is_connected) {
+        if (s_web_stack_disabled) {
             vTaskDelay(pdMS_TO_TICKS(WS_PING_INTERVAL_MS));
             continue;
         }

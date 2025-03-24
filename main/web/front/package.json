@@ -8,14 +8,11 @@
   },
   "scripts": {
     "build": "bunx concurrently 'bun run build:settings' 'bun run build:html'",
-    "build:settings": "bunx esbuild js/settings.jsx --outfile=lib/settings.js --target=es2015 --bundle=false --jsx=transform --minify",
+    "build:settings": "bunx esbuild js/settings.jsx --outfile=lib/settings.js --target=es2015 --bundle=false --jsx=transform --minify --tree-shaking=true --minify-whitespace --minify-identifiers --minify-syntax",
     "build:html": "bun meta/build-html.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
-  "devDependencies": {
-    "html-minifier-terser": "^7.2.0"
-  }
+  "type": "commonjs"
 }

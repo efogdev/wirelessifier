@@ -5,6 +5,7 @@
       "name": "front",
       "devDependencies": {
         "html-minifier-terser": "^7.2.0",
+        "terser": "^5.39.0",
       },
     },
   },

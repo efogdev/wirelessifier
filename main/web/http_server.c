@@ -152,9 +152,7 @@ static void event_handler(void*, esp_event_base_t event_base, int32_t event_id, 
                 xEventGroupSetBits(wifi_event_group, WIFI_FAIL_BIT);
             }
 
-            if (is_wifi_enabled()) {
-                update_wifi_connection_status(false, NULL);
-            }
+            update_wifi_connection_status(false, NULL);
         }
         
         xEventGroupClearBits(wifi_event_group, WIFI_CONNECTED_BIT);

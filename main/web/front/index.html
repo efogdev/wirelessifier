@@ -198,6 +198,21 @@
         label[for="passwordInput"] {
             margin-bottom: 10px;
         }
+
+        #network-selector {
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 5px;
+        }
+
+        #network-selector label {
+            font-weight: normal;
+        }
+
+        .danger {
+            background-color: #d5706e;
+        }
     </style>
 </head>
 <body>
@@ -213,15 +228,15 @@
         
         <div class="form-group">
             <button id="settingsBtn" class="secondary">Settings</button>
-            <button id="disableWebStackBtn" style="background-color: #d5706e;">Stop WiFi</button>
-            <button id="rebootBtn" style="background-color: #d5706e;">Reboot</button>
+            <button id="disableWebStackBtn" class="danger">Stop WiFi</button>
+            <button id="rebootBtn" class="danger">Reboot</button>
             <div class="fg-spacer"></div>
         </div>
         
         <div class="form-group">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+            <div id="network-selector">
                 <label for="networkSelect">Network:</label>
-                <label style="font-weight: normal;">
+                <label>
                     <input type="checkbox" id="manualSsidCheckbox"> Enter SSID
                 </label>
             </div>
@@ -430,7 +445,7 @@
             
             if (status.connected) {
                 isConnectedToWifi = true;
-                updateStatus('Successfully connected! The device is restarting. \n\n You can connect to the regular WiFi network. \n\n You will be automatically redirected to the new address soon.', 'success');
+                updateStatus('Successfully connected! The device is restarting. Please connect to the selected WiFi network. You will be redirected to the new address automatically soon.', 'success');                
                 
                 // Disable inactivity watcher when connected
                 if (wsCheckInterval) {
@@ -567,19 +582,16 @@
         });
         
         document.getElementById('rebootBtn').addEventListener('click', function() {
-            const keepWifi = confirm('Do you want to keep WiFi and web stack on after reboot? Press "Ok" to keep it enabled.');
+            // const keepWifi = confirm('Do you want to keep WiFi and web stack on after reboot? Press "Ok" to keep it enabled.');
             if (!socket || socket.readyState !== WebSocket.OPEN) {
                 updateStatus('Device not connected. Please refresh the page.', 'error');
                 return;
             }
             
             updateStatus('Rebooting device...', 'info');
-            
             socket.send(JSON.stringify({
                 type: 'reboot',
-                content: {
-                    keepWifi: keepWifi
-                }
+                content: { keepWifi: true },
             }));
         });
         
