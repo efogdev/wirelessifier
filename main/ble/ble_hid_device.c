@@ -20,7 +20,8 @@
 #define HIGH_SPEED_DEVICE_THRESHOLD_EVENTS 5
 
 static const char *TAG = "BLE_HID";
-static uint32_t s_current_rps = 0;
+static uint16_t s_current_rps = 0;
+static uint16_t s_prev_rps = 0;
 static TaskHandle_t s_stats_task_handle = NULL;
 static uint16_t s_conn_id = 0;
 static bool s_connected = false;
@@ -141,16 +142,15 @@ static void gap_event_handler(const esp_gap_ble_cb_event_t event, esp_ble_gap_cb
 }
 
 static void ble_stats_task(void *arg) {
-    uint32_t prev_count = 0;
     TickType_t last_wake_time = xTaskGetTickCount();
 
     while (1) {
-        const uint32_t reports_per_sec = (s_current_rps - prev_count) / BLE_STATS_INTERVAL_SEC;
+        const uint32_t reports_per_sec = (s_current_rps - s_prev_rps) / BLE_STATS_INTERVAL_SEC;
         if (reports_per_sec > 0) {
             ESP_LOGI(TAG, "BLE: %lu rps", reports_per_sec);
         }
 
-        prev_count = s_current_rps;
+        s_prev_rps = s_current_rps;
         vTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(BLE_STATS_INTERVAL_SEC * 1000));
     }
 }
@@ -392,7 +392,12 @@ esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report) {
 
         if (s_acc_buttons != report->buttons || s_batch_count >= s_batch_size) {
             esp_hidd_send_mouse_value(s_conn_id, report->buttons, s_acc_x, s_acc_y, s_acc_wheel, s_acc_pan);
+
             s_current_rps++;
+            if (s_prev_rps == 0) {
+                s_current_rps = 0;
+                s_prev_rps = 1;
+            }
 
             s_acc_buttons = report->buttons;
             if (s_batch_count >= s_batch_size) {
@@ -415,7 +420,12 @@ esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report) {
         s_batch_count++;
     } else {
         esp_hidd_send_mouse_value(s_conn_id, report->buttons, report->x, report->y, report->wheel, report->pan);
+
         s_current_rps++;
+        if (s_prev_rps == 0) {
+            s_current_rps = 0;
+            s_prev_rps = 1;
+        }
 
         if (s_accumulator_timer != NULL) {
             xTimerDelete(s_accumulator_timer, 0);

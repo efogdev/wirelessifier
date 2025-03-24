@@ -55,7 +55,7 @@ void app_main(void) {
     init_web_stack();
 
     while (1) {
-        vTaskDelay(pdMS_TO_TICKS(50));
+        vTaskDelay(pdMS_TO_TICKS(35));
         led_update_pattern(usb_hid_host_device_connected(), ble_hid_device_connected(), hid_bridge_is_ble_paused());
     }
 }

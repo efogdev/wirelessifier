@@ -31,6 +31,7 @@ static bool g_device_connected = false;
 static TaskHandle_t g_usb_events_task_handle = NULL;
 static TaskHandle_t g_stats_task_handle = NULL;
 static uint32_t s_current_rps = 0;
+static uint32_t s_prev_rps = 0;
 static StaticSemaphore_t g_report_maps_mutex_buffer;
 static SemaphoreHandle_t g_report_maps_mutex;
 static usb_hid_report_t g_report;
@@ -235,6 +236,11 @@ bool usb_hid_host_device_connected(void) {
 
 static void process_report(const uint8_t *const data, const size_t length, const uint8_t interface_num) {
     s_current_rps++;
+    if (s_prev_rps == 0) {
+        s_prev_rps = 1;
+        s_current_rps = 0;
+    }
+
     if (!data || !g_report_queue || length <= 1 || interface_num >= USB_HOST_MAX_INTERFACES) {
         ESP_LOGE(TAG, "Invalid parameters: data=%p, queue=%p, len=%d, iface=%u", data, g_report_queue, length,
                  interface_num);
@@ -483,16 +489,15 @@ static void usb_lib_task(void *arg) {
 }
 
 static void usb_stats_task(void *arg) {
-    uint32_t prev_count = 0;
     TickType_t last_wake_time = xTaskGetTickCount();
 
     while (1) {
-        const uint32_t reports_per_sec = (s_current_rps - prev_count) / USB_STATS_INTERVAL_SEC;
+        const uint32_t reports_per_sec = (s_current_rps - s_prev_rps) / USB_STATS_INTERVAL_SEC;
         if (reports_per_sec > 0) {
             ESP_LOGI(TAG, "USB: %lu rps", reports_per_sec);
         }
 
-        prev_count = s_current_rps;
+        s_prev_rps = s_current_rps;
         vTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(USB_STATS_INTERVAL_SEC * 1000));
     }
 }

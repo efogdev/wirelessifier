@@ -24,8 +24,8 @@ static TaskStatus_t start_array[MAX_TASKS];
 static TaskStatus_t end_array[MAX_TASKS];
 static TaskHandle_t monitor_task_handle = NULL;
 
-#define HEADER_FORMAT " Task (core %d)  |         Took |     | Free, bytes "
-#define HEADER_SEPARATOR "----------------|--------------|-----|-------------"
+#define HEADER_FORMAT " Task (core %d)  |     Took |     | Free, bytes "
+#define HEADER_SEPARATOR "----------------|----------|-----|-------------"
 
 void task_monitor_increment_usb_report_counter(void)
 {
@@ -64,7 +64,7 @@ static void print_core_tasks(UBaseType_t start_array_size, UBaseType_t end_array
             }
             core_total_time += task_elapsed_time;
             
-            ESP_LOGI(TAG, "%-16s| %9"PRIu32" ms | %2"PRIu32"%% | %d ",
+            ESP_LOGI(TAG, "%-16s| %5"PRIu32" ms | %2"PRIu32"%% | %d ",
                     start_array[i].pcTaskName, task_elapsed_ms, percentage_time, bytes_free);
         }
     }
@@ -112,21 +112,19 @@ static void monitor_task(void *pvParameter)
 {
     while (1) {
         ESP_LOGI(TAG, "");
-
-        const size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
-        ESP_LOGI(TAG, "Free heap: %d kb", free_heap / 1024);
-        
-        float tsens_value;
-        if (temp_sensor_get_temperature(&tsens_value) == ESP_OK) {
-            ESP_LOGI(TAG, "SOC temperature: %.1f°C", tsens_value);
-        } else {
+        ESP_LOGI(TAG, "        === Task monitor reporting ===");
+        float tsens_value = 0;
+        if (temp_sensor_get_temperature(&tsens_value) != ESP_OK) {
             ESP_LOGE(TAG, "Failed to read temperature");
         }
 
-        ESP_LOGI(TAG, "");
         if (print_real_time_stats(STATS_TICKS) != ESP_OK) {
             ESP_LOGE(TAG, "Error getting real time stats");
         }
+
+        const size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+        ESP_LOGI(TAG, "[I] Heap: %d kb, SoC temp: %.1f°C", free_heap / 1024, tsens_value);
+        ESP_LOGI(TAG, "");
 
         vTaskDelay(pdMS_TO_TICKS(10000));
     }
