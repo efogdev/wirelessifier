@@ -166,14 +166,16 @@ esp_err_t ble_hid_device_init(void) {
         s_high_speed_submode = SPEED_MODE_SLOW;
     }
 
+    // careful with this values
+    // wrong combination = "choppy" feeling
     switch (s_high_speed_submode) {
-        case SPEED_MODE_FAST:
-            s_batch_size = 4;
-            acc_window = pdMS_TO_TICKS(7);
-            break;
         case SPEED_MODE_VERYFAST:
             s_batch_size = 3;
             acc_window = pdMS_TO_TICKS(4);
+            break;
+        case SPEED_MODE_FAST:
+            s_batch_size = 5;
+            acc_window = pdMS_TO_TICKS(7);
             break;
         default:
             s_batch_size = 7;
