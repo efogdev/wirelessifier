@@ -21,7 +21,6 @@
 
 static const char *TAG = "BLE_HID";
 static uint16_t s_current_rps = 0;
-static uint16_t s_prev_rps = 0;
 static TaskHandle_t s_stats_task_handle = NULL;
 static uint16_t s_conn_id = 0;
 static bool s_connected = false;
@@ -143,7 +142,7 @@ static void gap_event_handler(const esp_gap_ble_cb_event_t event, esp_ble_gap_cb
 
 static void ble_stats_task(void *arg) {
     TickType_t last_wake_time = xTaskGetTickCount();
-
+    uint16_t s_prev_rps = 0;
     while (1) {
         const uint32_t reports_per_sec = (s_current_rps - s_prev_rps) / BLE_STATS_INTERVAL_SEC;
         if (reports_per_sec > 0) {
