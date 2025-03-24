@@ -86,20 +86,17 @@ static void run_hid_bridge() {
     ret = hid_bridge_start();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to start HID bridge: %s", esp_err_to_name(ret));
-        return;
     }
 }
 
 static void init_web_stack(void) {
     bool start_web_services = false;
     
-    // Check if SW4 button is pressed
     if (gpio_get_level(GPIO_BUTTON_SW4) == 0) {
         vTaskDelay(pdMS_TO_TICKS(60));
         ESP_LOGI(TAG, "Initializing web services because SW4 held on boot");
         start_web_services = true;
     } else {
-        // Check for one-time boot flag
         nvs_handle_t nvs_handle;
         uint8_t boot_with_wifi = 0;
         if (nvs_open("wifi_config", NVS_READWRITE, &nvs_handle) == ESP_OK) {
@@ -107,7 +104,6 @@ static void init_web_stack(void) {
                 ESP_LOGI(TAG, "Initializing web services because of one-time boot flag");
                 start_web_services = true;
                 
-                // Clear the flag since it's one-time
                 nvs_set_u8(nvs_handle, "boot_wifi", 0);
                 nvs_commit(nvs_handle);
             }
@@ -121,7 +117,7 @@ static void init_web_stack(void) {
 }
 
 static void init_gpio(void) {
-    gpio_config_t output_pullup_conf = {
+    const gpio_config_t output_pullup_conf = {
         .pin_bit_mask = (
             (1ULL<<GPIO_NUM_36) |
             (1ULL<<GPIO_NUM_35) |
@@ -136,7 +132,7 @@ static void init_gpio(void) {
     };
     gpio_config(&output_pullup_conf);
 
-    gpio_config_t input_pullup_conf = {
+    const gpio_config_t input_pullup_conf = {
         .pin_bit_mask = (
             (1ULL<<GPIO_NUM_14) |
             (1ULL<<GPIO_NUM_15) |
@@ -151,14 +147,14 @@ static void init_gpio(void) {
 
     // PWR_LED: red, via 5.1kOhm
     // PWM to optimize battery life
-    ledc_timer_config_t ledc_timer = {
+    const ledc_timer_config_t ledc_timer = {
         .speed_mode       = LEDC_LOW_SPEED_MODE,
         .duty_resolution  = LEDC_TIMER_8_BIT,
         .timer_num        = LEDC_TIMER_0,
         .freq_hz          = 32768,
         .clk_cfg          = LEDC_AUTO_CLK
     };
-    ledc_channel_config_t ledc_channel = {
+    const ledc_channel_config_t ledc_channel = {
         .speed_mode     = LEDC_LOW_SPEED_MODE,
         .channel        = LEDC_CHANNEL_0,
         .timer_sel      = LEDC_TIMER_0,

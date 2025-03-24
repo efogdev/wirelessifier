@@ -43,7 +43,7 @@ esp_err_t esp_hidd_profile_init(void) {
 esp_err_t esp_hidd_profile_deinit(void) {
     const uint16_t hidd_svc_hdl = hidd_le_env.hidd_inst.att_tbl[HIDD_LE_IDX_SVC];
     if (!hidd_le_env.enabled) {
-        ESP_LOGE(HID_LE_PRF_TAG, "HID device profile already initialized");
+        ESP_LOGE(HID_LE_PRF_TAG, "HID device profile already deinitialized");
         return ESP_OK;
     }
 
@@ -56,7 +56,6 @@ esp_err_t esp_hidd_profile_deinit(void) {
 
     esp_ble_gatts_app_unregister(hidd_le_env.gatt_if);
     hidd_le_env.enabled = false;
-
     return ESP_OK;
 }
 

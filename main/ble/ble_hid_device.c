@@ -286,13 +286,12 @@ esp_err_t ble_hid_device_init(const bool verbose) {
 }
 
 esp_err_t ble_hid_device_deinit(void) {
-    esp_err_t ret;
-
     if (s_accumulator_timer != NULL) {
         xTimerDelete(s_accumulator_timer, 0);
         s_accumulator_timer = NULL;
     }
 
+    esp_err_t ret;
     if ((ret = esp_hidd_profile_deinit()) != ESP_OK) {
         return ret;
     }
@@ -301,15 +300,15 @@ esp_err_t ble_hid_device_deinit(void) {
         return ret;
     }
 
-    if ((ret = esp_bluedroid_deinit()) != ESP_OK) {
-        return ret;
-    }
-
     if ((ret = esp_bt_controller_disable()) != ESP_OK) {
         return ret;
     }
 
     if ((ret = esp_bt_controller_deinit()) != ESP_OK) {
+        return ret;
+    }
+
+    if ((ret = esp_bluedroid_deinit()) != ESP_OK) {
         return ret;
     }
 

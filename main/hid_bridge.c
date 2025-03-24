@@ -66,9 +66,8 @@ static void inactivity_timer_callback(TimerHandle_t xTimer) {
     }
 
     ESP_LOGI(TAG, "No USB HID events for a while, stopping BLE stack");
-
     s_ble_stack_active = false;
-    esp_err_t ret = ble_hid_device_deinit();
+    const esp_err_t ret = ble_hid_device_deinit();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to deinitialize BLE HID device: %s", esp_err_to_name(ret));
         s_ble_stack_active = true;
@@ -190,7 +189,7 @@ esp_err_t hid_bridge_deinit(void) {
 
     if (s_ble_stack_active) {
         s_ble_stack_active = false;
-        esp_err_t ret = ble_hid_device_deinit();
+        const esp_err_t ret = ble_hid_device_deinit();
         if (ret != ESP_OK) {
             s_ble_stack_active = true;
             ESP_LOGE(TAG, "Failed to deinitialize BLE HID device: %s", esp_err_to_name(ret));
@@ -201,7 +200,7 @@ esp_err_t hid_bridge_deinit(void) {
 
     xSemaphoreGive(s_ble_stack_mutex);
 
-    esp_err_t ret = usb_hid_host_deinit();
+    const esp_err_t ret = usb_hid_host_deinit();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to deinitialize USB HID host: %s", esp_err_to_name(ret));
         return ret;
@@ -233,7 +232,7 @@ esp_err_t hid_bridge_start(void) {
         return ESP_OK;
     }
 
-    BaseType_t task_created = xTaskCreatePinnedToCore(hid_bridge_task, "hid_bridge", 2600, NULL, 14,
+    const BaseType_t task_created = xTaskCreatePinnedToCore(hid_bridge_task, "hid_bridge", 2600, NULL, 14,
                                                       &s_hid_bridge_task_handle, 1);
     if (task_created != pdTRUE) {
         ESP_LOGE(TAG, "Failed to create HID bridge task");

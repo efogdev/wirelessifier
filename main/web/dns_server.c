@@ -146,8 +146,8 @@ static void dns_server_task(void *pvParameters)
         dest_addr.sin_addr.s_addr = htonl(INADDR_ANY);
         dest_addr.sin_family = AF_INET;
         dest_addr.sin_port = htons(DNS_PORT);
-        int addr_family = AF_INET;
-        int ip_protocol = IPPROTO_IP;
+        const int addr_family = AF_INET;
+        const int ip_protocol = IPPROTO_IP;
         inet_ntoa_r(dest_addr.sin_addr, addr_str, sizeof(addr_str) - 1);
 
         const int sock = socket(addr_family, SOCK_DGRAM, ip_protocol);
