@@ -5,8 +5,8 @@ const App = () => {
     const [lastMessageTime, setLastMessageTime] = React.useState(0);
     
     const [systemInfo, setSystemInfo] = React.useState({
-        freeHeap: 0,
-        socTemp: 0,
+        heap: 0,
+        temp: 0,
     });
 
     const [settings, setSettings] = React.useState({
@@ -159,8 +159,8 @@ const App = () => {
                                 : message.content;
 
                             setSystemInfo({
-                                freeHeap: pingData.freeHeap || 0,
-                                socTemp: pingData.socTemp || 0
+                                heap: pingData.heap || 0,
+                                temp: pingData.temp || 0
                             });
                         } catch (e) {
                             console.error('Error parsing ping data:', e);
@@ -313,7 +313,7 @@ const App = () => {
                     </div>
 
                     <div onClick={() => setDeviceInfoExpanded(!deviceInfoExpanded)} className="temp-display">
-                        <h3>{deviceInfoExpanded ? '' : '▼'} {systemInfo.socTemp.toFixed(0)}°C</h3>
+                        <h3>{deviceInfoExpanded ? '' : '▼'} {systemInfo.temp.toFixed(0)}°C</h3>
                     </div>
                 </div>
 
@@ -336,12 +336,12 @@ const App = () => {
 
                         <div className="setting-item">
                             <div className="setting-title">Free heap</div>
-                            <div>{(systemInfo.freeHeap / 1000).toFixed(0)} kb</div>
+                            <div>{(systemInfo.heap / 1000).toFixed(0)} kb</div>
                         </div>
 
                         <div className="setting-item">
                             <div className="setting-title">SoC temperature</div>
-                            <div>{systemInfo.socTemp.toFixed(0)}°C</div>
+                            <div>{systemInfo.temp.toFixed(0)}°C</div>
                         </div>
                     </div>
                 </div>

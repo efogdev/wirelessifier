@@ -435,7 +435,6 @@ void reboot_device(bool keep_wifi) {
     esp_restart();
 }
 
-// Process WebSocket messages for WiFi management
 void process_wifi_ws_message(const char* message) {
     // Simple JSON parsing - in a real application, use a proper JSON parser
     if (strstr(message, "\"type\":\"wifi_check_saved\"")) {
@@ -466,11 +465,10 @@ void process_wifi_ws_message(const char* message) {
         disable_wifi_and_web_stack();
     }
     else if (strstr(message, "\"type\":\"wifi_connect\"")) {
-        // Extract SSID and password
         char ssid[33] = {0};
         char password[65] = {0};
         
-        // Very basic extraction - a real app should use proper JSON parsing
+        // ToDo proper extraction
         const char* ssid_start = strstr(message, "\"ssid\":\"");
         const char* pass_start = strstr(message, "\"password\":\"");
         
@@ -518,7 +516,6 @@ void update_wifi_connection_status(bool connected, const char* ip) {
     led_update_wifi_status(is_apsta_mode, connected);
 }
 
-// Check if device is connected to WiFi
 bool is_wifi_connected(void) {
     return is_connected;
 }
@@ -527,7 +524,6 @@ bool is_wifi_enabled(void) {
     return !s_web_stack_disabled;
 }
 
-// WebSocket ping task function
 static void ws_ping_task(void *pvParameters) {
     ESP_LOGI(WIFI_TAG, "WebSocket ping task started");
     
@@ -537,33 +533,23 @@ static void ws_ping_task(void *pvParameters) {
             continue;
         }
 
-        // Get free heap size
         const uint32_t free_heap = esp_get_free_heap_size();
-        
-        // Get SoC temperature
-        float temp = 0;
+        static float temp = 0;
         temp_sensor_get_temperature(&temp);
         
-        // Create JSON with system info
-        char ping_data[100];
+        static char ping_data[64];
         snprintf(ping_data, sizeof(ping_data), 
-                "{\"freeHeap\":%lu,\"socTemp\":%.1f}",
+                "{\"heap\":%lu,\"temp\":%.1f}",
                 free_heap, temp);
         
-        // Send a ping message to all connected clients
         ws_broadcast_json("ping", ping_data);
-        
-        // Wait for the next ping interval
         vTaskDelay(pdMS_TO_TICKS(WS_PING_INTERVAL_MS));
     }
     
-    // This should never be reached
     vTaskDelete(NULL);
 }
 
-// Start the WebSocket ping task
 void start_ws_ping_task(void) {
-    // Only create the task if it doesn't already exist
     if (ping_task_handle == NULL) {
         const BaseType_t result = xTaskCreatePinnedToCore(ws_ping_task,
             "ws_ping_task", WS_PING_TASK_STACK_SIZE, NULL, WS_PING_TASK_PRIORITY, &ping_task_handle, 0);
