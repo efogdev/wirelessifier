@@ -359,14 +359,15 @@ const App = () => {
                             Please note that it is not supported by the BLE standard and may or may not work in your case.
                             This option will not affect normal speed (125 rps) devices in any way.
                             Values are calculated for a 1000 Hz USB device.
+                            Your mileage may vary.
                         </div>
                         <select
                             value={settings.power.highSpeedSubmode}
                             onChange={(e) => updateSetting('power', 'highSpeedSubmode', e.target.value)}
                         >
-                            <option value="slow">±135 rps</option>
-                            <option value="fast">±240 rps</option>
-                            <option value="veryfast">±315 rps</option>
+                            <option value="slow">±133 rps</option>
+                            <option value="fast">≤250 rps</option>
+                            <option value="veryfast">≤380 rps</option>
                         </select>
                     </div>
 
