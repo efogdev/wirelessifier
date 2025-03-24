@@ -7,7 +7,7 @@
 #include "esp_heap_caps.h"
 #include "esp_clk_tree.h"
 #include "task_monitor.h"
-#include "../hid_bridge.h"
+#include "hid_bridge.h"
 #include "temp_sensor.h"
 
 static const char *TAG = "TaskMonitor";

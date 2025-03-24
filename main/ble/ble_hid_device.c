@@ -15,11 +15,11 @@
 #include "esp_bt_main.h"
 #include "storage.h"
 
+#define BLE_STATS_INTERVAL_SEC 1
 #define HIGH_SPEED_DEVICE_THRESHOLD_MS 6
 #define HIGH_SPEED_DEVICE_THRESHOLD_EVENTS 5
 
 static const char *TAG = "BLE_HID";
-#define BLE_STATS_INTERVAL_SEC  2
 static uint32_t s_current_rps = 0;
 static TaskHandle_t s_stats_task_handle = NULL;
 static uint16_t s_conn_id = 0;

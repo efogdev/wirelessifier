@@ -13,9 +13,8 @@
 #include "freertos/event_groups.h"
 #include "ws_server.h"
 #include "http_server.h"
-#include "dns_server.h"
-#include "../utils/temp_sensor.h"
-#include "../utils/rgb_leds.h"
+#include "temp_sensor.h"
+#include "rgb_leds.h"
 
 static const char *WIFI_TAG = "WIFI_MGR";
 

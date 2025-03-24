@@ -6,7 +6,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <esp_mac.h>
-#include "../const.h"
+#include "const.h"
 
 #define MAX_CACHE_SIZE 12
 #define MAX_PATH_LENGTH 48

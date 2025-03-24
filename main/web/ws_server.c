@@ -2,8 +2,8 @@
 #include <esp_log.h>
 #include "freertos/FreeRTOS.h"
 #include <cJSON.h>
-#include "../utils/storage.h"
-#include "../ble/ble_hid_device.h"
+#include "storage.h"
+#include "ble_hid_device.h"
 #include "esp_gap_ble_api.h"
 
 static const char *WS_TAG = "WS";

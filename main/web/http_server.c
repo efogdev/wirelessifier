@@ -10,7 +10,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "nvs_flash.h"
-#include "../utils/rgb_leds.h"
+#include "rgb_leds.h"
 
 static const char *HTTP_TAG = "HTTP";
 static httpd_handle_t server = NULL;
