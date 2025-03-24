@@ -320,8 +320,13 @@ static esp_err_t process_mouse_report(const usb_hid_report_t *report) {
     }
 
     if (s_sensitivity != 100) {
-        ble_mouse_report.x = ble_mouse_report.x * 100 / s_sensitivity;
-        ble_mouse_report.y = ble_mouse_report.y * 100 / s_sensitivity;
+        const int16_t x_before = (int16_t)ble_mouse_report.x;
+        const int16_t y_before = (int16_t)ble_mouse_report.y;
+
+        ble_mouse_report.x = (int16_t)(((int32_t)x_before * s_sensitivity) / 100);
+        ble_mouse_report.y = (int16_t)(((int32_t)y_before * s_sensitivity) / 100);
+
+        ESP_LOGI(TAG, "(%d, %d) → (%d, %d)", x_before, y_before, (int16_t)ble_mouse_report.x, (int16_t)ble_mouse_report.y);
     }
 
     return ble_hid_device_send_mouse_report(&ble_mouse_report);
