@@ -359,7 +359,7 @@ const App = () => {
                             Please note that it is not supported by the BLE standard and may or may not work in your case.
                             This option will not affect normal speed (125 rps) devices in any way.
                             Values are calculated for a 1000 Hz USB device.
-                            Your mileage may vary.
+                            Some modes might work better than others with your device(s).
                         </div>
                         <select
                             value={settings.power.highSpeedSubmode}
@@ -500,16 +500,15 @@ const App = () => {
                             For pointer devices, it's possible to apply the sensitity modifer on the device layer instead of your OS.
                             However, it is recommended to use OS settings and keep this preference untouched.
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div className="range-container">
                             <input
                                 type="range"
                                 min="50"
                                 max="300"
                                 value={settings.mouse.sensitivity}
                                 onChange={(e) => updateSetting('mouse', 'sensitivity', parseInt(e.target.value))}
-                                style={{ flex: 1 }}
                             />
-                            <span style={{ minWidth: '60px' }}>{settings.mouse.sensitivity}%</span>
+                            <span className="range-value">{settings.mouse.sensitivity}%</span>
                         </div>
                     </div>
 
