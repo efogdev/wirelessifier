@@ -215,6 +215,9 @@ void init_wifi_apsta(void)
 
 httpd_handle_t start_webserver(void)
 {
+    if (!is_wifi_enabled())
+        return server;
+
     if (server != NULL) {
         ESP_LOGI(HTTP_TAG, "Server already running");
         return server;
@@ -299,17 +302,25 @@ static void web_services_task(void *pvParameters)
                 esp_restart();
             }
         }
-
     }
-    
-    start_webserver();
+
+    const httpd_handle_t srv = start_webserver();
     while (1) {
-        vTaskDelay(pdMS_TO_TICKS(123456));
+        vTaskDelay(pdMS_TO_TICKS(1000));
+
+        if (!is_wifi_enabled()) {
+            httpd_stop(srv);
+            vTaskDelete(NULL);
+            break;
+        }
     }
 }
 
 void init_web_services(void)
 {
+    if (!is_wifi_enabled())
+        return;
+
     ESP_LOGI(HTTP_TAG, "Starting web services task");
     wifi_event_group = xEventGroupCreate();
     xTaskCreatePinnedToCore(web_services_task, "web_services", 3000, NULL, 8, &web_services_task_handle, 1);

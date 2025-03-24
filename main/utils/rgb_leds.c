@@ -503,7 +503,7 @@ __attribute__((section(".text"))) static void blend_pixel_colors(tNeopixel* dest
 __attribute__((section(".text"))) static void led_control_task(void *arg)
 {
     if (neopixel_ctx == NULL) {
-        ESP_LOGE(TAG, "NeoPixel not initialized");
+        ESP_LOGE(TAG, "neopixel lib not initialized");
         vTaskDelete(NULL);
         return;
     }

@@ -104,17 +104,7 @@ static esp_err_t print_real_time_stats(const TickType_t xTicksToWait)
     ESP_LOGI(TAG, "");
     print_core_tasks(start_array_size, end_array_size, total_elapsed_time, 1);
     ESP_LOGI(TAG, "");
-
-    for (int i = 0; i < start_array_size; i++) {
-        if (start_array[i].xHandle != NULL) {
-            ESP_LOGI(TAG, "[x] %s", start_array[i].pcTaskName);
-        }
-    }
-    for (int i = 0; i < end_array_size; i++) {
-        if (end_array[i].xHandle != NULL) {
-            ESP_LOGI(TAG, "[ ] %s", end_array[i].pcTaskName);
-        }
-    }
+    
     return ESP_OK;
 }
 
@@ -154,6 +144,6 @@ esp_err_t task_monitor_start(void)
         return ESP_ERR_INVALID_STATE;
     }
 
-    const BaseType_t ret = xTaskCreatePinnedToCore(monitor_task, "monitor", 2048, NULL, STATS_TASK_PRIO, &monitor_task_handle, 1);
+    const BaseType_t ret = xTaskCreatePinnedToCore(monitor_task, "monitor", 2200, NULL, STATS_TASK_PRIO, &monitor_task_handle, 1);
     return (ret == pdPASS) ? ESP_OK : ESP_FAIL;
 }

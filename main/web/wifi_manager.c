@@ -19,8 +19,8 @@
 static const char *WIFI_TAG = "WIFI_MGR";
 
 // WebSocket ping task parameters
-#define WS_PING_TASK_STACK_SIZE 1600
-#define WS_PING_TASK_PRIORITY 6
+#define WS_PING_TASK_STACK_SIZE 2048
+#define WS_PING_TASK_PRIORITY 3
 #define WS_PING_INTERVAL_MS 250
 
 // NVS keys
