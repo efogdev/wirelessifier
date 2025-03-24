@@ -236,11 +236,6 @@ bool usb_hid_host_device_connected(void) {
 
 static void process_report(const uint8_t *const data, const size_t length, const uint8_t interface_num) {
     s_current_rps++;
-    if (s_prev_rps == 0) {
-        s_prev_rps = 1;
-        s_current_rps = 0;
-    }
-
     if (!data || !g_report_queue || length <= 1 || interface_num >= USB_HOST_MAX_INTERFACES) {
         ESP_LOGE(TAG, "Invalid parameters: data=%p, queue=%p, len=%d, iface=%u", data, g_report_queue, length,
                  interface_num);

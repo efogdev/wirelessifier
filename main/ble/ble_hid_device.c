@@ -392,13 +392,7 @@ esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report) {
 
         if (s_acc_buttons != report->buttons || s_batch_count >= s_batch_size) {
             esp_hidd_send_mouse_value(s_conn_id, report->buttons, s_acc_x, s_acc_y, s_acc_wheel, s_acc_pan);
-
             s_current_rps++;
-            if (s_prev_rps == 0) {
-                s_current_rps = 0;
-                s_prev_rps = 1;
-            }
-
             s_acc_buttons = report->buttons;
             if (s_batch_count >= s_batch_size) {
                 s_acc_x = 0;
@@ -420,12 +414,7 @@ esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report) {
         s_batch_count++;
     } else {
         esp_hidd_send_mouse_value(s_conn_id, report->buttons, report->x, report->y, report->wheel, report->pan);
-
         s_current_rps++;
-        if (s_prev_rps == 0) {
-            s_current_rps = 0;
-            s_prev_rps = 1;
-        }
 
         if (s_accumulator_timer != NULL) {
             xTimerDelete(s_accumulator_timer, 0);
