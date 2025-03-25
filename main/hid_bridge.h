@@ -268,7 +268,6 @@ typedef struct {
     usb_hid_field_type_t type;
     uint8_t num_fields;
     usb_hid_field_t *fields;
-    uint8_t raw[USB_HID_MAX_RAW_REPORT_SIZE];
     uint16_t raw_len;
 } usb_hid_report_t;
 

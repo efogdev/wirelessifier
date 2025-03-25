@@ -7,6 +7,9 @@
 #define HID_KEYBOARD_IN_RPT_LEN     32
 #define HID_MOUSE_IN_RPT_LEN        7
 
+// Static buffer to avoid stack allocations
+static uint8_t s_report_buffer[HID_MOUSE_IN_RPT_LEN] __attribute__((section(".dram1.data")));
+
 esp_err_t esp_hidd_register_callbacks(esp_hidd_event_cb_t callbacks) {
     esp_err_t hidd_status;
 
@@ -70,27 +73,26 @@ void esp_hidd_send_keyboard_value(const uint16_t conn_id, const key_mask_t speci
         return;
     }
 
-    uint8_t buffer[HID_KEYBOARD_IN_RPT_LEN] = {0};
-    buffer[0] = special_key_mask;
+    s_report_buffer[0] = special_key_mask;
+    memset(&s_report_buffer[2], 0, HID_KEYBOARD_IN_RPT_LEN - 2);
     for (int i = 0; i < num_key; i++) {
-        buffer[i + 2] = keyboard_cmd[i];
+        s_report_buffer[i + 2] = keyboard_cmd[i];
     }
 
     hid_dev_send_report(hidd_le_env.gatt_if,
-        conn_id, HID_RPT_ID_KEY_IN, HID_REPORT_TYPE_INPUT, HID_KEYBOARD_IN_RPT_LEN, buffer);
+        conn_id, HID_RPT_ID_KEY_IN, HID_REPORT_TYPE_INPUT, HID_KEYBOARD_IN_RPT_LEN, s_report_buffer);
 }
 
 __attribute__((section(".iram1.text"))) void esp_hidd_send_mouse_value(const uint16_t conn_id, const uint8_t mouse_button, const uint16_t mickeys_x,
                                const uint16_t mickeys_y, const int8_t wheel, const int8_t pan) {
-    uint8_t buffer[HID_MOUSE_IN_RPT_LEN];
-    buffer[0] = mickeys_x & 0xFF;
-    buffer[1] = (mickeys_x >> 8);
-    buffer[2] = mickeys_y & 0xFF;
-    buffer[3] = (mickeys_y >> 8);
-    buffer[4] = wheel;
-    buffer[5] = pan;
-    buffer[6] = mouse_button;
+    s_report_buffer[0] = mickeys_x & 0xFF;
+    s_report_buffer[1] = (mickeys_x >> 8);
+    s_report_buffer[2] = mickeys_y & 0xFF;
+    s_report_buffer[3] = (mickeys_y >> 8);
+    s_report_buffer[4] = wheel;
+    s_report_buffer[5] = pan;
+    s_report_buffer[6] = mouse_button;
 
     hid_dev_send_report(hidd_le_env.gatt_if, conn_id, HID_RPT_ID_MOUSE_IN, HID_REPORT_TYPE_INPUT, HID_MOUSE_IN_RPT_LEN,
-                        buffer);
+                        s_report_buffer);
 }

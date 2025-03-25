@@ -245,6 +245,7 @@ __attribute__((section(".iram1.text"))) static void process_report(const uint8_t
     const uint8_t *report_data = data;
     size_t report_length = length;
     static uint8_t report_id = 0;
+    
     if (report_map->num_reports > 1) {
         report_id = data[0];
         report_data++;
@@ -253,8 +254,7 @@ __attribute__((section(".iram1.text"))) static void process_report(const uint8_t
         report_id = report_map->report_ids[0];
     }
 
-    if (last_report_info == NULL || last_report_id == -1 || last_interface == -1 || last_report_id != report_id ||
-        last_interface != interface_num) {
+    if (last_report_info == NULL || last_report_id != report_id || last_interface != interface_num) {
         for (int i = 0; i < report_map->num_reports; i++) {
             if (report_map->report_ids[i] == report_id) {
                 last_report_info = &report_map->reports[i];
@@ -277,6 +277,8 @@ __attribute__((section(".iram1.text"))) static void process_report(const uint8_t
     g_report.num_fields = report_info->num_fields;
     g_report.raw_len = report_length;
     g_report.fields = g_fields;
+    g_report.is_keyboard = report_info->is_keyboard;
+    g_report.is_mouse = report_info->is_mouse;
 
     const report_field_info_t *const field_info = report_info->fields;
     for (uint8_t i = 0; i < report_info->num_fields; i++) {
@@ -285,10 +287,6 @@ __attribute__((section(".iram1.text"))) static void process_report(const uint8_t
         g_fields[i].values = &g_field_values[i];
     }
 
-    g_report.is_keyboard = report_info->is_keyboard;
-    g_report.is_mouse = report_info->is_mouse;
-
-    memcpy(g_report.raw, report_data, g_report.raw_len);
     xQueueSend(g_report_queue, &g_report, 0);
 }
 

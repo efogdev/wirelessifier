@@ -24,13 +24,13 @@ static uint16_t s_current_fps = BASE_FPS;
 static int s_gpio_pin = 0;
 uint8_t g_rgb_brightness = 35;
 
-__attribute__((section(".text"))) static uint32_t get_cycle_time_ms(const uint8_t speed) {
+__attribute__((section(".iram1.text"))) static uint32_t get_cycle_time_ms(const uint8_t speed) {
     if (speed == 0) return MAX_CYCLE_TIME_MS;
     return MIN_CYCLE_TIME_MS + ((MAX_CYCLE_TIME_MS - MIN_CYCLE_TIME_MS) * (100 - speed)) / 100;
 }
 
 // Color utility functions
-__attribute__((section(".text"))) static uint32_t color_with_brightness(const uint32_t color, const uint8_t brightness) {
+__attribute__((section(".iram1.text"))) static uint32_t color_with_brightness(const uint32_t color, const uint8_t brightness) {
     uint8_t r = (color >> 16) & 0xFF;
     uint8_t g = (color >> 8) & 0xFF;
     uint8_t b = color & 0xFF;
@@ -42,7 +42,7 @@ __attribute__((section(".text"))) static uint32_t color_with_brightness(const ui
     return NP_RGB(r, g, b);
 }
 
-__attribute__((section(".text"))) static uint32_t blend_colors(const uint32_t color1, const uint32_t color2, const float blend_factor) {
+__attribute__((section(".iram1.text"))) static uint32_t blend_colors(const uint32_t color1, const uint32_t color2, const float blend_factor) {
     const uint8_t r1 = (color1 >> 16) & 0xFF;
     const uint8_t g1 = (color1 >> 8) & 0xFF;
     const uint8_t b1 = color1 & 0xFF;
@@ -58,7 +58,7 @@ __attribute__((section(".text"))) static uint32_t blend_colors(const uint32_t co
     return NP_RGB(r, g, b);
 }
 
-__attribute__((section(".text"))) static void extract_rgb(const uint32_t color, uint8_t *r, uint8_t *g, uint8_t *b) {
+__attribute__((section(".iram1.text"))) static void extract_rgb(const uint32_t color, uint8_t *r, uint8_t *g, uint8_t *b) {
     *r = (color >> 16) & 0xFF;
     *g = (color >> 8) & 0xFF;
     *b = color & 0xFF;
@@ -99,7 +99,7 @@ typedef struct {
     status_animation_type_t animation;
 } status_led_state_t;
 
-__attribute__((section(".text"))) static void update_status_led_state(status_led_state_t *state, tNeopixel* pixel) {
+__attribute__((section(".iram1.text"))) static void update_status_led_state(status_led_state_t *state, tNeopixel* pixel) {
     const uint32_t current_time = pdTICKS_TO_MS(xTaskGetTickCount());
     
     if (state->animation != WIFI_ANIM_NONE) {
@@ -202,9 +202,7 @@ static const status_led_state_t s_status_led_state_init __attribute__((section("
     .animation = WIFI_ANIM_NONE
 };
 
-// Status LED state in RAM
 static status_led_state_t s_status_led_state;
-
 static bool s_wifi_apsta_mode = false;
 static bool s_wifi_connected = false;
 static void update_status_led(tNeopixel* pixels);
@@ -213,9 +211,9 @@ static void led_control_task(void *arg);
 static bool is_task_suspended = false;
 
 // Function to check if the task should be suspended and handle suspension/resumption
-__attribute__((section(".text"))) static void check_and_update_task_suspension(void)
+__attribute__((section(".iram1.text"))) static void check_and_update_task_suspension(void)
 {
-    bool should_suspend = false;
+    static bool should_suspend = false;
     
     if (s_led_pattern >= 0 && s_led_pattern < sizeof(led_patterns)/sizeof(led_patterns[0])) {
         const led_pattern_t* pattern = &led_patterns[s_led_pattern];
@@ -227,6 +225,7 @@ __attribute__((section(".text"))) static void check_and_update_task_suspension(v
     }
     
     if (should_suspend && !is_task_suspended && s_led_task_handle != NULL) {
+        is_task_suspended = true;
         ESP_LOGD(TAG, "Suspending LED task - no color and status LED off");
         
         if (neopixel_ctx != NULL) {
@@ -238,11 +237,10 @@ __attribute__((section(".text"))) static void check_and_update_task_suspension(v
             neopixel_SetPixel(neopixel_ctx, pixels, s_num_leds);
         }
 
-        vTaskDelay(pdMS_TO_TICKS(50));
+        vTaskDelay(pdMS_TO_TICKS(100));
         neopixel_Deinit(neopixel_ctx);
         vTaskDelay(pdMS_TO_TICKS(50));
         vTaskSuspend(s_led_task_handle);
-        is_task_suspended = true;
     } else if (!should_suspend && is_task_suspended && s_led_task_handle != NULL) {
         ESP_LOGD(TAG, "Resuming LED task - conditions changed");
 
@@ -316,7 +314,7 @@ void led_control_deinit(void)
     s_in_transition = false;
 }
 
-void led_update_pattern(const bool usb_connected, const bool ble_connected, const bool ble_paused)
+__attribute__((section(".iram1.text"))) void led_update_pattern(const bool usb_connected, const bool ble_connected, const bool ble_paused)
 {
     int new_pattern = LED_PATTERN_IDLE;
     const uint32_t current_time = pdTICKS_TO_MS(xTaskGetTickCount());
@@ -408,8 +406,12 @@ __attribute__((section(".text"))) static void update_status_led(tNeopixel* pixel
     update_status_led_state(&s_status_led_state, &pixels[0]);
 }
 
-__attribute__((section(".text"))) static void apply_pattern(tNeopixel* pixels, const led_pattern_t* pattern)
+__attribute__((section(".iram1.text"))) static void apply_pattern(tNeopixel* pixels, const led_pattern_t* pattern)
 {
+    if (is_task_suspended) {
+        return;
+    }
+
     const int column_length = (s_num_leds - 1) / 2;
     const uint32_t current_color = s_use_secondary_color ? pattern->colors[1] : pattern->colors[0];
     
@@ -507,7 +509,7 @@ __attribute__((section(".text"))) static void apply_pattern(tNeopixel* pixels, c
     }
 }
 
-__attribute__((section(".text"))) static void blend_pixel_colors(tNeopixel* dest, const tNeopixel* src1, const tNeopixel* src2, const float blend_factor)
+__attribute__((section(".iram1.text"))) static void blend_pixel_colors(tNeopixel* dest, const tNeopixel* src1, const tNeopixel* src2, const float blend_factor)
 {
     dest->rgb = blend_colors(src1->rgb, src2->rgb, blend_factor);
 }
@@ -524,6 +526,11 @@ __attribute__((section(".text"))) static void led_control_task(void *arg)
     tNeopixel new_state[s_num_leds];
     
     while (1) {
+        if (is_task_suspended) {
+            vTaskDelay(pdMS_TO_TICKS(100));
+            continue;
+        }
+
         for (int i = 0; i < s_num_leds; i++) {
             pixels[i].index = i;
             pixels[i].rgb = 0;

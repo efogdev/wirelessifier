@@ -271,12 +271,15 @@ static esp_err_t process_keyboard_report(const usb_hid_report_t *report) {
         return ESP_OK;
     }
 
-    keyboard_report_t ble_kb_report = {0};
+    static keyboard_report_t ble_kb_report;
+    ble_kb_report.modifier = 0;
+    ble_kb_report.keycodes = 0;
+
+    // Process fields directly from raw data
     for (int i = 0; i < report->num_fields; i++) {
         const usb_hid_field_t *field = &report->fields[i];
-        const int value = field->values[0];
-
         if (field->attr.usage_page == HID_USAGE_KEYPAD) {
+            const int value = field->values[0];
             if (field->attr.usage >= 0xE0 && field->attr.usage <= 0xE7 && value) {
                 ble_kb_report.modifier |= (1 << (field->attr.usage - 0xE0));
             } else if (field->attr.usage <= 0xA4 && value) {
@@ -294,7 +297,13 @@ __attribute__((section(".iram1.text"))) static esp_err_t process_mouse_report(co
         return ESP_OK;
     }
 
-    mouse_report_t ble_mouse_report = {0};
+    static mouse_report_t ble_mouse_report;
+    ble_mouse_report.buttons = 0;
+    ble_mouse_report.x = 0;
+    ble_mouse_report.y = 0;
+    ble_mouse_report.wheel = 0;
+    ble_mouse_report.pan = 0;
+
     for (int i = 0; i < report->num_fields; i++) {
         const usb_hid_field_t *field = &report->fields[i];
         const int value = field->values[0];
@@ -307,21 +316,21 @@ __attribute__((section(".iram1.text"))) static esp_err_t process_mouse_report(co
             switch (field->attr.usage) {
                 case HID_USAGE_X:
                     ble_mouse_report.x = value;
-                break;
+                    break;
                 case HID_USAGE_Y:
                     ble_mouse_report.y = value;
-                break;
+                    break;
                 case HID_USAGE_WHEEL:
                     ble_mouse_report.wheel = value;
-                break;
+                    break;
                 case 0x238:
                     ble_mouse_report.pan = value;
-                break;
-                default: break;
+                    break;
+                default:
+                    break;
             }
         }
     }
-
     if (s_sensitivity != 100) {
         ble_mouse_report.x = (int32_t)(int16_t)ble_mouse_report.x * s_sensitivity / 100;
         ble_mouse_report.y = (int32_t)(int16_t)ble_mouse_report.y * s_sensitivity / 100;

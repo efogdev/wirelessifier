@@ -16,8 +16,10 @@ typedef struct __attribute__((packed)) {
 } cache_entry_t;
 
 static cache_entry_t cache[CACHE_SIZE];
-
 static uint8_t cache_size = 0;
+
+// Static report buffer to avoid stack allocations
+static uint8_t s_report_buffer[48] __attribute__((section(".dram1.data")));
 
 static hid_report_map_t *hid_dev_rpt_by_id(const uint8_t id, const uint8_t type) {
     const uint16_t key = (id << 8) | type;
@@ -60,9 +62,12 @@ void hid_keyboard_build_report(uint8_t *buffer, const keyboard_cmd_t cmd) {
 }
 
 __attribute__((section(".iram1.text"))) void hid_dev_send_report(const esp_gatt_if_t gatts_if, const uint16_t conn_id,
-                         const uint8_t id, const uint8_t type, const uint8_t length, uint8_t *data) {
+                         const uint8_t id, const uint8_t type, const uint8_t length, const uint8_t *data) {
     hid_report_map_t *p_rpt;
     if ((p_rpt = hid_dev_rpt_by_id(id, type)) != NULL) {
-        esp_ble_gatts_send_indicate(gatts_if, conn_id, p_rpt->handle, length, data, false);
+        if (length <= sizeof(s_report_buffer)) {
+            memcpy(s_report_buffer, data, length);
+            esp_ble_gatts_send_indicate(gatts_if, conn_id, p_rpt->handle, length, s_report_buffer, false);
+        }
     }
 }
