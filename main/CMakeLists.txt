@@ -28,4 +28,4 @@ SRCS "main.c"
   REQUIRES neopixel esp_hid bt nvs_flash esp_http_server app_update json
   PRIV_REQUIRES usb)
 
-target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-error=unused-const-variable)
+target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-error=unused-const-variable -Wno-unknown-warning-option)

@@ -1,3 +1,4 @@
+#include <const.h>
 #include <stdio.h>
 #include <limits.h>
 #include <inttypes.h>
@@ -17,12 +18,6 @@
 #include "utils/rgb_leds.h"
 #include "utils/storage.h"
 #include "web/http_server.h"
-
-#define VERBOSE 1
-#define GPIO_RESET_PIN GPIO_NUM_16
-#define GPIO_WS2812B_PIN GPIO_NUM_38
-#define GPIO_BUTTON_SW4 GPIO_NUM_13
-#define NUM_LEDS 17
 
 static const char *TAG = "MAIN";
 static QueueHandle_t intrQueue = NULL;
@@ -74,8 +69,13 @@ static void init_pm() {
 }
 
 static void run_hid_bridge() {
-    gpio_set_level(GPIO_NUM_34, 0);
-    gpio_set_level(GPIO_NUM_33, 0);
+    gpio_set_level(GPIO_MUX_OE, 0);
+
+#ifdef HW01
+    gpio_set_level(GPIO_MUX_SEL, 0);
+#elifdef HW02
+    gpio_set_level(GPIO_MUX_SEL, 1);
+#endif
 
     esp_err_t ret = hid_bridge_init(VERBOSE);
     if (ret != ESP_OK) {
@@ -119,11 +119,11 @@ static void init_web_stack(void) {
 static void init_gpio(void) {
     const gpio_config_t output_pullup_conf = {
         .pin_bit_mask = (
-            (1ULL<<GPIO_NUM_36) |
-            (1ULL<<GPIO_NUM_35) |
-            (1ULL<<GPIO_NUM_38) |
-            (1ULL<<GPIO_NUM_34) |
-            (1ULL<<GPIO_NUM_33)
+            (1ULL<<GPIO_BAT_CE) |
+            (1ULL<<GPIO_5V_EN) |
+            (1ULL<<GPIO_WS2812B_PIN) |
+            (1ULL<<GPIO_MUX_SEL) |
+            (1ULL<<GPIO_MUX_OE)
         ),
         .mode = GPIO_MODE_OUTPUT,
         .pull_up_en = GPIO_PULLUP_ENABLE,
@@ -134,9 +134,10 @@ static void init_gpio(void) {
 
     const gpio_config_t input_pullup_conf = {
         .pin_bit_mask = (
-            (1ULL<<GPIO_NUM_14) |
-            (1ULL<<GPIO_NUM_15) |
-            (1ULL<<GPIO_BUTTON_SW4)
+            (1ULL<<GPIO_BUTTON_SW4) |
+            (1ULL<<GPIO_BUTTON_SW3) |
+            (1ULL<<GPIO_BUTTON_SW2) |
+            (1ULL<<GPIO_BUTTON_SW1)
         ),
         .mode = GPIO_MODE_INPUT,
         .pull_up_en = GPIO_PULLUP_ENABLE,
@@ -145,6 +146,45 @@ static void init_gpio(void) {
     };
     gpio_config(&input_pullup_conf);
 
+#ifdef HW02
+    const gpio_config_t output_pulldown_conf = {
+        .pin_bit_mask = (
+            (1ULL<<GPIO_BAT_ISET1) |
+            (1ULL<<GPIO_BAT_ISET2) |
+            (1ULL<<GPIO_BAT_ISET3) |
+            (1ULL<<GPIO_BAT_ISET4) |
+            (1ULL<<GPIO_BAT_ISET5) |
+            (1ULL<<GPIO_BAT_ISET6)
+        ),
+        .mode = GPIO_MODE_OUTPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_ENABLE,
+        .intr_type = GPIO_INTR_DISABLE
+    };
+    gpio_config(&output_pulldown_conf);
+
+    const gpio_config_t input_nopull_conf = {
+        .pin_bit_mask = (
+            (1ULL<<GPIO_ADC_BAT) |
+            (1ULL<<GPIO_ADC_VIN) |
+            (1ULL<<GPIO_BAT_CHRG) |
+            (1ULL<<GPIO_BAT_PGOOD) |
+            (1ULL<<GPIO_BAT_ISET1) |
+            (1ULL<<GPIO_BAT_ISET2) |
+            (1ULL<<GPIO_BAT_ISET3) |
+            (1ULL<<GPIO_BAT_ISET4) |
+            (1ULL<<GPIO_BAT_ISET5) |
+            (1ULL<<GPIO_BAT_ISET6)
+        ),
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE
+    };
+    gpio_config(&input_nopull_conf);
+#endif
+
+#ifdef HW01
     // PWR_LED: red, via 5.1kOhm
     // PWM to optimize battery life
     const ledc_timer_config_t ledc_timer = {
@@ -165,4 +205,7 @@ static void init_gpio(void) {
     };
     ESP_ERROR_CHECK(ledc_timer_config(&ledc_timer));
     ESP_ERROR_CHECK(ledc_channel_config(&ledc_channel));
+#endif
+
+    gpio_set_level(GPIO_5V_EN, 1);
 }
