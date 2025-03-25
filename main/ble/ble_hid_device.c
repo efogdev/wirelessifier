@@ -387,7 +387,7 @@ esp_err_t ble_hid_device_send_keyboard_report(const keyboard_report_t *report) {
 }
 
 // goal is to map any high (up to 1000hz) report rate to lower BLE report rate
-esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report) {
+__attribute__((section(".iram1.text"))) esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report) {
     if (!s_connected) {
         return ESP_ERR_INVALID_STATE;
     }

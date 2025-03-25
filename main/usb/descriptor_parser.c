@@ -265,7 +265,7 @@ void parse_report_descriptor(const uint8_t *desc, const size_t length, const uin
     }
 }
 
-int extract_field_value(const uint8_t *data, const uint16_t bit_offset, const uint16_t bit_size) {
+__attribute__((section(".iram1.text"))) int extract_field_value(const uint8_t *data, const uint16_t bit_offset, const uint16_t bit_size) {
     if (!data || bit_size == 0 || bit_size > 32) {
         return 0;
     }

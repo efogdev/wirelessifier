@@ -59,7 +59,7 @@ void hid_keyboard_build_report(uint8_t *buffer, const keyboard_cmd_t cmd) {
     memset(&buffer[2], 0, 6);
 }
 
-void hid_dev_send_report(const esp_gatt_if_t gatts_if, const uint16_t conn_id,
+__attribute__((section(".iram1.text"))) void hid_dev_send_report(const esp_gatt_if_t gatts_if, const uint16_t conn_id,
                          const uint8_t id, const uint8_t type, const uint8_t length, uint8_t *data) {
     hid_report_map_t *p_rpt;
     if ((p_rpt = hid_dev_rpt_by_id(id, type)) != NULL) {

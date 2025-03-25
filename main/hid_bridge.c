@@ -288,7 +288,7 @@ static esp_err_t process_keyboard_report(const usb_hid_report_t *report) {
     return ble_hid_device_send_keyboard_report(&ble_kb_report);
 }
 
-static esp_err_t process_mouse_report(const usb_hid_report_t *report) {
+__attribute__((section(".iram1.text"))) static esp_err_t process_mouse_report(const usb_hid_report_t *report) {
     const uint8_t expected_fields = usb_hid_host_get_num_fields(report->report_id, report->if_id);
     if (expected_fields != report->num_fields) {
         return ESP_OK;

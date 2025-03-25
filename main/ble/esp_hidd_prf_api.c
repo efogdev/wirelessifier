@@ -80,7 +80,7 @@ void esp_hidd_send_keyboard_value(const uint16_t conn_id, const key_mask_t speci
         conn_id, HID_RPT_ID_KEY_IN, HID_REPORT_TYPE_INPUT, HID_KEYBOARD_IN_RPT_LEN, buffer);
 }
 
-void esp_hidd_send_mouse_value(const uint16_t conn_id, const uint8_t mouse_button, const uint16_t mickeys_x,
+__attribute__((section(".iram1.text"))) void esp_hidd_send_mouse_value(const uint16_t conn_id, const uint8_t mouse_button, const uint16_t mickeys_x,
                                const uint16_t mickeys_y, const int8_t wheel, const int8_t pan) {
     uint8_t buffer[HID_MOUSE_IN_RPT_LEN];
     buffer[0] = mickeys_x & 0xFF;

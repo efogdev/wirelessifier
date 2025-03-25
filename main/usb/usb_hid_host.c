@@ -145,7 +145,7 @@ esp_err_t usb_hid_host_init(const QueueHandle_t report_queue, const bool verbose
         return ESP_ERR_NO_MEM;
     }
 
-    BaseType_t task_created = xTaskCreatePinnedToCore(device_event_task, "dev_evt", 2048, NULL, 15, &g_device_task_handle, 1);
+    BaseType_t task_created = xTaskCreatePinnedToCore(device_event_task, "dev_evt", 2048, NULL, 6, &g_device_task_handle, 1);
     if (task_created != pdTRUE) {
         vQueueDelete(g_device_event_queue);
         return ESP_ERR_NO_MEM;
@@ -190,7 +190,7 @@ esp_err_t usb_hid_host_init(const QueueHandle_t report_queue, const bool verbose
 
     const hid_host_driver_config_t hid_host_config = {
         .create_background_task = true,
-        .task_priority = 12,
+        .task_priority = 14,
         .stack_size = 1800,
         .core_id = 1,
         .callback = hid_host_device_callback,
@@ -233,7 +233,7 @@ bool usb_hid_host_device_connected(void) {
     return g_device_connected;
 }
 
-static void process_report(const uint8_t *const data, const size_t length, const uint8_t interface_num) {
+__attribute__((section(".iram1.text"))) static void process_report(const uint8_t *const data, const size_t length, const uint8_t interface_num) {
     s_current_rps++;
     if (!data || !g_report_queue || length <= 1 || interface_num >= USB_HOST_MAX_INTERFACES) {
         ESP_LOGE(TAG, "Invalid parameters: data=%p, queue=%p, len=%d, iface=%u", data, g_report_queue, length,
@@ -294,7 +294,7 @@ static void process_report(const uint8_t *const data, const size_t length, const
 
 static uint8_t cur_if_evt_data[64] = {0};
 
-static void hid_host_interface_callback(const hid_host_device_handle_t hid_device_handle,
+__attribute__((section(".iram1.text"))) static void hid_host_interface_callback(const hid_host_device_handle_t hid_device_handle,
                                         const hid_host_interface_event_t event, void *arg) {
     static size_t data_length = 0;
     static hid_host_dev_params_t dev_params;
