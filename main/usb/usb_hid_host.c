@@ -14,7 +14,7 @@
 #include "descriptor_parser.h"
 
 #define USB_STATS_INTERVAL_SEC  1
-#define HOST_HID_QUEUE_SIZE     2
+#define HOST_HID_QUEUE_SIZE     3
 #define DEVICE_EVENT_QUEUE_SIZE 6
 
 static const char *TAG = "USB_HID";

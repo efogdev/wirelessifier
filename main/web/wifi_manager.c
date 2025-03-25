@@ -439,8 +439,9 @@ void process_wifi_ws_message(const char* message) {
         reboot_device(keep_wifi);
     }
     else if (strcmp(type->valuestring, "disable_web_stack") == 0) {
-        vTaskDelay(pdMS_TO_TICKS(500));
         // disable_wifi_and_web_stack();
+        ws_broadcast_json("web_stack_disabled", "{}");
+        vTaskDelay(pdMS_TO_TICKS(250));
         esp_restart(); // because no memory freed when disabling web stack for some reason (ToDo)
     }
     else if (strcmp(type->valuestring, "wifi_connect") == 0) {

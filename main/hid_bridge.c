@@ -13,7 +13,7 @@
 #include "web/wifi_manager.h"
 #include "utils/storage.h"
 
-#define HID_QUEUE_SIZE 4
+#define HID_QUEUE_SIZE 8
 #define HID_QUEUE_ITEM_SIZE sizeof(usb_hid_report_t)
 
 static const char *TAG = "HID_BRIDGE";

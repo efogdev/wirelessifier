@@ -21,6 +21,7 @@
 
 static const char *TAG = "RGB_UTILS";
 static uint16_t s_current_fps = BASE_FPS;
+static int s_gpio_pin = 0;
 uint8_t g_rgb_brightness = 35;
 
 __attribute__((section(".text"))) static uint32_t get_cycle_time_ms(const uint8_t speed) {
@@ -236,11 +237,21 @@ __attribute__((section(".text"))) static void check_and_update_task_suspension(v
             }
             neopixel_SetPixel(neopixel_ctx, pixels, s_num_leds);
         }
-        
+
+        vTaskDelay(pdMS_TO_TICKS(150));
+        neopixel_Deinit(neopixel_ctx);
+        vTaskDelay(pdMS_TO_TICKS(50));
         vTaskSuspend(s_led_task_handle);
         is_task_suspended = true;
     } else if (!should_suspend && is_task_suspended && s_led_task_handle != NULL) {
         ESP_LOGD(TAG, "Resuming LED task - conditions changed");
+
+        neopixel_ctx = neopixel_Init(s_num_leds, s_gpio_pin);
+        if (neopixel_ctx == NULL) {
+            ESP_LOGE(TAG, "Failed to initialize NeoPixel");
+            return;
+        }
+
         vTaskResume(s_led_task_handle);
         is_task_suspended = false;
     }
@@ -269,7 +280,8 @@ void led_control_init(const int num_leds, const int gpio_pin)
         free(s_previous_state);
         s_previous_state = NULL;
     }
-    
+
+    s_gpio_pin = gpio_pin;
     s_num_leds = num_leds;
     memcpy(&s_status_led_state, &s_status_led_state_init, sizeof(status_led_state_t));
     neopixel_ctx = neopixel_Init(num_leds, gpio_pin);
@@ -284,7 +296,7 @@ void led_control_init(const int num_leds, const int gpio_pin)
         return;
     }
     
-    xTaskCreatePinnedToCore(led_control_task, "led_control", 1500, NULL, 7, &s_led_task_handle, 1);
+    xTaskCreatePinnedToCore(led_control_task, "led_control", 1720, NULL, 7, &s_led_task_handle, 1);
 }
 
 void led_control_deinit(void)
