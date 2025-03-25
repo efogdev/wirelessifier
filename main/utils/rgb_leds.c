@@ -238,7 +238,7 @@ __attribute__((section(".text"))) static void check_and_update_task_suspension(v
             neopixel_SetPixel(neopixel_ctx, pixels, s_num_leds);
         }
 
-        vTaskDelay(pdMS_TO_TICKS(150));
+        vTaskDelay(pdMS_TO_TICKS(50));
         neopixel_Deinit(neopixel_ctx);
         vTaskDelay(pdMS_TO_TICKS(50));
         vTaskSuspend(s_led_task_handle);
@@ -296,7 +296,7 @@ void led_control_init(const int num_leds, const int gpio_pin)
         return;
     }
     
-    xTaskCreatePinnedToCore(led_control_task, "led_control", 1720, NULL, 7, &s_led_task_handle, 1);
+    xTaskCreatePinnedToCore(led_control_task, "led_control", 1960, NULL, 7, &s_led_task_handle, 1);
 }
 
 void led_control_deinit(void)
