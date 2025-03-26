@@ -261,17 +261,6 @@ typedef struct {
 } usb_hid_field_t;
 
 typedef struct {
-    bool is_mouse;
-    bool is_keyboard;
-    uint8_t if_id;
-    uint8_t report_id;
-    usb_hid_field_type_t type;
-    uint8_t num_fields;
-    usb_hid_field_t *fields;
-    uint16_t raw_len;
-} usb_hid_report_t;
-
-typedef struct {
     usb_hid_field_attr_t attr;
     uint16_t bit_offset;
     uint16_t bit_size;
@@ -285,6 +274,13 @@ typedef struct {
     uint8_t usage_stack_pos;
     bool is_mouse;
     bool is_keyboard;
+    struct {
+        uint8_t x;
+        uint8_t y;
+        uint8_t wheel;
+        uint8_t pan;
+        uint8_t buttons;
+    } mouse_fields;
 } report_info_t;
 
 typedef struct {
@@ -294,6 +290,17 @@ typedef struct {
     uint16_t collection_stack[MAX_COLLECTION_DEPTH];
     uint8_t collection_depth;
 } report_map_t;
+
+typedef struct {
+    bool is_mouse;
+    bool is_keyboard;
+    uint8_t if_id;
+    uint8_t report_id;
+    usb_hid_field_type_t type;
+    uint8_t num_fields;
+    usb_hid_field_t* fields;
+    report_info_t* info;
+} usb_hid_report_t;
 
 /**
  * @brief Initialize HID bridge

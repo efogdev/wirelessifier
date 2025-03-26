@@ -11,7 +11,6 @@
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "driver/gpio.h"
-#include "driver/ledc.h"
 #include "usb/usb_hid_host.h"
 #include "ble_hid_device.h"
 #include "hid_bridge.h"

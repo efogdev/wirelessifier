@@ -43,9 +43,7 @@ static usb_host_client_handle_t client_hdl;
 static uint8_t client_addr;
 static bool usb_host_dev_connected = false;
 
-static report_info_t *last_report_info = NULL;
-static int16_t last_report_id = -1;
-static int16_t last_interface = -1;
+static report_info_t *report_lookup_table[USB_HOST_MAX_INTERFACES][MAX_REPORTS_PER_INTERFACE] = {0};
 
 static void usb_lib_task(void *arg);
 
@@ -241,7 +239,7 @@ __attribute__((section(".iram1.text"))) static void process_report(const uint8_t
         return;
     }
 
-    report_map_t *const report_map = &g_interface_report_maps[interface_num];
+    const report_map_t *const report_map = &g_interface_report_maps[interface_num];
     const uint8_t *report_data = data;
     size_t report_length = length;
     static uint8_t report_id = 0;
@@ -254,18 +252,7 @@ __attribute__((section(".iram1.text"))) static void process_report(const uint8_t
         report_id = report_map->report_ids[0];
     }
 
-    if (last_report_info == NULL || last_report_id != report_id || last_interface != interface_num) {
-        for (int i = 0; i < report_map->num_reports; i++) {
-            if (report_map->report_ids[i] == report_id) {
-                last_report_info = &report_map->reports[i];
-                last_report_id = report_id;
-                last_interface = interface_num;
-                break;
-            }
-        }
-    }
-
-    const report_info_t *report_info = last_report_info;
+    report_info_t* const report_info = report_lookup_table[interface_num][report_id];
     if (!report_info) {
         ESP_LOGW(TAG, "Unknown report ID %d for interface %d", report_id, interface_num);
         return;
@@ -275,8 +262,8 @@ __attribute__((section(".iram1.text"))) static void process_report(const uint8_t
     g_report.report_id = report_id;
     g_report.type = USB_HID_FIELD_TYPE_INPUT;
     g_report.num_fields = report_info->num_fields;
-    g_report.raw_len = report_length;
     g_report.fields = g_fields;
+    g_report.info = report_info;
     g_report.is_keyboard = report_info->is_keyboard;
     g_report.is_mouse = report_info->is_mouse;
 
@@ -318,9 +305,7 @@ __attribute__((section(".iram1.text"))) static void hid_host_interface_callback(
             ESP_LOGI(TAG, "HID Device Disconnected - Interface: %d", dev_params.iface_num);
             g_device_connected = false;
             memset(g_field_counts[dev_params.iface_num], 0, sizeof(g_field_counts[dev_params.iface_num]));
-            last_report_info = NULL;
-            last_report_id = 0;
-            last_interface = 0;
+            memset(report_lookup_table[dev_params.iface_num], 0, sizeof(report_lookup_table[dev_params.iface_num]));
             err = hid_host_device_close(hid_device_handle);
             if (err != ESP_OK) {
                 ESP_LOGE(TAG, "Failed to close device: %d", err);
@@ -399,13 +384,14 @@ static void device_event_task(void *arg) {
                     if (xSemaphoreTake(g_report_maps_mutex, portMAX_DELAY) == pdTRUE) {
                         parse_report_descriptor(desc, desc_len, dev_params.iface_num,
                                                 &g_interface_report_maps[dev_params.iface_num]);
-                        const report_map_t *report_map = &g_interface_report_maps[dev_params.iface_num];
+                        report_map_t *report_map = &g_interface_report_maps[dev_params.iface_num];
                         for (int i = 0; i < report_map->num_reports; i++) {
                             ESP_LOGI(TAG, "Expecting %d fields for interface=%d report=%d",
                                      report_map->reports[i].num_fields, dev_params.iface_num,
                                      report_map->report_ids[i]);
                             g_field_counts[dev_params.iface_num][report_map->report_ids[i]] = report_map->reports[i].
                                     num_fields;
+                            report_lookup_table[dev_params.iface_num][report_map->report_ids[i]] = &report_map->reports[i];
                         }
                         xSemaphoreGive(g_report_maps_mutex);
                     } else {

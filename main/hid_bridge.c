@@ -291,46 +291,31 @@ static esp_err_t process_keyboard_report(const usb_hid_report_t *report) {
     return ble_hid_device_send_keyboard_report(&ble_kb_report);
 }
 
+static mouse_report_t ble_mouse_report;
+
 __attribute__((section(".iram1.text"))) static esp_err_t process_mouse_report(const usb_hid_report_t *report) {
-    const uint8_t expected_fields = usb_hid_host_get_num_fields(report->report_id, report->if_id);
-    if (expected_fields != report->num_fields) {
-        return ESP_OK;
-    }
+    // ToDo: define some "safe" mode?
+    // const uint8_t expected_fields = usb_hid_host_get_num_fields(report->report_id, report->if_id);
+    // if (expected_fields != report->num_fields) {
+    //     return ESP_OK;
+    // }
 
-    static mouse_report_t ble_mouse_report;
     ble_mouse_report.buttons = 0;
-    ble_mouse_report.x = 0;
-    ble_mouse_report.y = 0;
-    ble_mouse_report.wheel = 0;
-    ble_mouse_report.pan = 0;
-
-    for (int i = 0; i < report->num_fields; i++) {
-        const usb_hid_field_t *field = &report->fields[i];
-        const int value = field->values[0];
-
-        if (field->attr.usage_page == HID_USAGE_PAGE_BUTTONS) {
-            if (field->attr.usage >= 1 && field->attr.usage <= 8 && value) {
-                ble_mouse_report.buttons |= (1 << (field->attr.usage - 1));
-            }
-        } else {
-            switch (field->attr.usage) {
-                case HID_USAGE_X:
-                    ble_mouse_report.x = value;
-                    break;
-                case HID_USAGE_Y:
-                    ble_mouse_report.y = value;
-                    break;
-                case HID_USAGE_WHEEL:
-                    ble_mouse_report.wheel = value;
-                    break;
-                case 0x238:
-                    ble_mouse_report.pan = value;
-                    break;
-                default:
-                    break;
-            }
-        }
+    const usb_hid_field_t* const btn_field_info = &report->fields[report->info->mouse_fields.buttons];
+    if (btn_field_info == NULL) {
+        return ESP_ERR_INVALID_ARG;
     }
+
+    const int buttons_val = btn_field_info->values[0];
+    if (buttons_val) {
+        ble_mouse_report.buttons |= (1 << (btn_field_info->attr.usage - 1));
+    }
+
+    ble_mouse_report.x = report->fields[report->info->mouse_fields.x].values[0];
+    ble_mouse_report.y = report->fields[report->info->mouse_fields.y].values[0];
+    ble_mouse_report.wheel = report->fields[report->info->mouse_fields.wheel].values[0];
+    ble_mouse_report.pan = report->fields[report->info->mouse_fields.pan].values[0];
+
     if (s_sensitivity != 100) {
         ble_mouse_report.x = (int32_t)(int16_t)ble_mouse_report.x * s_sensitivity / 100;
         ble_mouse_report.y = (int32_t)(int16_t)ble_mouse_report.y * s_sensitivity / 100;

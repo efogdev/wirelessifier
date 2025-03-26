@@ -249,9 +249,21 @@ void parse_report_descriptor(const uint8_t *desc, const size_t length, const uin
         for (int j = 0; j < report->num_fields; j++) {
             const report_field_info_t *field = &report->fields[j];
 
-            if (field->attr.usage_page == HID_USAGE_PAGE_GENERIC_DESKTOP &&
-                (field->attr.usage == HID_USAGE_X || field->attr.usage == HID_USAGE_Y)) {
-                report->is_mouse = true;
+            if (field->attr.usage_page == HID_USAGE_PAGE_GENERIC_DESKTOP) {
+                if (field->attr.usage == HID_USAGE_X || field->attr.usage == HID_USAGE_Y) {
+                    report->is_mouse = true;
+                }
+                if (field->attr.usage == HID_USAGE_X) {
+                    report->mouse_fields.x = j;
+                } else if (field->attr.usage == HID_USAGE_Y) {
+                    report->mouse_fields.y = j;
+                } else if (field->attr.usage == HID_USAGE_WHEEL) {
+                    report->mouse_fields.wheel = j;
+                } else if (field->attr.usage == 0x238) { // Pan
+                    report->mouse_fields.pan = j;
+                }
+            } else if (field->attr.usage >= 1 && field->attr.usage <= 8 && field->attr.usage_page == HID_USAGE_PAGE_BUTTON) {
+                report->mouse_fields.buttons = j;
             }
 
             if (field->attr.usage_page == HID_USAGE_KEYPAD) {
