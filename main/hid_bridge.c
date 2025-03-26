@@ -301,14 +301,16 @@ __attribute__((section(".iram1.text"))) static esp_err_t process_mouse_report(co
     // }
 
     ble_mouse_report.buttons = 0;
-    const usb_hid_field_t* const btn_field_info = &report->fields[report->info->mouse_fields.buttons];
-    if (btn_field_info == NULL) {
-        return ESP_ERR_INVALID_ARG;
-    }
+    for (int i = 0; i < report->info->mouse_fields.buttons_count; i++) {
+        const usb_hid_field_t* const btn_field_info = &report->fields[report->info->mouse_fields.buttons[i]];
+        if (btn_field_info == NULL) {
+            return ESP_ERR_INVALID_ARG;
+        }
 
-    const int buttons_val = btn_field_info->values[0];
-    if (buttons_val) {
-        ble_mouse_report.buttons |= (1 << (btn_field_info->attr.usage - 1));
+        const int buttons_val = btn_field_info->values[0];
+        if (buttons_val) {
+            ble_mouse_report.buttons |= (1 << (btn_field_info->attr.usage - 1));
+        }
     }
 
     ble_mouse_report.x = report->fields[report->info->mouse_fields.x].values[0];

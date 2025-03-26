@@ -263,7 +263,8 @@ void parse_report_descriptor(const uint8_t *desc, const size_t length, const uin
                     report->mouse_fields.pan = j;
                 }
             } else if (field->attr.usage >= 1 && field->attr.usage <= 8 && field->attr.usage_page == HID_USAGE_PAGE_BUTTON) {
-                report->mouse_fields.buttons = j;
+                report->mouse_fields.buttons[field->attr.usage - 1] = j;
+                report->mouse_fields.buttons_count++;
             }
 
             if (field->attr.usage_page == HID_USAGE_KEYPAD) {

@@ -279,7 +279,8 @@ typedef struct {
         uint8_t y;
         uint8_t wheel;
         uint8_t pan;
-        uint8_t buttons;
+        uint8_t buttons[8];
+        uint8_t buttons_count;
     } mouse_fields;
 } report_info_t;
 
