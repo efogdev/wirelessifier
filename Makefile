@@ -12,10 +12,11 @@ build:
 
 flash: build
 	- kill `ps aux | grep idf.py | cut -d' ' -s -f6`
-	until esptool.py --chip esp32s3 -p "$(DEVICE)" -b 460800 --before=no_reset --after watchdog_reset write_flash --flash_mode dio --flash_freq 80m --flash_size detect 0x0 build/bootloader/bootloader.bin 0x10000 build/esp32s3-project.bin 0x8000 build/partition_table/partition-table.bin 0xf000 build/phy_init_data.bin; do \
+	until esptool.py --chip esp32s3 -p "$(DEVICE)" -b 230400 --before=no_reset --after watchdog_reset write_flash --flash_mode dio --flash_freq 80m --flash_size detect 0x0 build/bootloader/bootloader.bin 0x10000 build/esp32s3-project.bin 0x8000 build/partition_table/partition-table.bin 0xf000 build/phy_init_data.bin; do \
 		echo "Flash failed, retrying in 1 second..."; \
 		sleep 1; \
 	done
+	idf.py monitor -p "$(DEVICE)" -b 230400
 
 erase-nvs:
 	parttool.py erase_partition --partition-name nvs

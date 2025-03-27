@@ -5,7 +5,7 @@
 #include <usb_hid_host.h>
 #include "hid_bridge.h"
 
-static const char *TAG = "usb_hid_parser";
+static const char *TAG = "HID_DSC_PARSE";
 
 void parse_report_descriptor(const uint8_t *desc, const size_t length, const uint8_t interface_num,
                              report_map_t *report_map) {
@@ -259,12 +259,12 @@ void parse_report_descriptor(const uint8_t *desc, const size_t length, const uin
                     report->mouse_fields.y = j;
                 } else if (field->attr.usage == HID_USAGE_WHEEL) {
                     report->mouse_fields.wheel = j;
-                } else if (field->attr.usage == 0x238) { // Pan
-                    report->mouse_fields.pan = j;
                 }
             } else if (field->attr.usage >= 1 && field->attr.usage <= 8 && field->attr.usage_page == HID_USAGE_PAGE_BUTTON) {
                 report->mouse_fields.buttons[field->attr.usage - 1] = j;
                 report->mouse_fields.buttons_count++;
+            } else if (field->attr.usage == 0x238) { // Pan
+                report->mouse_fields.pan = j;
             }
 
             if (field->attr.usage_page == HID_USAGE_KEYPAD) {
