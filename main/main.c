@@ -37,10 +37,10 @@ void app_main(void) {
     }
     ESP_ERROR_CHECK(ret);
 
+    init_pm();
     init_variables();
     init_gpio();
     init_global_settings();
-    init_pm();
 
     led_control_init(NUM_LEDS, GPIO_WS2812B_PIN);
     led_update_pattern(usb_hid_host_device_connected(), ble_hid_device_connected(), hid_bridge_is_ble_paused());
@@ -123,6 +123,14 @@ static void init_gpio(void) {
             (1ULL<<GPIO_WS2812B_PIN) |
             (1ULL<<GPIO_MUX_SEL) |
             (1ULL<<GPIO_MUX_OE)
+#ifdef HW02
+            | (1ULL<<GPIO_BAT_ISET1)
+            | (1ULL<<GPIO_BAT_ISET2)
+            | (1ULL<<GPIO_BAT_ISET3)
+            | (1ULL<<GPIO_BAT_ISET4)
+            | (1ULL<<GPIO_BAT_ISET5)
+            | (1ULL<<GPIO_BAT_ISET6)
+#endif
         ),
         .mode = GPIO_MODE_OUTPUT,
         .pull_up_en = GPIO_PULLUP_ENABLE,
@@ -146,34 +154,12 @@ static void init_gpio(void) {
     gpio_config(&input_pullup_conf);
 
 #ifdef HW02
-    const gpio_config_t output_pulldown_conf = {
-        .pin_bit_mask = (
-            (1ULL<<GPIO_BAT_ISET1) |
-            (1ULL<<GPIO_BAT_ISET2) |
-            (1ULL<<GPIO_BAT_ISET3) |
-            (1ULL<<GPIO_BAT_ISET4) |
-            (1ULL<<GPIO_BAT_ISET5) |
-            (1ULL<<GPIO_BAT_ISET6)
-        ),
-        .mode = GPIO_MODE_OUTPUT,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
-        .pull_down_en = GPIO_PULLDOWN_ENABLE,
-        .intr_type = GPIO_INTR_DISABLE
-    };
-    gpio_config(&output_pulldown_conf);
-
     const gpio_config_t input_nopull_conf = {
         .pin_bit_mask = (
             (1ULL<<GPIO_ADC_BAT) |
             (1ULL<<GPIO_ADC_VIN) |
             (1ULL<<GPIO_BAT_CHRG) |
-            (1ULL<<GPIO_BAT_PGOOD) |
-            (1ULL<<GPIO_BAT_ISET1) |
-            (1ULL<<GPIO_BAT_ISET2) |
-            (1ULL<<GPIO_BAT_ISET3) |
-            (1ULL<<GPIO_BAT_ISET4) |
-            (1ULL<<GPIO_BAT_ISET5) |
-            (1ULL<<GPIO_BAT_ISET6)
+            (1ULL<<GPIO_BAT_PGOOD)
         ),
         .mode = GPIO_MODE_INPUT,
         .pull_up_en = GPIO_PULLUP_DISABLE,

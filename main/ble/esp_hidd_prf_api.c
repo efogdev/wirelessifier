@@ -23,8 +23,7 @@ esp_err_t esp_hidd_register_callbacks(esp_hidd_event_cb_t callbacks) {
         return hidd_status;
     }
 
-    esp_ble_gatts_app_register(BATTRAY_APP_ID);
-
+    esp_ble_gatts_app_register(BATTERY_APP_ID);
     if ((hidd_status = esp_ble_gatts_app_register(HIDD_APP_ID)) != ESP_OK) {
         return hidd_status;
     }

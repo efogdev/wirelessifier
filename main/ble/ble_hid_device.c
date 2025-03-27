@@ -1,6 +1,8 @@
 #include "ble_hid_device.h"
+#include <esp_gatts_api.h>
 #include "const.h"
 #include <esp_gatt_common_api.h>
+#include <hid_device_le_prf.h>
 #include <stdio.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
@@ -14,6 +16,7 @@
 #include "esp_gap_ble_api.h"
 #include "esp_bt_main.h"
 #include "storage.h"
+#include "connection.h"
 
 #define BLE_STATS_INTERVAL_SEC 1
 #define HIGH_SPEED_DEVICE_THRESHOLD_MS 6
@@ -43,6 +46,8 @@ typedef enum {
     SPEED_MODE_VERYFAST
 } speed_mode_t;
 
+static esp_ble_addr_type_t s_connected_device_addr_type = BLE_ADDR_TYPE_PUBLIC;
+static esp_bd_addr_t s_connected_device_addr;
 static speed_mode_t s_high_speed_submode = SPEED_MODE_SLOW;
 static uint8_t hidd_service_uuid128[] = {
     /* LSB <--------------------------------------------------------------------------------> MSB */
@@ -75,6 +80,31 @@ static esp_ble_adv_params_t hidd_adv_params = {
     .adv_filter_policy = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
 };
 
+static void update_tx_power(void) {
+    char tx_power_str[10];
+    esp_power_level_t power_level = ESP_PWR_LVL_N0;
+    if (storage_get_string_setting("connectivity.bleTxPower", tx_power_str, sizeof(tx_power_str)) == ESP_OK) {
+        ESP_LOGI(TAG, "BLE TX power setting: %s", tx_power_str);
+        if (strcmp(tx_power_str, "n6") == 0) {
+            power_level = ESP_PWR_LVL_N6;
+        } else if (strcmp(tx_power_str, "n3") == 0) {
+            power_level = ESP_PWR_LVL_N3;
+        } else if (strcmp(tx_power_str, "n0") == 0) {
+            power_level = ESP_PWR_LVL_N0;
+        } else if (strcmp(tx_power_str, "p3") == 0) {
+            power_level = ESP_PWR_LVL_P3;
+        } else if (strcmp(tx_power_str, "p6") == 0) {
+            power_level = ESP_PWR_LVL_P6;
+        } else if (strcmp(tx_power_str, "p9") == 0) {
+            power_level = ESP_PWR_LVL_P9;
+        }
+    }
+
+    esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_DEFAULT, power_level);
+    esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, power_level);
+    esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_SCAN, power_level);
+}
+
 static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *param) {
     switch (event) {
         case ESP_HIDD_EVENT_REG_FINISH: {
@@ -92,6 +122,8 @@ static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *
             ESP_LOGI(TAG, "ESP_HIDD_EVENT_BLE_CONNECT");
             s_conn_id = param->connect.conn_id;
             s_connected = true;
+            update_tx_power();
+            save_connected_device(param->connect.remote_bda, s_connected_device_addr_type);
             break;
         }
         case ESP_HIDD_EVENT_BLE_DISCONNECT: {
@@ -122,6 +154,10 @@ static void gap_event_handler(const esp_gap_ble_cb_event_t event, esp_ble_gap_cb
         case ESP_GAP_BLE_AUTH_CMPL_EVT:
             esp_bd_addr_t bd_addr;
             memcpy(bd_addr, param->ble_security.auth_cmpl.bd_addr, sizeof(esp_bd_addr_t));
+            memcpy(s_connected_device_addr, param->ble_security.auth_cmpl.bd_addr, sizeof(esp_bd_addr_t));
+            s_connected_device_addr_type = param->ble_security.auth_cmpl.addr_type;
+            update_tx_power();
+
             ESP_LOGI(TAG, "remote BD_ADDR: %08x%04x",\
                      (bd_addr[0] << 24) + (bd_addr[1] << 16) + (bd_addr[2] << 8) + bd_addr[3],
                      (bd_addr[4] << 8) + bd_addr[5]);
@@ -133,6 +169,8 @@ static void gap_event_handler(const esp_gap_ble_cb_event_t event, esp_ble_gap_cb
                     ESP_LOGI(TAG, "Unbonding device due to error 0x66");
                     esp_ble_remove_bond_device(bd_addr);
                 }
+            } else {
+                save_connected_device(bd_addr, s_connected_device_addr_type);
             }
             break;
         default:
@@ -152,6 +190,9 @@ static void ble_stats_task(void *arg) {
         const uint32_t reports_per_sec = (s_current_rps - s_prev_rps) / BLE_STATS_INTERVAL_SEC;
         if (reports_per_sec > 0) {
             ESP_LOGI(TAG, "BLE: %lu rps", reports_per_sec);
+            if (esp_bt_controller_is_sleeping()) {
+                esp_bt_controller_wakeup_request();
+            }
         }
 
         s_prev_rps = s_current_rps;
@@ -261,31 +302,14 @@ esp_err_t ble_hid_device_init(const bool verbose) {
     esp_ble_gap_set_security_param(ESP_BLE_SM_MAX_KEY_SIZE, &key_size, sizeof(uint8_t));
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_INIT_KEY, &init_key, sizeof(uint8_t));
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_RSP_KEY, &rsp_key, sizeof(uint8_t));
+    esp_ble_gatt_set_local_mtu(48);
+    // esp_bt_sleep_enable();
+    update_tx_power();
 
-    char tx_power_str[10];
-    esp_power_level_t power_level = ESP_PWR_LVL_N0;
-
-    if (storage_get_string_setting("connectivity.bleTxPower", tx_power_str, sizeof(tx_power_str)) == ESP_OK) {
-        ESP_LOGI(TAG, "BLE TX power setting: %s", tx_power_str);
-        if (strcmp(tx_power_str, "n6") == 0) {
-            power_level = ESP_PWR_LVL_N6;
-        } else if (strcmp(tx_power_str, "n3") == 0) {
-            power_level = ESP_PWR_LVL_N3;
-        } else if (strcmp(tx_power_str, "n0") == 0) {
-            power_level = ESP_PWR_LVL_N0;
-        } else if (strcmp(tx_power_str, "p3") == 0) {
-            power_level = ESP_PWR_LVL_P3;
-        } else if (strcmp(tx_power_str, "p6") == 0) {
-            power_level = ESP_PWR_LVL_P6;
-        } else if (strcmp(tx_power_str, "p9") == 0) {
-            power_level = ESP_PWR_LVL_P9;
-        }
+    if (has_saved_device()) {
+        connect_to_saved_device(get_gatts_if());
     }
 
-    esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_DEFAULT, power_level);
-    esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, power_level);
-    esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_SCAN, power_level);
-    esp_ble_gatt_set_local_mtu(48);
     return ESP_OK;
 }
 

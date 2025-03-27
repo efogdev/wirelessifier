@@ -24,7 +24,7 @@
 #define HID_RPT_ID_FEATURE       0  // ToDo: Feature report ID
 
 #define HIDD_APP_ID			0x1812 // ATT_SVC_HID
-#define BATTRAY_APP_ID       0x180f
+#define BATTERY_APP_ID       0x180f
 #define ATT_SVC_HID          0x1812
 
 /// Maximal number of Report Char. that can be added in the DB for one HIDS - Up to 11
@@ -316,5 +316,7 @@ void hidd_set_attr_value(uint16_t handle, uint16_t val_len, const uint8_t *value
 void hidd_get_attr_value(uint16_t handle, uint16_t *length, uint8_t **value);
 
 esp_err_t hidd_register_cb(void);
+
+uint16_t get_gatts_if(void);
 
 #endif  ///__HID_DEVICE_LE_PRF__

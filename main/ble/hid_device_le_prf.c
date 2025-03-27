@@ -3,6 +3,12 @@
 #include "esp_log.h"
 #include "storage.h"
 #include "hid_report_data.h"
+#include "nvs_flash.h"
+#include "nvs.h"
+
+#define STORAGE_NAMESPACE "hid_dev"
+#define ADDR_KEY "last_addr"
+#define ADDR_TYPE_KEY "addr_type"
 
 struct __attribute__((packed)) gatts_profile_inst {
     esp_gatts_cb_t gatts_cb;
@@ -13,6 +19,14 @@ struct __attribute__((packed)) gatts_profile_inst {
 
 hidd_le_env_t hidd_le_env;
 uint8_t hidProtocolMode = HID_PROTOCOL_MODE_REPORT;
+
+uint16_t get_gatts_if(void) {
+    if (hidd_le_env.hidd_cb != NULL) {
+        return hidd_le_env.gatt_if;
+    }
+
+    return 0;
+}
 
 static void hid_add_id_tbl(void);
 
@@ -30,7 +44,7 @@ static void __attribute__((section(".iram1.text"))) esp_hidd_prf_cb_hdl(esp_gatt
                     hidd_le_create_service(hidd_le_env.gatt_if);
                 }
             }
-            if (param->reg.app_id == BATTRAY_APP_ID) {
+            if (param->reg.app_id == BATTERY_APP_ID) {
                 hidd_param.init_finish.gatts_if = gatts_if;
                 if (hidd_le_env.hidd_cb != NULL) {
                     (hidd_le_env.hidd_cb)(ESP_BAT_EVENT_REG, &hidd_param);

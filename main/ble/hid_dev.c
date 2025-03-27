@@ -18,7 +18,6 @@ typedef struct __attribute__((packed)) {
 static cache_entry_t cache[CACHE_SIZE];
 static uint8_t cache_size = 0;
 
-// Static report buffer to avoid stack allocations
 static uint8_t s_report_buffer[48] __attribute__((section(".dram1.data")));
 
 static hid_report_map_t *hid_dev_rpt_by_id(const uint8_t id, const uint8_t type) {
