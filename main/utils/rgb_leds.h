@@ -66,6 +66,9 @@ void led_update_status(uint32_t color, uint8_t mode);
 // Update WiFi status LED
 void led_update_wifi_status(bool is_apsta_mode, bool is_connected);
 
+// Enter flash mode - stops animations, clears LEDs, sets to dim white
+void rgb_enter_flash_mode(void);
+
 #ifdef __cplusplus
 }
 #endif

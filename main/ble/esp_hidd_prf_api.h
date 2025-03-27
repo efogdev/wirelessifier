@@ -144,6 +144,8 @@ void esp_hidd_send_keyboard_value(uint16_t conn_id, key_mask_t special_key_mask,
 
 void esp_hidd_send_mouse_value(uint16_t conn_id, uint8_t mouse_button, uint16_t mickeys_x, uint16_t mickeys_y, int8_t wheel, int8_t pan);
 
+bool is_ble_enabled(void);
+
 #ifdef __cplusplus
 }
 #endif

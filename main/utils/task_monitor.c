@@ -25,7 +25,7 @@ static TaskHandle_t monitor_task_handle = NULL;
 #define HEADER_FORMAT " Task (core %d)  |     Took |     | Free "
 #define HEADER_SEPARATOR "----------------|----------|-----|------"
 
-static void print_core_tasks(UBaseType_t start_array_size, UBaseType_t end_array_size, 
+static void print_core_tasks(UBaseType_t start_array_size, UBaseType_t end_array_size,
                            uint32_t total_elapsed_time, uint8_t core_id)
 {
     ESP_LOGI(TAG, HEADER_FORMAT, core_id);

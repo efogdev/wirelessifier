@@ -18,6 +18,7 @@ SRCS "main.c"
      "utils/task_monitor.c"
      "utils/temp_sensor.c"
      "utils/storage.c"
+     "utils/rotary_enc.c"
   EMBED_TXTFILES
      "web/front/lib/index.min.html"
      "web/front/lib/settings.min.html"
@@ -29,4 +30,4 @@ SRCS "main.c"
   REQUIRES neopixel esp_hid bt nvs_flash esp_http_server app_update json
   PRIV_REQUIRES usb)
 
-target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-error=unused-const-variable -Wno-unknown-warning-option)
+target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-error=unused-const-variable)

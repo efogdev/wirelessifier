@@ -1,4 +1,6 @@
 #include "hid_bridge.h"
+
+#include <esp_gap_ble_api.h>
 #include <string.h>
 #include "esp_log.h"
 #include "esp_sleep.h"
@@ -182,7 +184,7 @@ esp_err_t hid_bridge_deinit(void) {
         s_inactivity_timer = NULL;
     }
 
-    if (xSemaphoreTake(s_ble_stack_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+    if (xSemaphoreTake(s_ble_stack_mutex, pdMS_TO_TICKS(50)) != pdTRUE) {
         ESP_LOGE(TAG, "Failed to take BLE stack mutex in deinit");
         return ESP_FAIL;
     }
@@ -198,11 +200,10 @@ esp_err_t hid_bridge_deinit(void) {
         }
     }
 
-    xSemaphoreGive(s_ble_stack_mutex);
-
     const esp_err_t ret = usb_hid_host_deinit();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to deinitialize USB HID host: %s", esp_err_to_name(ret));
+        xSemaphoreGive(s_ble_stack_mutex);
         return ret;
     }
 
@@ -218,6 +219,8 @@ esp_err_t hid_bridge_deinit(void) {
 
     s_hid_bridge_initialized = false;
     ESP_LOGI(TAG, "HID bridge deinitialized");
+    xSemaphoreGive(s_ble_stack_mutex);
+
     return ESP_OK;
 }
 

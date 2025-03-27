@@ -209,10 +209,15 @@ static void update_status_led(tNeopixel* pixels);
 static void apply_pattern(tNeopixel* pixels, const led_pattern_t* pattern);
 static void led_control_task(void *arg);
 static bool is_task_suspended = false;
+static bool is_in_flash_mode = false;
 
 // Function to check if the task should be suspended and handle suspension/resumption
 __attribute__((section(".iram1.text"))) static void check_and_update_task_suspension(void)
 {
+    if (is_in_flash_mode) {
+        return;
+    }
+
     static bool should_suspend = false;
     
     if (s_led_pattern >= 0 && s_led_pattern < sizeof(led_patterns)/sizeof(led_patterns[0])) {
@@ -308,7 +313,11 @@ void led_control_deinit(void)
         free(s_previous_state);
         s_previous_state = NULL;
     }
-    
+
+    if (neopixel_ctx != NULL) {
+        neopixel_Deinit(neopixel_ctx);
+    }
+
     s_num_leds = 0;
     s_led_pattern = LED_PATTERN_IDLE;
     s_in_transition = false;
@@ -316,6 +325,10 @@ void led_control_deinit(void)
 
 __attribute__((section(".iram1.text"))) void led_update_pattern(const bool usb_connected, const bool ble_connected, const bool ble_paused)
 {
+    if (is_in_flash_mode) {
+        return;
+    }
+
     int new_pattern = LED_PATTERN_IDLE;
     const uint32_t current_time = pdTICKS_TO_MS(xTaskGetTickCount());
     
@@ -372,6 +385,10 @@ __attribute__((section(".iram1.text"))) void led_update_pattern(const bool usb_c
 
 void led_update_status(const uint32_t color, const uint8_t mode)
 {
+    if (is_in_flash_mode) {
+        return;
+    }
+
     s_status_led_state.animation = WIFI_ANIM_NONE;
     s_status_led_state.color = color;
     s_status_led_state.mode = mode;
@@ -383,6 +400,10 @@ void led_update_status(const uint32_t color, const uint8_t mode)
 
 void led_update_wifi_status(bool is_apsta_mode, bool is_connected)
 {
+    if (is_in_flash_mode) {
+        return;
+    }
+
     s_wifi_apsta_mode = is_apsta_mode;
     s_wifi_connected = is_connected;
     
@@ -400,15 +421,28 @@ void led_update_wifi_status(bool is_apsta_mode, bool is_connected)
     check_and_update_task_suspension();
 }
 
+void IRAM_ATTR rgb_enter_flash_mode(void)
+{
+    if (neopixel_ctx == NULL) {
+        return;
+    }
+
+    // ToDo
+}
+
 __attribute__((section(".text"))) static void update_status_led(tNeopixel* pixels)
 {
+    if (is_in_flash_mode) {
+        return;
+    }
+
     pixels[0].index = 0;
     update_status_led_state(&s_status_led_state, &pixels[0]);
 }
 
 __attribute__((section(".iram1.text"))) static void apply_pattern(tNeopixel* pixels, const led_pattern_t* pattern)
 {
-    if (is_task_suspended) {
+    if (is_task_suspended || is_in_flash_mode) {
         return;
     }
 
@@ -527,6 +561,11 @@ __attribute__((section(".text"))) static void led_control_task(void *arg)
     
     while (1) {
         if (is_task_suspended) {
+            vTaskDelay(pdMS_TO_TICKS(100));
+            continue;
+        }
+
+        if (is_in_flash_mode) {
             vTaskDelay(pdMS_TO_TICKS(100));
             continue;
         }

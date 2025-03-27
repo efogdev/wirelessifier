@@ -9,6 +9,11 @@
 
 // Static buffer to avoid stack allocations
 static uint8_t s_report_buffer[HID_MOUSE_IN_RPT_LEN] __attribute__((section(".dram1.data")));
+static bool s_enabled = true;
+
+bool is_ble_enabled(void) {
+    return s_enabled;
+}
 
 esp_err_t esp_hidd_register_callbacks(esp_hidd_event_cb_t callbacks) {
     esp_err_t hidd_status;
@@ -37,6 +42,7 @@ esp_err_t esp_hidd_profile_init(void) {
         return ESP_FAIL;
     }
 
+    s_enabled = true;
     memset(&hidd_le_env, 0, sizeof(hidd_le_env_t));
     hidd_le_env.enabled = true;
     return ESP_OK;
@@ -56,6 +62,7 @@ esp_err_t esp_hidd_profile_deinit(void) {
         return ESP_FAIL;
     }
 
+    s_enabled = false;
     esp_ble_gatts_app_unregister(hidd_le_env.gatt_if);
     hidd_le_env.enabled = false;
     return ESP_OK;

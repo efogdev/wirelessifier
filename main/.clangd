@@ -1,0 +1,23 @@
+CompileFlags:
+  Add: 
+    - -std=gnu17
+    - --target=xtensa-esp32-elf
+    - -DESP_PLATFORM
+    - -DHAVE_CONFIG_H
+    - -I${workspaceFolder}/main
+    - -I${workspaceFolder}/main/ble
+    - -I${workspaceFolder}/main/usb
+    - -I${workspaceFolder}/main/utils
+    - -I${workspaceFolder}/main/web
+  Remove:
+    - -forward-unknown-to-host-compiler
+    - --generate-code*
+    - -mlongcalls
+    - -fstrict-volatile-bitfields
+    - -fno-tree-switch-conversion
+
+Diagnostics:
+  Suppress: 
+    - "drv_unknown_argument_with_suggestion"
+    - "drv_unknown_argument"
+    - "drv_unsupported_opt"

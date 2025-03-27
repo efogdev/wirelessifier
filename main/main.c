@@ -1,7 +1,11 @@
 #include <const.h>
+#include <esp_phy_init.h>
 #include <stdio.h>
 #include <limits.h>
 #include <inttypes.h>
+#include <esp_private/system_internal.h>
+#include <hal/usb_wrap_hal.h>
+#include <soc/rtc_cntl_reg.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -16,6 +20,7 @@
 #include "hid_bridge.h"
 #include "utils/rgb_leds.h"
 #include "utils/storage.h"
+#include "utils/rotary_enc.h"
 #include "web/http_server.h"
 
 static const char *TAG = "MAIN";
@@ -26,10 +31,11 @@ static void init_pm(void);
 static void init_gpio(void);
 static void run_hid_bridge(void);
 static void init_web_stack(void);
+static void rot_long_press_cb(void);
 
 void app_main(void) {
     ESP_LOGI(TAG, "Starting USB HID to BLE HID bridge");
-    
+
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
@@ -44,6 +50,9 @@ void app_main(void) {
 
     led_control_init(NUM_LEDS, GPIO_WS2812B_PIN);
     led_update_pattern(usb_hid_host_device_connected(), ble_hid_device_connected(), hid_bridge_is_ble_paused());
+
+    rotary_enc_init();
+    rotary_enc_subscribe_long_press(rot_long_press_cb);
 
     run_hid_bridge();
     init_web_stack();
@@ -130,6 +139,7 @@ static void init_gpio(void) {
             | (1ULL<<GPIO_BAT_ISET4)
             | (1ULL<<GPIO_BAT_ISET5)
             | (1ULL<<GPIO_BAT_ISET6)
+            | (1ULL<<GPIO_ROT_D)
 #endif
         ),
         .mode = GPIO_MODE_OUTPUT,
@@ -159,7 +169,9 @@ static void init_gpio(void) {
             (1ULL<<GPIO_ADC_BAT) |
             (1ULL<<GPIO_ADC_VIN) |
             (1ULL<<GPIO_BAT_CHRG) |
-            (1ULL<<GPIO_BAT_PGOOD)
+            (1ULL<<GPIO_BAT_PGOOD) |
+            (1ULL<<GPIO_ROT_A) |
+            (1ULL<<GPIO_ROT_B)
         ),
         .mode = GPIO_MODE_INPUT,
         .pull_up_en = GPIO_PULLUP_DISABLE,
@@ -167,6 +179,25 @@ static void init_gpio(void) {
         .intr_type = GPIO_INTR_DISABLE
     };
     gpio_config(&input_nopull_conf);
+
+    const gpio_config_t rot_conf = {
+        .pin_bit_mask = (1ULL << GPIO_ROT_A) | (1ULL << GPIO_ROT_B),
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_ANYEDGE
+    };
+    gpio_config(&rot_conf);
+
+    const gpio_config_t rot_btn_conf = {
+        .pin_bit_mask = (1ULL << GPIO_ROT_E),
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_ENABLE,
+        .intr_type = GPIO_INTR_ANYEDGE
+    };
+    gpio_config(&rot_btn_conf);
+    gpio_set_level(GPIO_ROT_D, 1);
 #endif
 
 #ifdef HW01
@@ -193,4 +224,11 @@ static void init_gpio(void) {
 #endif
 
     gpio_set_level(GPIO_5V_EN, 1);
+}
+
+static void rot_long_press_cb(void) {
+    rotary_enc_deinit();
+    rgb_enter_flash_mode();
+    REG_WRITE(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
+    esp_restart();
 }

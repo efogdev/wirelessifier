@@ -231,7 +231,9 @@ bool usb_hid_host_device_connected(void) {
     return g_device_connected;
 }
 
-__attribute__((section(".iram1.text"))) static void process_report(const uint8_t *const data, const size_t length, const uint8_t interface_num) {
+static uint8_t* data_ptr = NULL;
+
+__attribute__((section(".iram1.text"))) static void process_report(uint8_t *const data, const size_t length, const uint8_t interface_num) {
     s_current_rps++;
     if (!data || !g_report_queue || length <= 1 || interface_num >= USB_HOST_MAX_INTERFACES) {
         ESP_LOGE(TAG, "Invalid parameters: data=%p, queue=%p, len=%d, iface=%u", data, g_report_queue, length,
@@ -240,13 +242,13 @@ __attribute__((section(".iram1.text"))) static void process_report(const uint8_t
     }
 
     const report_map_t *const report_map = &g_interface_report_maps[interface_num];
-    const uint8_t *report_data = data;
+    data_ptr = data;
     size_t report_length = length;
-    static uint8_t report_id = 0;
+    uint8_t report_id = 0;
     
     if (report_map->num_reports > 1) {
         report_id = data[0];
-        report_data++;
+        data_ptr++;
         report_length--;
     } else if (report_map->num_reports == 1) {
         report_id = report_map->report_ids[0];
@@ -269,7 +271,7 @@ __attribute__((section(".iram1.text"))) static void process_report(const uint8_t
 
     const report_field_info_t *const field_info = report_info->fields;
     for (uint8_t i = 0; i < report_info->num_fields; i++) {
-        g_field_values[i] = extract_field_value(report_data, field_info[i].bit_offset, field_info[i].bit_size);
+        g_field_values[i] = extract_field_value(data_ptr, field_info[i].bit_offset, field_info[i].bit_size);
         g_fields[i].attr = field_info[i].attr;
         g_fields[i].values = &g_field_values[i];
     }

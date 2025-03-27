@@ -11,3 +11,6 @@ cmake-build-debug
 *.ttf
 .cache
 *.map
+.env
+.devcontainer
+.vscode

@@ -40,6 +40,7 @@ static int8_t s_acc_pan = 0;
 static uint8_t s_acc_buttons = 0;
 static uint8_t s_batch_size = 3;
 static bool g_verbose = false;
+static bool g_enabled = true;
 typedef enum {
     SPEED_MODE_SLOW = 0,
     SPEED_MODE_FAST,
@@ -106,6 +107,9 @@ static void update_tx_power(void) {
 }
 
 static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *param) {
+    if (!is_ble_enabled() || !g_enabled)
+        return;
+
     switch (event) {
         case ESP_HIDD_EVENT_REG_FINISH: {
             if (param->init_finish.state == ESP_HIDD_INIT_OK) {
@@ -129,6 +133,7 @@ static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *
         case ESP_HIDD_EVENT_BLE_DISCONNECT: {
             s_connected = false;
             ESP_LOGI(TAG, "ESP_HIDD_EVENT_BLE_DISCONNECT");
+
             vTaskDelay(pdMS_TO_TICKS(s_reconnect_delay * 1000));
             esp_ble_gap_start_advertising(&hidd_adv_params);
             break;
@@ -144,6 +149,9 @@ static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *
 }
 
 static void gap_event_handler(const esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param) {
+    if (!is_ble_enabled() || !g_enabled)
+        return;
+
     switch (event) {
         case ESP_GAP_BLE_ADV_DATA_SET_COMPLETE_EVT:
             esp_ble_gap_start_advertising(&hidd_adv_params);
@@ -213,6 +221,7 @@ static void accumulator_timer_callback(TimerHandle_t timer) {
 static TickType_t acc_window = pdMS_TO_TICKS(8);
 
 esp_err_t ble_hid_device_init(const bool verbose) {
+    g_enabled = true;
     g_verbose = verbose;
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -314,6 +323,7 @@ esp_err_t ble_hid_device_init(const bool verbose) {
 }
 
 esp_err_t ble_hid_device_deinit(void) {
+    g_enabled = false;
     if (s_accumulator_timer != NULL) {
         xTimerDelete(s_accumulator_timer, 0);
         s_accumulator_timer = NULL;
