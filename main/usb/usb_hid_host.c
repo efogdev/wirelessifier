@@ -10,7 +10,11 @@
 #include "usb/usb_host.h"
 #include "usb/hid_host.h"
 #include "usb_hid_host.h"
+
+#include <const.h>
 #include <task_monitor.h>
+#include <lwip/mem.h>
+
 #include "descriptor_parser.h"
 
 #define USB_STATS_INTERVAL_SEC  1
@@ -34,16 +38,16 @@ static uint16_t s_current_rps = 0;
 static StaticSemaphore_t g_report_maps_mutex_buffer;
 static SemaphoreHandle_t g_report_maps_mutex;
 static usb_hid_report_t g_report;
-static usb_hid_field_t g_fields[MAX_REPORT_FIELDS];
-static int g_field_values[MAX_REPORT_FIELDS];
-static report_map_t g_interface_report_maps[USB_HOST_MAX_INTERFACES] = {0};
 static bool g_verbose = false;
-static uint8_t g_field_counts[USB_HOST_MAX_INTERFACES][MAX_REPORTS_PER_INTERFACE] = {0};
 static usb_host_client_handle_t client_hdl;
 static uint8_t client_addr;
+static uint8_t g_num_fields;
 static bool usb_host_dev_connected = false;
-
-static report_info_t *report_lookup_table[USB_HOST_MAX_INTERFACES][MAX_REPORTS_PER_INTERFACE] = {0};
+static usb_hid_field_t *g_fields = NULL;
+static int64_t *g_field_values = NULL;
+static report_map_t *g_interface_report_maps = NULL;
+static report_info_t ***report_lookup_table = NULL;
+static uint8_t **g_field_counts = NULL;
 
 static void usb_lib_task(void *arg);
 
@@ -56,6 +60,66 @@ static void hid_host_device_callback(hid_host_device_handle_t hid_device_handle,
 
 static void hid_host_interface_callback(hid_host_device_handle_t hid_device_handle, hid_host_interface_event_t event,
                                         void *arg);
+
+static void cleanup_interface_resources(uint8_t interface_num) {
+    if (g_field_counts && g_field_counts[interface_num]) {
+        free(g_field_counts[interface_num]);
+        g_field_counts[interface_num] = NULL;
+    }
+
+    if (report_lookup_table && report_lookup_table[interface_num]) {
+        for (int i = 0; i < MAX_REPORTS_PER_INTERFACE; i++) {
+            if (report_lookup_table[interface_num][i]) {
+                free(report_lookup_table[interface_num][i]);
+                report_lookup_table[interface_num][i] = NULL;
+            }
+        }
+        free(report_lookup_table[interface_num]);
+        report_lookup_table[interface_num] = NULL;
+    }
+}
+
+static void cleanup_all_resources(void) {
+    if (g_fields) {
+        free(g_fields);
+        g_fields = NULL;
+    }
+
+    if (g_field_values) {
+        free(g_field_values);
+        g_field_values = NULL;
+    }
+
+    if (g_interface_report_maps) {
+        free(g_interface_report_maps);
+        g_interface_report_maps = NULL;
+    }
+
+    if (g_field_counts) {
+        for (int i = 0; i < USB_HOST_MAX_INTERFACES; i++) {
+            if (g_field_counts[i]) {
+                free(g_field_counts[i]);
+            }
+        }
+        free(g_field_counts);
+        g_field_counts = NULL;
+    }
+
+    if (report_lookup_table) {
+        for (int i = 0; i < USB_HOST_MAX_INTERFACES; i++) {
+            if (report_lookup_table[i]) {
+                for (int j = 0; j < MAX_REPORTS_PER_INTERFACE; j++) {
+                    if (report_lookup_table[i][j]) {
+                        free(report_lookup_table[i][j]);
+                    }
+                }
+                free(report_lookup_table[i]);
+            }
+        }
+        free(report_lookup_table);
+        report_lookup_table = NULL;
+    }
+}
 
 static void control_transfer_cb(usb_transfer_t *transfer) {
     usb_host_transfer_free(transfer);
@@ -78,21 +142,21 @@ static void send_linux_like_control_transfers() {
             ESP_LOGE(TAG, "Failed to allocate transfer: %s", esp_err_to_name(err));
             continue;
         }
-        
+
         // Setup packet for GET_DESCRIPTOR (Device)
-        usb_setup_packet_t *setup = (usb_setup_packet_t *)transfer->data_buffer;
-        setup->bmRequestType = 0x80;  // Device to Host, Standard, Device
-        setup->bRequest = 0x06;       // GET_DESCRIPTOR
-        setup->wValue = (0x01 << 8);  // Device Descriptor
+        usb_setup_packet_t *setup = (usb_setup_packet_t *) transfer->data_buffer;
+        setup->bmRequestType = 0x80; // Device to Host, Standard, Device
+        setup->bRequest = 0x06; // GET_DESCRIPTOR
+        setup->wValue = (0x01 << 8); // Device Descriptor
         setup->wIndex = 0;
-        setup->wLength = 0xFF;        // Set to 0xFF for Linux detection
-        
+        setup->wLength = 0xFF; // Set to 0xFF for Linux detection
+
         transfer->num_bytes = sizeof(usb_setup_packet_t) + 0xFF;
         transfer->device_handle = dev_hdl;
-        transfer->bEndpointAddress = 0;  // Control endpoint
+        transfer->bEndpointAddress = 0; // Control endpoint
         transfer->callback = control_transfer_cb;
         transfer->context = NULL;
-        
+
         err = usb_host_transfer_submit_control(client_hdl, transfer);
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "Failed to submit control transfer: %s", esp_err_to_name(err));
@@ -108,10 +172,13 @@ static void send_linux_like_control_transfers() {
 }
 
 uint8_t usb_hid_host_get_num_fields(const uint8_t report_id, const uint8_t interface_num) {
+    if (!g_field_counts || !g_field_counts[interface_num]) {
+        return 0;
+    }
     return g_field_counts[interface_num][report_id];
 }
 
-static void client_event_callback(const usb_host_client_event_msg_t * event_msg, void*);
+static void client_event_callback(const usb_host_client_event_msg_t *event_msg, void *);
 
 esp_err_t usb_hid_host_init(const QueueHandle_t report_queue, const bool verbose) {
     ESP_LOGI(TAG, "Initializing USB HID Host");
@@ -120,14 +187,47 @@ esp_err_t usb_hid_host_init(const QueueHandle_t report_queue, const bool verbose
         return ESP_ERR_INVALID_ARG;
     }
 
+    // Allocate dynamic memory
+    g_interface_report_maps = calloc(USB_HOST_MAX_INTERFACES, sizeof(report_map_t));
+    if (!g_interface_report_maps) {
+        ESP_LOGE(TAG, "Failed to allocate report maps");
+        return ESP_ERR_NO_MEM;
+    }
+
+    g_field_counts = calloc(USB_HOST_MAX_INTERFACES, sizeof(uint8_t *));
+    if (!g_field_counts) {
+        cleanup_all_resources();
+        ESP_LOGE(TAG, "Failed to allocate field counts array");
+        return ESP_ERR_NO_MEM;
+    }
+
+    report_lookup_table = calloc(USB_HOST_MAX_INTERFACES, sizeof(report_info_t **));
+    if (!report_lookup_table) {
+        cleanup_all_resources();
+        ESP_LOGE(TAG, "Failed to allocate lookup table");
+        return ESP_ERR_NO_MEM;
+    }
+
+    for (int i = 0; i < USB_HOST_MAX_INTERFACES; i++) {
+        g_field_counts[i] = calloc(MAX_REPORTS_PER_INTERFACE, sizeof(uint8_t));
+        report_lookup_table[i] = calloc(MAX_REPORTS_PER_INTERFACE, sizeof(report_info_t *));
+        if (!g_field_counts[i] || !report_lookup_table[i]) {
+            cleanup_all_resources();
+            ESP_LOGE(TAG, "Failed to allocate interface resources");
+            return ESP_ERR_NO_MEM;
+        }
+    }
+
     if (verbose) {
         esp_err_t err = task_monitor_init();
         if (err != ESP_OK) {
+            cleanup_all_resources();
             ESP_LOGE(TAG, "Failed to init task monitor: %d", err);
             return err;
         }
         err = task_monitor_start();
         if (err != ESP_OK) {
+            cleanup_all_resources();
             ESP_LOGE(TAG, "Failed to start task monitor: %d", err);
             return err;
         }
@@ -139,12 +239,15 @@ esp_err_t usb_hid_host_init(const QueueHandle_t report_queue, const bool verbose
     g_report_queue = report_queue;
     g_device_event_queue = xQueueCreate(DEVICE_EVENT_QUEUE_SIZE, sizeof(usb_device_type_event_t));
     if (g_device_event_queue == NULL) {
+        cleanup_all_resources();
         ESP_LOGE(TAG, "Failed to create device event queue");
         return ESP_ERR_NO_MEM;
     }
 
-    BaseType_t task_created = xTaskCreatePinnedToCore(device_event_task, "dev_evt", 2048, NULL, 6, &g_device_task_handle, 1);
+    BaseType_t task_created = xTaskCreatePinnedToCore(device_event_task, "dev_evt", 2048, NULL, 6,
+                                                      &g_device_task_handle, 1);
     if (task_created != pdTRUE) {
+        cleanup_all_resources();
         vQueueDelete(g_device_event_queue);
         return ESP_ERR_NO_MEM;
     }
@@ -156,15 +259,17 @@ esp_err_t usb_hid_host_init(const QueueHandle_t report_queue, const bool verbose
         .intr_flags = ESP_INTR_FLAG_LEVEL1,
     };
 
-    const esp_err_t err = usb_host_install(&host_config);
+    esp_err_t err = usb_host_install(&host_config);
     if (err != ESP_OK) {
+        cleanup_all_resources();
         vTaskDelete(g_device_task_handle);
         vQueueDelete(g_device_event_queue);
         return err;
     }
 
-    task_created = xTaskCreatePinnedToCore(usb_lib_task, "usb_events", 1860, NULL, 13, &g_usb_events_task_handle, 1);
+    task_created = xTaskCreatePinnedToCore(usb_lib_task, "usb_events", 1600, NULL, 13, &g_usb_events_task_handle, 1);
     if (task_created != pdTRUE) {
+        cleanup_all_resources();
         usb_host_uninstall();
         vTaskDelete(g_device_task_handle);
         vQueueDelete(g_device_event_queue);
@@ -180,16 +285,17 @@ esp_err_t usb_hid_host_init(const QueueHandle_t report_queue, const bool verbose
         }
     };
 
-    const esp_err_t ret = usb_host_client_register(&client_config, &client_hdl);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to register client: %s", esp_err_to_name(ret));
-        return ret;
+    err = usb_host_client_register(&client_config, &client_hdl);
+    if (err != ESP_OK) {
+        cleanup_all_resources();
+        ESP_LOGE(TAG, "Failed to register client: %s", esp_err_to_name(err));
+        return err;
     }
 
     const hid_host_driver_config_t hid_host_config = {
         .create_background_task = true,
-        .task_priority = 14,
-        .stack_size = 1800,
+        .task_priority = 16,
+        .stack_size = 1600,
         .core_id = 1,
         .callback = hid_host_device_callback,
         .callback_arg = NULL
@@ -221,6 +327,7 @@ esp_err_t usb_hid_host_deinit(void) {
         ESP_LOGE(TAG, "Failed to uninstall USB host: %d", ret);
     }
 
+    cleanup_all_resources();
     g_report_queue = NULL;
     g_device_connected = false;
     ESP_LOGI(TAG, "USB HID Host deinitialized");
@@ -231,9 +338,10 @@ bool usb_hid_host_device_connected(void) {
     return g_device_connected;
 }
 
-static uint8_t* data_ptr = NULL;
+static uint8_t *data_ptr = NULL;
 
-__attribute__((section(".iram1.text"))) static void process_report(uint8_t *const data, const size_t length, const uint8_t interface_num) {
+__attribute__((section(".iram1.text"))) static void process_report(uint8_t *const data, const size_t length,
+                                                                   const uint8_t interface_num) {
     s_current_rps++;
     if (!data || !g_report_queue || length <= 1 || interface_num >= USB_HOST_MAX_INTERFACES) {
         ESP_LOGE(TAG, "Invalid parameters: data=%p, queue=%p, len=%d, iface=%u", data, g_report_queue, length,
@@ -245,7 +353,7 @@ __attribute__((section(".iram1.text"))) static void process_report(uint8_t *cons
     data_ptr = data;
     size_t report_length = length;
     uint8_t report_id = 0;
-    
+
     if (report_map->num_reports > 1) {
         report_id = data[0];
         data_ptr++;
@@ -254,10 +362,26 @@ __attribute__((section(".iram1.text"))) static void process_report(uint8_t *cons
         report_id = report_map->report_ids[0];
     }
 
-    report_info_t* const report_info = report_lookup_table[interface_num][report_id];
+    report_info_t *const report_info = report_lookup_table[interface_num][report_id];
     if (!report_info) {
         ESP_LOGW(TAG, "Unknown report ID %d for interface %d", report_id, interface_num);
         return;
+    }
+
+    if (g_num_fields != report_info->num_fields) {
+        free(g_fields);
+        free(g_field_values);
+        g_fields = NULL;
+        g_field_values = NULL;
+    }
+
+    if (!g_fields || !g_field_values) {
+        g_fields = calloc(report_info->num_fields, sizeof(usb_hid_field_t));
+        g_field_values = calloc(report_info->num_fields, sizeof(int64_t));
+        if (!g_fields || !g_field_values) {
+            ESP_LOGE(TAG, "Failed to allocate field buffers");
+            return;
+        }
     }
 
     g_report.if_id = interface_num;
@@ -269,20 +393,32 @@ __attribute__((section(".iram1.text"))) static void process_report(uint8_t *cons
     g_report.is_keyboard = report_info->is_keyboard;
     g_report.is_mouse = report_info->is_mouse;
 
+    // if (g_report.is_keyboard && VERBOSE) {
+    //     ESP_LOGI(TAG, "");
+    //     ESP_LOGI(TAG, "Raw data: %08X %08X %08X", *(const int16_t *)&data_ptr[0], *(const int16_t *)&data_ptr[2], *(const int16_t *)&data_ptr[4]);
+    // }
+
     const report_field_info_t *const field_info = report_info->fields;
     for (uint8_t i = 0; i < report_info->num_fields; i++) {
         g_field_values[i] = extract_field_value(data_ptr, field_info[i].bit_offset, field_info[i].bit_size);
         g_fields[i].attr = field_info[i].attr;
-        g_fields[i].values = &g_field_values[i];
+        g_fields[i].value = &g_field_values[i];
+
+        // if (g_report.is_keyboard) {
+        //     ESP_LOGI(TAG, "field #%d (usg=%02X, offset=%d, size=%d) = 0x%08X%08X", i, field_info[i].attr.usage,
+        //       field_info[i].bit_offset, field_info[i].bit_size,
+        //       (uint32_t)(*g_fields[i].value >> 32), (uint32_t)*g_fields[i].value);
+        // }
     }
 
     xQueueSend(g_report_queue, &g_report, 0);
 }
 
-static uint8_t cur_if_evt_data[64] = {0};
+static uint8_t cur_if_evt_data[256] = {0};
 
-__attribute__((section(".iram1.text"))) static void hid_host_interface_callback(const hid_host_device_handle_t hid_device_handle,
-                                        const hid_host_interface_event_t event, void *arg) {
+__attribute__((section(".iram1.text"))) static void hid_host_interface_callback(
+    const hid_host_device_handle_t hid_device_handle,
+    const hid_host_interface_event_t event, void *arg) {
     static size_t data_length = 0;
     static hid_host_dev_params_t dev_params;
     esp_err_t err;
@@ -295,7 +431,8 @@ __attribute__((section(".iram1.text"))) static void hid_host_interface_callback(
 
     switch (event) {
         case HID_HOST_INTERFACE_EVENT_INPUT_REPORT:
-            err = hid_host_device_get_raw_input_report_data(hid_device_handle, cur_if_evt_data, sizeof(cur_if_evt_data), &data_length);
+            err = hid_host_device_get_raw_input_report_data(hid_device_handle, cur_if_evt_data, sizeof(cur_if_evt_data),
+                                                            &data_length);
             if (err != ESP_OK) {
                 ESP_LOGE(TAG, "Failed to get raw input report: %d", err);
                 return;
@@ -306,8 +443,7 @@ __attribute__((section(".iram1.text"))) static void hid_host_interface_callback(
         case HID_HOST_INTERFACE_EVENT_DISCONNECTED:
             ESP_LOGI(TAG, "HID Device Disconnected - Interface: %d", dev_params.iface_num);
             g_device_connected = false;
-            memset(g_field_counts[dev_params.iface_num], 0, sizeof(g_field_counts[dev_params.iface_num]));
-            memset(report_lookup_table[dev_params.iface_num], 0, sizeof(report_lookup_table[dev_params.iface_num]));
+            cleanup_interface_resources(dev_params.iface_num);
             err = hid_host_device_close(hid_device_handle);
             if (err != ESP_OK) {
                 ESP_LOGE(TAG, "Failed to close device: %d", err);
@@ -393,7 +529,8 @@ static void device_event_task(void *arg) {
                                      report_map->report_ids[i]);
                             g_field_counts[dev_params.iface_num][report_map->report_ids[i]] = report_map->reports[i].
                                     num_fields;
-                            report_lookup_table[dev_params.iface_num][report_map->report_ids[i]] = &report_map->reports[i];
+                            report_lookup_table[dev_params.iface_num][report_map->report_ids[i]] = &report_map->reports[
+                                i];
                         }
                         xSemaphoreGive(g_report_maps_mutex);
                     } else {

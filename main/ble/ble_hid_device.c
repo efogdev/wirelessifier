@@ -298,7 +298,7 @@ esp_err_t ble_hid_device_init(const bool verbose) {
     esp_hidd_register_callbacks(hidd_event_callback);
 
     if (g_verbose) {
-        xTaskCreatePinnedToCore(ble_stats_task, "ble_stats", 2048, NULL, 5, &s_stats_task_handle, 1);
+        xTaskCreatePinnedToCore(ble_stats_task, "ble_stats", 1600, NULL, 5, &s_stats_task_handle, 1);
     }
 
     esp_ble_auth_req_t auth_req = ESP_LE_AUTH_REQ_SC_MITM_BOND;
@@ -311,7 +311,7 @@ esp_err_t ble_hid_device_init(const bool verbose) {
     esp_ble_gap_set_security_param(ESP_BLE_SM_MAX_KEY_SIZE, &key_size, sizeof(uint8_t));
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_INIT_KEY, &init_key, sizeof(uint8_t));
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_RSP_KEY, &rsp_key, sizeof(uint8_t));
-    esp_ble_gatt_set_local_mtu(48);
+    esp_ble_gatt_set_local_mtu(64);
     // esp_bt_sleep_enable();
     update_tx_power();
 
@@ -405,18 +405,8 @@ esp_err_t ble_hid_device_send_keyboard_report(const keyboard_report_t *report) {
         return ESP_ERR_INVALID_STATE;
     }
 
-    uint8_t keys[6] = {0};
-    const uint32_t mask = report->keycodes;
-    int key_count = 0;
-
-    for (int i = 0; i < 32 && key_count < 6; i++) {
-        if (mask & (1UL << i)) {
-            keys[key_count++] = i;
-        }
-    }
-
     s_current_rps++;
-    esp_hidd_send_keyboard_value(s_conn_id, report->modifier, keys, key_count);
+    esp_hidd_send_keyboard_value(s_conn_id, report->modifier, report->keycodes);
     return ESP_OK;
 }
 

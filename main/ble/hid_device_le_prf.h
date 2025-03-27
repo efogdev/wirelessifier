@@ -9,13 +9,13 @@
 #define SUPPORT_REPORT_VENDOR                 false
 #define HID_LE_PRF_TAG                        "HID_LE_PRF"
 #define HIDD_LE_NB_HIDS_INST_MAX              (1)
-#define HID_NUM_REPORTS          4
+#define HID_NUM_REPORTS                       4
 
 #define HIDD_GREAT_VER   0x01  //Version + Subversion
 #define HIDD_SUB_VER     0x00  //Version + Subversion
 #define HIDD_VERSION     ((HIDD_GREAT_VER<<8)|HIDD_SUB_VER)  //Version + Subversion
 
-#define HID_MAX_APPS                 1
+#define HID_MAX_APPS             1
 #define HID_RPT_ID_MOUSE_IN      1   // Mouse input report ID
 #define HID_RPT_ID_KEY_IN        6   // Keyboard input report ID
 #define HID_RPT_ID_CC_IN         4   // Consumer Control input report ID
@@ -23,7 +23,7 @@
 #define HID_RPT_ID_LED_OUT       2  // ToDo: LED output report ID
 #define HID_RPT_ID_FEATURE       0  // ToDo: Feature report ID
 
-#define HIDD_APP_ID			0x1812 // ATT_SVC_HID
+#define HIDD_APP_ID		     0x1812 // ATT_SVC_HID
 #define BATTERY_APP_ID       0x180f
 #define ATT_SVC_HID          0x1812
 
@@ -31,9 +31,9 @@
 #define HIDD_LE_NB_REPORT_INST_MAX            (8)
 
 /// Maximal length of Report Char. Value
-#define HIDD_LE_REPORT_MAX_LEN                (32)
+#define HIDD_LE_REPORT_MAX_LEN                (64)
 /// Maximal length of Report Map Char. Value
-#define HIDD_LE_REPORT_MAP_MAX_LEN            (256)
+#define HIDD_LE_REPORT_MAP_MAX_LEN            (255)
 
 /// Length of Boot Report Char. Value Maximal Length
 #define HIDD_LE_BOOT_REPORT_MAX_LEN           (8)
@@ -227,7 +227,7 @@ enum {
 #define HIDD_LE_CLEANUP_FNCT        (NULL)
 
 /// HIDD Features structure
-typedef struct __attribute__((packed)) {
+typedef struct {
     /// Service Features
     uint8_t svc_features;
     /// Number of Report Char. instances to add in the database
@@ -236,7 +236,7 @@ typedef struct __attribute__((packed)) {
     uint8_t report_char_cfg[HIDD_LE_NB_REPORT_INST_MAX];
 } hidd_feature_t;
 
-typedef struct __attribute__((packed)) {
+typedef struct {
     bool in_use;
     bool congest;
     uint16_t conn_id;
@@ -247,7 +247,7 @@ typedef struct __attribute__((packed)) {
 } hidd_clcb_t;
 
 // HID report mapping table
-typedef struct __attribute__((packed)) {
+typedef struct {
     uint16_t handle; // Handle of report characteristic
     uint16_t cccdHandle; // Handle of CCCD for report characteristic
     uint8_t id; // Report ID
@@ -291,7 +291,7 @@ typedef struct __attribute__((packed)) {
 } hids_hid_info_t;
 
 /* service engine control block */
-typedef struct __attribute__((packed)) {
+typedef struct {
     hidd_clcb_t hidd_clcb[HID_MAX_APPS]; /* connection link*/
     esp_gatt_if_t gatt_if;
     bool enabled;

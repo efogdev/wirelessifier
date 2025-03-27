@@ -24,7 +24,7 @@ void parse_report_descriptor(const uint8_t *desc, size_t length, uint8_t interfa
  * @param bit_size Size of the field in bits
  * @return Extracted field value
  */
-int extract_field_value(const uint8_t *data, uint16_t bit_offset, uint16_t bit_size);
+int64_t extract_field_value(const uint8_t *data, uint16_t bit_offset, uint16_t bit_size);
 
 #ifdef __cplusplus
 }

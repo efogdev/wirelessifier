@@ -10,7 +10,7 @@
 #define ADDR_KEY "last_addr"
 #define ADDR_TYPE_KEY "addr_type"
 
-struct __attribute__((packed)) gatts_profile_inst {
+struct gatts_profile_inst {
     esp_gatts_cb_t gatts_cb;
     uint16_t gatts_if;
     uint16_t app_id;

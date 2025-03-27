@@ -17,7 +17,7 @@ typedef struct __attribute__((packed))
   uint8_t     mode;             // Protocol mode (report or boot)
 } hid_report_map_t;
 
-typedef struct __attribute__((packed))
+typedef struct
 {
   uint32_t    idleTimeout;      // Idle timeout in milliseconds
   uint8_t     hidFlags;         // HID feature flags
@@ -26,7 +26,7 @@ typedef struct __attribute__((packed))
 void hid_dev_register_reports(uint8_t num_reports, hid_report_map_t *p_report);
 
 void hid_dev_send_report(esp_gatt_if_t gatts_if, uint16_t conn_id,
-                        uint8_t id, uint8_t type, uint8_t length, const uint8_t *data);
+                        uint8_t id, uint8_t type, uint8_t length, uint8_t *data);
 
 void hid_keyboard_build_report(uint8_t *buffer, keyboard_cmd_t cmd);
 

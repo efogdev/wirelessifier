@@ -52,7 +52,8 @@ void app_main(void) {
     led_update_pattern(usb_hid_host_device_connected(), ble_hid_device_connected(), hid_bridge_is_ble_paused());
 
     rotary_enc_init();
-    rotary_enc_subscribe_long_press(rot_long_press_cb);
+    // rotary_enc_subscribe_long_press(rot_long_press_cb);
+    rotary_enc_subscribe_click(rot_long_press_cb);
 
     run_hid_bridge();
     init_web_stack();

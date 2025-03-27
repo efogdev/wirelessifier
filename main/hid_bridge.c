@@ -235,7 +235,7 @@ esp_err_t hid_bridge_start(void) {
         return ESP_OK;
     }
 
-    const BaseType_t task_created = xTaskCreatePinnedToCore(hid_bridge_task, "hid_bridge", 2360, NULL, 14,
+    const BaseType_t task_created = xTaskCreatePinnedToCore(hid_bridge_task, "hid_bridge", 2150, NULL, 12,
                                                       &s_hid_bridge_task_handle, 1);
     if (task_created != pdTRUE) {
         ESP_LOGE(TAG, "Failed to create HID bridge task");
@@ -271,54 +271,61 @@ esp_err_t hid_bridge_stop(void) {
 static esp_err_t process_keyboard_report(const usb_hid_report_t *report) {
     const uint8_t expected_fields = usb_hid_host_get_num_fields(report->report_id, report->if_id);
     if (expected_fields != report->num_fields) {
+        ESP_LOGW(TAG, "Unexpected number of fields: expected=%d, got=%d", expected_fields, report->num_fields);
         return ESP_OK;
     }
 
-    static keyboard_report_t ble_kb_report;
-    ble_kb_report.modifier = 0;
-    ble_kb_report.keycodes = 0;
+    static keyboard_report_t ble_kb_report = {0};
+    memset(&ble_kb_report, 0, sizeof(keyboard_report_t));
 
+    uint8_t btn_idx = 0;
     for (int i = 0; i < report->num_fields; i++) {
         const usb_hid_field_t *field = &report->fields[i];
-        if (field->attr.usage_page == HID_USAGE_KEYPAD) {
-            const int value = field->values[0];
-            if (field->attr.usage >= 0xE0 && field->attr.usage <= 0xE7 && value) {
-                ble_kb_report.modifier |= (1 << (field->attr.usage - 0xE0));
-            } else if (field->attr.usage <= 0xA4 && value) {
-                ble_kb_report.keycodes |= (1UL << field->attr.usage);
-            }
+        if (field->value == NULL) {
+            continue;
         }
+
+        if (field->attr.usage_page == HID_USAGE_KEYPAD && !field->attr.constant) {
+            if (field->attr.usage == HID_KEY_LEFT_CTRL) {
+                // field->value is a pointer to the first report array item out of field->attr.report_count
+                // for keyboard, field->value[0] will be HID_KEY_LEFT_CTRL
+                ble_kb_report.modifier = field->value[0];
+                // ESP_LOGI(TAG, "Field[%d]: usg=0x%02x, cnt=%d, sz=%d, value=%d",
+                //              i, field->attr.usage, field->attr.report_count, field->attr.report_size, *field->value);
+            }
+            else if (field->attr.usage == 0 && field->attr.array && !field->attr.constant) {
+                memcpy(&ble_kb_report.keycodes[btn_idx], &((uint8_t*)(field->value))[btn_idx], sizeof(uint8_t));
+                btn_idx++;
+
+                // ESP_LOGI(TAG, "Field[%d]: usg=0x%02x, cnt=%d, sz=%d, value=[%02X,%02X,%02X,%02X,%02X,%02X]",
+                //              i, field->attr.usage, field->attr.report_count, field->attr.report_size,
+                //              ble_kb_report.keycodes[0], ble_kb_report.keycodes[1], ble_kb_report.keycodes[2],
+                //              ble_kb_report.keycodes[3], ble_kb_report.keycodes[4], ble_kb_report.keycodes[5]);
+            } 
+        } 
     }
 
-    return ble_hid_device_send_keyboard_report(&ble_kb_report);
+    const esp_err_t ret = ble_hid_device_send_keyboard_report(&ble_kb_report);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to send keyboard report: %s", esp_err_to_name(ret));
+    }
+    return ret;
 }
 
 static mouse_report_t ble_mouse_report;
 
-__attribute__((section(".iram1.text"))) static esp_err_t process_mouse_report(const usb_hid_report_t *report) {
-    // ToDo: define some "safe" mode?
-    // const uint8_t expected_fields = usb_hid_host_get_num_fields(report->report_id, report->if_id);
-    // if (expected_fields != report->num_fields) {
-    //     return ESP_OK;
-    // }
-
-    ble_mouse_report.buttons = 0;
-    for (int i = 0; i < report->info->mouse_fields.buttons_count; i++) {
-        const usb_hid_field_t* const btn_field_info = &report->fields[report->info->mouse_fields.buttons[i]];
-        if (btn_field_info == NULL) {
-            return ESP_ERR_INVALID_ARG;
-        }
-
-        const int buttons_val = btn_field_info->values[0];
-        if (buttons_val) {
-            ble_mouse_report.buttons |= (1 << (btn_field_info->attr.usage - 1));
-        }
+__attribute__((section(".iram1.text"))) static esp_err_t process_mouse_report(const usb_hid_report_t *report) 
+{    
+    const usb_hid_field_t* const btn_field_info = &report->fields[report->info->mouse_fields.buttons];
+    if (btn_field_info == NULL || btn_field_info->value == NULL) {
+        return ESP_ERR_INVALID_ARG;
     }
 
-    ble_mouse_report.x = report->fields[report->info->mouse_fields.x].values[0];
-    ble_mouse_report.y = report->fields[report->info->mouse_fields.y].values[0];
-    ble_mouse_report.wheel = report->fields[report->info->mouse_fields.wheel].values[0];
-    ble_mouse_report.pan = report->fields[report->info->mouse_fields.pan].values[0];
+    ble_mouse_report.buttons  = btn_field_info->value[0];
+    ble_mouse_report.x = report->fields[report->info->mouse_fields.x].value[0];
+    ble_mouse_report.y = report->fields[report->info->mouse_fields.y].value[0];
+    ble_mouse_report.wheel = report->fields[report->info->mouse_fields.wheel].value[0];
+    ble_mouse_report.pan = report->fields[report->info->mouse_fields.pan].value[0];
 
     if (s_sensitivity != 100) {
         ble_mouse_report.x = (int32_t)(int16_t)ble_mouse_report.x * s_sensitivity / 100;

@@ -7,11 +7,11 @@
 extern "C" {
 #endif
 
-#define USB_HOST_MAX_INTERFACES     4
-#define USB_HID_MAX_RAW_REPORT_SIZE 48
-#define MAX_REPORT_FIELDS 48
-#define MAX_COLLECTION_DEPTH 6
-#define MAX_REPORTS_PER_INTERFACE 8
+#define USB_HOST_MAX_INTERFACES      4
+#define USB_HID_MAX_RAW_REPORT_SIZE  24
+#define MAX_REPORT_FIELDS            16
+#define MAX_COLLECTION_DEPTH         3
+#define MAX_REPORTS_PER_INTERFACE    8
 
 // HID Report Types
 #define HID_TYPE_INPUT       1
@@ -21,12 +21,13 @@ extern "C" {
 // HID Usage Pages
 #define HID_USAGE_PAGE_GENERIC_DESKTOP  0x01
 #define HID_USAGE_PAGE_SIMULATION       0x02
-#define HID_USAGE_PAGE_VR              0x03
-#define HID_USAGE_PAGE_SPORT           0x04
-#define HID_USAGE_PAGE_GAME            0x05
-#define HID_USAGE_PAGE_BUTTON          0x09
-#define HID_USAGE_PAGE_LEDS            0x08
-#define HID_USAGE_PAGE_CONSUMER        0x0C
+#define HID_USAGE_PAGE_VR               0x03
+#define HID_USAGE_PAGE_SPORT            0x04
+#define HID_USAGE_PAGE_GAME             0x05
+#define HID_USAGE_PAGE_BUTTON           0x09
+#define HID_USAGE_PAGE_KEYBOARD         0x07
+#define HID_USAGE_PAGE_LEDS             0x08
+#define HID_USAGE_PAGE_CONSUMER         0x0C
 
 // Generic Desktop Page Usages
 #define HID_USAGE_POINTER    0x01
@@ -257,7 +258,7 @@ typedef struct {
 
 typedef struct {
     usb_hid_field_attr_t attr;
-    int *values;
+    int64_t *value;
 } usb_hid_field_t;
 
 typedef struct {
@@ -279,8 +280,7 @@ typedef struct {
         uint8_t y;
         uint8_t wheel;
         uint8_t pan;
-        uint8_t buttons[8];
-        uint8_t buttons_count;
+        uint8_t buttons;
     } mouse_fields;
 } report_info_t;
 

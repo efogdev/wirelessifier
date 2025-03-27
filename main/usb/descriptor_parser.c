@@ -86,6 +86,7 @@ void parse_report_descriptor(const uint8_t *desc, const size_t length, const uin
                                 report_field_info_t *field = &current_report->fields[current_report->num_fields];
                                 field->attr.usage_page = current_usage_page;
                                 field->attr.usage = 0;
+                                field->attr.usage_maximum = 0;
                                 field->attr.report_size = report_size;
                                 field->attr.report_count = report_count;
                                 field->attr.logical_min = 0;
@@ -98,12 +99,20 @@ void parse_report_descriptor(const uint8_t *desc, const size_t length, const uin
                                 field->bit_size = report_size * report_count;
                                 current_report->total_bits += report_size * report_count;
                                 current_report->num_fields++;
-                            } else if (is_array && has_usage_range) {
-                                // Handle array with usage range
+                            } else if (is_array) {
+                                // Handle array field - store as single field with range
                                 report_field_info_t *field = &current_report->fields[current_report->num_fields];
                                 field->attr.usage_page = current_usage_page;
-                                field->attr.usage = usage_minimum;
-                                field->attr.usage_maximum = usage_maximum;
+                                if (has_usage_range) {
+                                    field->attr.usage = usage_minimum;
+                                    field->attr.usage_maximum = usage_maximum;
+                                } else if (current_report->usage_stack_pos > 0) {
+                                    field->attr.usage = current_report->usage_stack[0];
+                                    field->attr.usage_maximum = field->attr.usage;
+                                } else {
+                                    field->attr.usage = current_usage;
+                                    field->attr.usage_maximum = field->attr.usage;
+                                }
                                 field->attr.report_size = report_size;
                                 field->attr.report_count = report_count;
                                 field->attr.logical_min = logical_min;
@@ -116,17 +125,16 @@ void parse_report_descriptor(const uint8_t *desc, const size_t length, const uin
                                 field->bit_size = report_size * report_count;
                                 current_report->total_bits += report_size * report_count;
                                 current_report->num_fields++;
-                            } else if (has_usage_range && is_variable) {
-                                // Handle variable items with usage range
-                                const uint16_t range_size = usage_maximum - usage_minimum + 1;
-                                for (uint8_t j = 0;
-                                     j < report_count && j < range_size && current_report->num_fields < MAX_REPORT_FIELDS;
-                                     j++) {
+                            } else {
+                                // Handle variable items - FIXED SECTION
+                                if (has_usage_range) {
+                                    // For usage ranges, create a single field with multiple usages
                                     report_field_info_t *field = &current_report->fields[current_report->num_fields];
                                     field->attr.usage_page = current_usage_page;
-                                    field->attr.usage = usage_minimum + j;
+                                    field->attr.usage = usage_minimum;
+                                    field->attr.usage_maximum = usage_maximum;
                                     field->attr.report_size = report_size;
-                                    field->attr.report_count = 1;
+                                    field->attr.report_count = report_count;
                                     field->attr.logical_min = logical_min;
                                     field->attr.logical_max = logical_max;
                                     field->attr.constant = false;
@@ -134,37 +142,71 @@ void parse_report_descriptor(const uint8_t *desc, const size_t length, const uin
                                     field->attr.relative = is_relative;
                                     field->attr.array = false;
                                     field->bit_offset = current_report->total_bits;
-                                    field->bit_size = report_size;
-                                    current_report->total_bits += report_size;
+                                    field->bit_size = report_size * report_count;
+                                    current_report->total_bits += report_size * report_count;
                                     current_report->num_fields++;
-                                }
-                            } else {
-                                // Handle individual usages
-                                for (uint8_t j = 0; j < report_count && current_report->num_fields < MAX_REPORT_FIELDS; j++) {
-                                    report_field_info_t *field = &current_report->fields[current_report->num_fields];
-                                    field->attr.usage_page = current_usage_page;
+                                } else {
+                                    // For individual usages
+                                    const uint8_t usages_available = current_report->usage_stack_pos;
 
-                                    if (current_report->usage_stack_pos > j) {
-                                        field->attr.usage = current_report->usage_stack[j];
-                                    } else if (current_report->usage_stack_pos > 0) {
-                                        field->attr.usage = current_report->usage_stack[
-                                            current_report->usage_stack_pos - 1];
-                                    } else {
+                                    if (usages_available == 0 && current_usage != 0) {
+                                        // If we have a single usage but multiple report counts, create one field
+                                        report_field_info_t *field = &current_report->fields[current_report->num_fields];
+                                        field->attr.usage_page = current_usage_page;
                                         field->attr.usage = current_usage;
+                                        field->attr.usage_maximum = current_usage;
+                                        field->attr.report_size = report_size;
+                                        field->attr.report_count = report_count;
+                                        field->attr.logical_min = logical_min;
+                                        field->attr.logical_max = logical_max;
+                                        field->attr.constant = false;
+                                        field->attr.variable = true;
+                                        field->attr.relative = is_relative;
+                                        field->attr.array = false;
+                                        field->bit_offset = current_report->total_bits;
+                                        field->bit_size = report_size * report_count;
+                                        current_report->total_bits += report_size * report_count;
+                                        current_report->num_fields++;
+                                    } else if (usages_available >= report_count) {
+                                        // If we have enough usages for each report count, create separate fields
+                                        for (uint8_t j = 0; j < report_count && current_report->num_fields < MAX_REPORT_FIELDS; j++) {
+                                            report_field_info_t *field = &current_report->fields[current_report->num_fields];
+                                            field->attr.usage_page = current_usage_page;
+                                            field->attr.usage = current_report->usage_stack[j];
+                                            field->attr.usage_maximum = field->attr.usage;
+                                            field->attr.report_size = report_size;
+                                            field->attr.report_count = 1;
+                                            field->attr.logical_min = logical_min;
+                                            field->attr.logical_max = logical_max;
+                                            field->attr.constant = false;
+                                            field->attr.variable = true;
+                                            field->attr.relative = is_relative;
+                                            field->attr.array = false;
+                                            field->bit_offset = current_report->total_bits;
+                                            field->bit_size = report_size;
+                                            current_report->total_bits += report_size;
+                                            current_report->num_fields++;
+                                        }
+                                    } else {
+                                        // If we don't have enough usages, create one field with the last usage
+                                        report_field_info_t *field = &current_report->fields[current_report->num_fields];
+                                        field->attr.usage_page = current_usage_page;
+                                        field->attr.usage = usages_available > 0 ?
+                                            current_report->usage_stack[usages_available - 1] : current_usage;
+                                        field->attr.usage_maximum = field->attr.usage;
+                                        field->attr.report_size = report_size;
+                                        field->attr.report_count = report_count;
+                                        field->attr.logical_min = logical_min;
+                                        field->attr.logical_max = logical_max;
+                                        field->attr.constant = false;
+                                        field->attr.variable = true;
+                                        field->attr.relative = is_relative;
+                                        field->attr.array = false;
+                                        field->bit_offset = current_report->total_bits;
+                                        field->bit_size = report_size * report_count;
+                                        current_report->total_bits += report_size * report_count;
+                                        current_report->num_fields++;
                                     }
-
-                                    field->attr.report_size = report_size;
-                                    field->attr.report_count = 1;
-                                    field->attr.logical_min = logical_min;
-                                    field->attr.logical_max = logical_max;
-                                    field->attr.constant = false;
-                                    field->attr.variable = is_variable;
-                                    field->attr.relative = is_relative;
-                                    field->attr.array = !is_variable;
-                                    field->bit_offset = current_report->total_bits;
-                                    field->bit_size = report_size;
-                                    current_report->total_bits += report_size;
-                                    current_report->num_fields++;
                                 }
                             }
 
@@ -244,6 +286,32 @@ void parse_report_descriptor(const uint8_t *desc, const size_t length, const uin
         }
     }
 
+    // ESP_LOGI(TAG, "=== Report Descriptor Summary ===");
+    // ESP_LOGI(TAG, "Interface: %d, Total Reports: %d", interface_num, report_map->num_reports);
+    //
+    // for (int i = 0; i < report_map->num_reports; i++) {
+    //     report_info_t *report = &report_map->reports[i];
+    //     ESP_LOGI(TAG, "\nReport %d (ID: 0x%02x):", i, report_map->report_ids[i]);
+    //     ESP_LOGI(TAG, "Total Fields: %d, Total Bits: %d", report->num_fields, report->total_bits);
+    //
+    //     for (int j = 0; j < report->num_fields; j++) {
+    //         const report_field_info_t *field = &report->fields[j];
+    //         ESP_LOGI(TAG, "  Field %d:", j);
+    //         ESP_LOGI(TAG, "    Usage Page: 0x%04x", field->attr.usage_page);
+    //         ESP_LOGI(TAG, "    Usage: 0x%04x-0x%04x", field->attr.usage, field->attr.usage_maximum);
+    //         ESP_LOGI(TAG, "    Report Size: %d bits", field->attr.report_size);
+    //         ESP_LOGI(TAG, "    Report Count: %d", field->attr.report_count);
+    //         ESP_LOGI(TAG, "    Logical Range: %d to %d", field->attr.logical_min, field->attr.logical_max);
+    //         ESP_LOGI(TAG, "    Attributes: %s%s%s%s",
+    //             field->attr.constant ? "Constant " : "",
+    //             field->attr.variable ? "Variable " : "",
+    //             field->attr.relative ? "Relative " : "",
+    //             field->attr.array ? "Array" : "");
+    //         ESP_LOGI(TAG, "    Bit Offset: %d, Size: %d", field->bit_offset, field->bit_size);
+    //     }
+    // }
+    // ESP_LOGI(TAG, "==============================");
+
     for (int i = 0; i < report_map->num_reports; i++) {
         report_info_t *report = &report_map->reports[i];
         for (int j = 0; j < report->num_fields; j++) {
@@ -260,9 +328,8 @@ void parse_report_descriptor(const uint8_t *desc, const size_t length, const uin
                 } else if (field->attr.usage == HID_USAGE_WHEEL) {
                     report->mouse_fields.wheel = j;
                 }
-            } else if (field->attr.usage >= 1 && field->attr.usage <= 8 && field->attr.usage_page == HID_USAGE_PAGE_BUTTON) {
-                report->mouse_fields.buttons[field->attr.usage - 1] = j;
-                report->mouse_fields.buttons_count++;
+            } else if (field->attr.usage == HID_USAGE_PAGE_GENERIC_DESKTOP && field->attr.usage_page == HID_USAGE_PAGE_BUTTON) {
+                report->mouse_fields.buttons = j;
             } else if (field->attr.usage == 0x238) { // Pan
                 report->mouse_fields.pan = j;
             }
@@ -278,41 +345,51 @@ void parse_report_descriptor(const uint8_t *desc, const size_t length, const uin
     }
 }
 
-__attribute__((section(".iram1.text"))) int extract_field_value(const uint8_t *data, const uint16_t bit_offset, const uint16_t bit_size) {
-    if (!data || bit_size == 0 || bit_size > 32) {
+__attribute__((section(".iram1.text"))) int64_t extract_field_value(const uint8_t *data, const uint16_t bit_offset,
+                                                                    const uint16_t bit_size) {
+    if (!data || bit_size == 0 || bit_size > 64) {
         return 0;
     }
 
-    int value = 0;
+    uint64_t value = 0;
     uint16_t byte_offset = bit_offset / 8;
     uint8_t bit_shift = bit_offset % 8;
     uint16_t bits_remaining = bit_size;
+    uint16_t current_bit = 0;
 
+    // Handle simple case for single bit
     if (bit_size == 1) {
-        uint8_t byte_value;
-        memcpy(&byte_value, &data[byte_offset], sizeof(uint8_t));
+        const uint8_t byte_value = data[byte_offset];
         return (byte_value >> bit_shift) & 0x01;
     }
 
+    // Extract bits from each byte
     while (bits_remaining > 0) {
-        uint8_t current_byte;
-        memcpy(&current_byte, &data[byte_offset], sizeof(uint8_t));
-
+        // How many bits we can read from current byte
         const uint8_t bits_to_read = MIN(8 - bit_shift, bits_remaining);
-        const uint8_t mask = ((1 << bits_to_read) - 1);
-        const int byte_value = (current_byte >> bit_shift) & mask;
-        const uint8_t shift_amount = bit_size - bits_remaining;
-        value |= (byte_value << shift_amount);
 
+        // Extract bits from current byte
+        const uint8_t mask = (1 << bits_to_read) - 1;
+        const uint8_t byte_value = (data[byte_offset] >> bit_shift) & mask;
+
+        // Add these bits to our result
+        value |= ((uint64_t)byte_value << current_bit);
+
+        // Update counters
+        current_bit += bits_to_read;
         bits_remaining -= bits_to_read;
         byte_offset++;
-        bit_shift = 0;
+        bit_shift = 0;  // After first byte, we always start at bit 0
     }
 
-    // Sign extend if the value is negative (MSB is 1)
-    if (bit_size < 32 && (value & (1 << (bit_size - 1)))) {
-        value |= ~((1 << bit_size) - 1);
+    // Handle sign extension for signed values
+    if (bit_size < 64) {
+        // Check if the highest bit is set (negative value)
+        if (value & (1ULL << (bit_size - 1))) {
+            // Sign extend by setting all higher bits to 1
+            value |= ~((1ULL << bit_size) - 1);
+        }
     }
 
-    return value;
+    return (int64_t)value;
 }

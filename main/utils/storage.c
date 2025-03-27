@@ -8,7 +8,7 @@
 #include <esp_mac.h>
 #include "const.h"
 
-#define MAX_CACHE_SIZE 12
+#define MAX_CACHE_SIZE 6
 #define MAX_PATH_LENGTH 48
 
 typedef enum {
@@ -21,7 +21,7 @@ typedef struct {
     char path[MAX_PATH_LENGTH];
     cache_value_type_t type;
     union {
-        char str[128];
+        char str[48];
         int num;
         bool flag;
     } value;

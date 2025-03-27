@@ -4,10 +4,10 @@
 #include <string.h>
 #include "esp_log.h"
 
-#define HID_KEYBOARD_IN_RPT_LEN     32
+#define HID_KEYBOARD_IN_RPT_LEN     63
 #define HID_MOUSE_IN_RPT_LEN        7
 
-static uint8_t s_report_buffer[32] __attribute__((section(".dram1.data")));
+static uint8_t s_report_buffer[HID_KEYBOARD_IN_RPT_LEN+2] __attribute__((section(".dram1.data")));
 static bool s_enabled = true;
 
 bool is_ble_enabled(void) {
@@ -71,17 +71,13 @@ uint16_t esp_hidd_get_version(void) {
     return HIDD_VERSION;
 }
 
-void esp_hidd_send_keyboard_value(const uint16_t conn_id, const key_mask_t special_key_mask, const uint8_t *keyboard_cmd,
-                                  const uint8_t num_key) {
-    if (num_key > HID_KEYBOARD_IN_RPT_LEN - 1) {
-        ESP_LOGE(HID_LE_PRF_TAG, "%s(), the number key should not be more than %d", __func__, HID_KEYBOARD_IN_RPT_LEN - 1);
-        return;
-    }
+void esp_hidd_send_keyboard_value(const uint16_t conn_id, const key_mask_t special_key_mask, const uint8_t *keyboard_cmd) {
+    // ESP_LOGI(HID_LE_PRF_TAG, "mask=%02X data=%08X%08X", special_key_mask, *(const uint32_t *const)keyboard_cmd, *(const uint32_t*const)&keyboard_cmd[4]);
 
     s_report_buffer[0] = special_key_mask;
     memset(&s_report_buffer[1], 0, HID_KEYBOARD_IN_RPT_LEN - 1);
-    for (int i = 0; i < num_key; i++) {
-        s_report_buffer[i + 1] = keyboard_cmd[i];
+    for (int i = 1; i < HID_KEYBOARD_IN_RPT_LEN - 1; i++) {
+        s_report_buffer[i + 1] = keyboard_cmd[i - 1];
     }
 
     hid_dev_send_report(hidd_le_env.gatt_if,

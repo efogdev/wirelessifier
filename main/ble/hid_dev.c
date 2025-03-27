@@ -20,10 +20,9 @@ typedef struct {
 static cache_entry_t __attribute__((section(".dram1.data"))) cache[CACHE_SIZE];
 static hid_report_map_t * __attribute__((section(".dram1.data"))) direct_cache[DIRECT_CACHE_SIZE];
 static uint8_t __attribute__((section(".dram1.data"))) cache_size = 0;
+// static uint8_t s_report_buffer[96] __attribute__((section(".dram1.data")));
 
-static uint8_t s_report_buffer[48] __attribute__((section(".dram1.data")));
-
-static inline hid_report_map_t *hid_dev_rpt_by_id(const uint8_t id, const uint8_t type) {
+static IRAM_ATTR hid_report_map_t *hid_dev_rpt_by_id(const uint8_t id, const uint8_t type) {
     // Direct indexing for most common reports (assuming IDs 0-3 are most frequent)
     if (id < DIRECT_CACHE_SIZE && direct_cache[id] && 
         direct_cache[id]->id == id && 
@@ -71,22 +70,10 @@ void hid_dev_register_reports(const uint8_t num_reports, hid_report_map_t *p_rep
     memset(direct_cache, 0, sizeof(direct_cache));
 }
 
-void hid_keyboard_build_report(uint8_t *buffer, const keyboard_cmd_t cmd) {
-    if (!buffer) {
-        ESP_LOGE(HID_LE_PRF_TAG, "%s(), the buffer is NULL, hid build report failed.", __func__);
-        return;
-    }
-
-    buffer[0] = cmd;
-    buffer[1] = 0;
-    memset(&buffer[2], 0, 6);
-}
-
 __attribute__((section(".iram1.text"))) void hid_dev_send_report(const esp_gatt_if_t gatts_if, const uint16_t conn_id,
-                         const uint8_t id, const uint8_t type, const uint8_t length, const uint8_t *data) {
+                         const uint8_t id, const uint8_t type, const uint8_t length, uint8_t *data) {
     hid_report_map_t *p_rpt;
     if ((p_rpt = hid_dev_rpt_by_id(id, type)) != NULL) {
-        memcpy(s_report_buffer, data, length);
-        esp_ble_gatts_send_indicate(gatts_if, conn_id, p_rpt->handle, length, s_report_buffer, false);
+        esp_ble_gatts_send_indicate(gatts_if, conn_id, p_rpt->handle, length, data, false);
     }
 }
