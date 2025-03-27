@@ -49,10 +49,10 @@ void parse_report_descriptor(const uint8_t *desc, const size_t length, const uin
                     case 8: // Input
                     case 9: // Output
                         if (current_report && current_report->num_fields < MAX_REPORT_FIELDS) {
-                            bool is_constant = (data & 0x01) != 0;
-                            bool is_variable = (data & 0x02) != 0;
+                            const bool is_constant = (data & 0x01) != 0;
+                            const bool is_variable = (data & 0x02) != 0;
                             is_relative = (data & 0x04) != 0;
-                            bool is_array = !is_variable;
+                            const bool is_array = !is_variable;
 
                             // If we have a report ID, find or create the corresponding report info
                             if (current_report_id != 0) {

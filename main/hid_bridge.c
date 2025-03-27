@@ -278,7 +278,6 @@ static esp_err_t process_keyboard_report(const usb_hid_report_t *report) {
     ble_kb_report.modifier = 0;
     ble_kb_report.keycodes = 0;
 
-    // Process fields directly from raw data
     for (int i = 0; i < report->num_fields; i++) {
         const usb_hid_field_t *field = &report->fields[i];
         if (field->attr.usage_page == HID_USAGE_KEYPAD) {
