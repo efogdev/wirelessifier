@@ -18,8 +18,8 @@
 #include "descriptor_parser.h"
 
 #define USB_STATS_INTERVAL_SEC  1
-#define HOST_HID_QUEUE_SIZE     3
-#define DEVICE_EVENT_QUEUE_SIZE 6
+#define HOST_HID_QUEUE_SIZE     2
+#define DEVICE_EVENT_QUEUE_SIZE 4
 
 static const char *TAG = "USB_HID";
 static QueueHandle_t g_report_queue = NULL;
@@ -295,7 +295,7 @@ esp_err_t usb_hid_host_init(const QueueHandle_t report_queue, const bool verbose
     const hid_host_driver_config_t hid_host_config = {
         .create_background_task = true,
         .task_priority = 16,
-        .stack_size = 1600,
+        .stack_size = 2000,
         .core_id = 1,
         .callback = hid_host_device_callback,
         .callback_arg = NULL
@@ -395,7 +395,8 @@ __attribute__((section(".iram1.text"))) static void process_report(uint8_t *cons
 
     // if (g_report.is_keyboard && VERBOSE) {
     //     ESP_LOGI(TAG, "");
-    //     ESP_LOGI(TAG, "Raw data: %08X %08X %08X", *(const int16_t *)&data_ptr[0], *(const int16_t *)&data_ptr[2], *(const int16_t *)&data_ptr[4]);
+    // ESP_LOGI(TAG, "[%d fields] Raw data: %08X %08X %08X, info ptr: 0x%02X", report_info->num_fields,
+        // *(const int16_t *)&data_ptr[0], *(const int16_t *)&data_ptr[2], *(const int16_t *)&data_ptr[4], report_info);
     // }
 
     const report_field_info_t *const field_info = report_info->fields;
@@ -405,9 +406,9 @@ __attribute__((section(".iram1.text"))) static void process_report(uint8_t *cons
         g_fields[i].value = &g_field_values[i];
 
         // if (g_report.is_keyboard) {
-        //     ESP_LOGI(TAG, "field #%d (usg=%02X, offset=%d, size=%d) = 0x%08X%08X", i, field_info[i].attr.usage,
-        //       field_info[i].bit_offset, field_info[i].bit_size,
-        //       (uint32_t)(*g_fields[i].value >> 32), (uint32_t)*g_fields[i].value);
+        // ESP_LOGI(TAG, "field #%d (usg=%02X, offset=%d, size=%d) = 0x%08X%08X", i, field_info[i].attr.usage,
+          // field_info[i].bit_offset, field_info[i].bit_size,
+          // (uint32_t)(*g_fields[i].value >> 32), (uint32_t)*g_fields[i].value);
         // }
     }
 

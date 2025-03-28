@@ -311,9 +311,11 @@ static esp_err_t process_keyboard_report(const usb_hid_report_t *report) {
     return ret;
 }
 
+static mouse_report_t ble_mouse_report = {0};
+
 __attribute__((section(".iram1.text"))) static esp_err_t process_mouse_report(const usb_hid_report_t *report)
 {
-    mouse_report_t ble_mouse_report = {0};
+    memset(&ble_mouse_report, 0, sizeof(mouse_report_t));
 
     const usb_hid_field_t* const btn_field_info = &report->fields[report->info->mouse_fields.buttons];
     ble_mouse_report.buttons = ((uint8_t const*)btn_field_info->value)[0];
@@ -360,7 +362,6 @@ esp_err_t hid_bridge_process_report(const usb_hid_report_t *report) {
         if (!s_ble_stack_active) {
             ESP_LOGI(TAG, "USB HID event received, restarting BLE stack");
 
-            s_ble_stack_active = true;
             const esp_err_t ret = ble_hid_device_init(s_verbose);
             if (ret != ESP_OK) {
                 s_ble_stack_active = false;
@@ -369,6 +370,7 @@ esp_err_t hid_bridge_process_report(const usb_hid_report_t *report) {
                 return ret;
             }
 
+            s_ble_stack_active = true;
             xSemaphoreGive(s_ble_stack_mutex);
             return ESP_OK;
         }
