@@ -147,7 +147,7 @@ esp_err_t load_saved_device_to_cache(void) {
  * @param gatts_if GATT server interface
  * @return esp_err_t ESP_OK if connection initiated successfully, error code otherwise
  */
-esp_err_t connect_to_saved_device(esp_gatt_if_t gatts_if) {
+esp_err_t connect_to_saved_device(const esp_gatt_if_t gatts_if) {
     esp_err_t err;
     
     // If cache is not valid, try to load from NVS
@@ -158,11 +158,9 @@ esp_err_t connect_to_saved_device(esp_gatt_if_t gatts_if) {
             return err;
         }
     }
-    
-    // Double check cache validity
+
     if (!saved_device_cache.is_valid) {
-        ESP_LOGE(TAG, "No valid saved device available");
-        return ESP_ERR_NOT_FOUND;
+        return ESP_OK;
     }
     
     // Log the connection attempt

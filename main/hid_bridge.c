@@ -315,12 +315,17 @@ static esp_err_t process_keyboard_report(const usb_hid_report_t *report) {
 static mouse_report_t ble_mouse_report;
 
 __attribute__((section(".iram1.text"))) static esp_err_t process_mouse_report(const usb_hid_report_t *report) 
-{    
+{
+    if (report == NULL || report->info == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
     const usb_hid_field_t* const btn_field_info = &report->fields[report->info->mouse_fields.buttons];
     if (btn_field_info == NULL || btn_field_info->value == NULL) {
         return ESP_ERR_INVALID_ARG;
     }
 
+    memset(&ble_mouse_report, 0, sizeof(ble_mouse_report));
     ble_mouse_report.buttons  = btn_field_info->value[0];
     ble_mouse_report.x = report->fields[report->info->mouse_fields.x].value[0];
     ble_mouse_report.y = report->fields[report->info->mouse_fields.y].value[0];
