@@ -232,7 +232,7 @@ esp_err_t usb_hid_host_init(const QueueHandle_t report_queue, const bool verbose
             return err;
         }
 
-        xTaskCreatePinnedToCore(usb_stats_task, "usb_stats", 2048, NULL, 5, &g_stats_task_handle, 1);
+        xTaskCreatePinnedToCore(usb_stats_task, "usb_stats", 1500, NULL, 5, &g_stats_task_handle, 1);
     }
 
     g_verbose = verbose;

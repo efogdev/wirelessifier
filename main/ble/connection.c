@@ -1,6 +1,10 @@
 #include "connection.h"
 #include <esp_log.h>
 #include <string.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/projdefs.h>
+#include <freertos/task.h>
+
 #include "nvs.h"
 
 #define STORAGE_NAMESPACE "hid_dev"
@@ -175,7 +179,8 @@ esp_err_t connect_to_saved_device(const esp_gatt_if_t gatts_if) {
         ESP_LOGE(TAG, "Failed to connect to saved device, error: %s", esp_err_to_name(err));
         return err;
     }
-    
+
+    vTaskDelay(pdMS_TO_TICKS(10));
     return ESP_OK;
 }
 

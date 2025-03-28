@@ -15,7 +15,7 @@
 #include "web/wifi_manager.h"
 #include "utils/storage.h"
 
-#define HID_QUEUE_SIZE 8
+#define HID_QUEUE_SIZE 1
 #define HID_QUEUE_ITEM_SIZE sizeof(usb_hid_report_t)
 
 static const char *TAG = "HID_BRIDGE";
@@ -40,7 +40,7 @@ static bool s_enable_sleep = true;
 static bool s_verbose = false;
 
 static void inactivity_timer_callback(TimerHandle_t xTimer) {
-    if (xSemaphoreTake(s_ble_stack_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+    if (xSemaphoreTake(s_ble_stack_mutex, pdMS_TO_TICKS(250)) != pdTRUE) {
         ESP_LOGW(TAG, "Failed to take BLE stack mutex in inactivity timer");
         return;
     }
@@ -183,7 +183,7 @@ esp_err_t hid_bridge_deinit(void) {
         s_inactivity_timer = NULL;
     }
 
-    if (xSemaphoreTake(s_ble_stack_mutex, pdMS_TO_TICKS(50)) != pdTRUE) {
+    if (xSemaphoreTake(s_ble_stack_mutex, pdMS_TO_TICKS(250)) != pdTRUE) {
         ESP_LOGE(TAG, "Failed to take BLE stack mutex in deinit");
         return ESP_FAIL;
     }
@@ -316,25 +316,36 @@ static mouse_report_t ble_mouse_report;
 __attribute__((section(".iram1.text"))) static esp_err_t process_mouse_report(const usb_hid_report_t *report) 
 {
     memset(&ble_mouse_report, 0, sizeof(ble_mouse_report));
+    // printf("1");
 
     const usb_hid_field_t* const btn_field_info = &report->fields[report->info->mouse_fields.buttons];
+    ble_mouse_report.buttons = ((uint8_t const*)btn_field_info->value)[0];
+    // printf("2");
 
-    ble_mouse_report.buttons  = btn_field_info->value[0];
+    if (report->fields[report->info->mouse_fields.x].attr.report_size == 16) {
+        ble_mouse_report.x = ((int16_t const*)report->fields[report->info->mouse_fields.x].value)[0];
+        ble_mouse_report.y = ((int16_t const*)report->fields[report->info->mouse_fields.y].value)[0];
+        // printf("3");
+    } else if (report->fields[report->info->mouse_fields.x].attr.report_size == 8) {
+        ble_mouse_report.x = ((int8_t const*)report->fields[report->info->mouse_fields.x].value)[0];
+        ble_mouse_report.y = ((int8_t const*)report->fields[report->info->mouse_fields.y].value)[0];
+        // printf("4");
+    }
 
-    ble_mouse_report.x = report->fields[report->info->mouse_fields.x].value[0];
+    ble_mouse_report.wheel = ((uint8_t const*)report->fields[report->info->mouse_fields.wheel].value)[0];
+    // printf("5");
 
-    ble_mouse_report.y = report->fields[report->info->mouse_fields.y].value[0];
-
-    ble_mouse_report.wheel = report->fields[report->info->mouse_fields.wheel].value[0];
-
-    ble_mouse_report.pan = report->fields[report->info->mouse_fields.pan].value[0];
+    ble_mouse_report.pan = ((uint8_t const*)report->fields[report->info->mouse_fields.pan].value)[0];
+    // printf("6");
 
     if (s_sensitivity != 100) {
         ble_mouse_report.x = (int32_t)(int16_t)ble_mouse_report.x * s_sensitivity / 100;
         ble_mouse_report.y = (int32_t)(int16_t)ble_mouse_report.y * s_sensitivity / 100;
     }
 
+    // printf("7");
     return ble_hid_device_send_mouse_report(&ble_mouse_report);
+
 }
 
 bool hid_bridge_is_ble_paused(void) {
@@ -353,7 +364,7 @@ esp_err_t hid_bridge_process_report(const usb_hid_report_t *report) {
     }
 
     if (!s_ble_stack_active) {
-        if (xSemaphoreTake(s_ble_stack_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+        if (xSemaphoreTake(s_ble_stack_mutex, pdMS_TO_TICKS(25)) != pdTRUE) {
             ESP_LOGW(TAG, "Failed to take BLE stack mutex in process_report");
             return ESP_FAIL;
         }
