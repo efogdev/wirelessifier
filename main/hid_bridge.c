@@ -68,7 +68,6 @@ static void inactivity_timer_callback(TimerHandle_t xTimer) {
     }
 
     ESP_LOGI(TAG, "No USB HID events for a while, stopping BLE stack");
-    s_ble_stack_active = false;
     const esp_err_t ret = ble_hid_device_deinit();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to deinitialize BLE HID device: %s", esp_err_to_name(ret));
@@ -76,8 +75,8 @@ static void inactivity_timer_callback(TimerHandle_t xTimer) {
     } else {
         ESP_LOGI(TAG, "BLE stack stopped");
         xSemaphoreGive(s_ble_stack_mutex);
+        s_ble_stack_active = false;
         // esp_light_sleep_start();
-        return;
     }
 
     xSemaphoreGive(s_ble_stack_mutex);
