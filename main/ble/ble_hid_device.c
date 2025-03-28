@@ -124,10 +124,10 @@ static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *
         }
         case ESP_HIDD_EVENT_BLE_CONNECT: {
             ESP_LOGI(TAG, "ESP_HIDD_EVENT_BLE_CONNECT");
-            s_conn_id = param->connect.conn_id;
-            s_connected = true;
             update_tx_power();
             save_connected_device(param->connect.remote_bda, s_connected_device_addr_type);
+            s_conn_id = param->connect.conn_id;
+            s_connected = true;
             break;
         }
         case ESP_HIDD_EVENT_BLE_DISCONNECT: {

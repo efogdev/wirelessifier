@@ -18,6 +18,7 @@ struct gatts_profile_inst {
 };
 
 hidd_le_env_t hidd_le_env;
+static esp_gatt_if_t s_gatts_if;
 uint8_t hidProtocolMode = HID_PROTOCOL_MODE_REPORT;
 
 uint16_t get_gatts_if(void) {
@@ -25,7 +26,11 @@ uint16_t get_gatts_if(void) {
         return hidd_le_env.gatt_if;
     }
 
-    return 0;
+    if (s_gatts_if != ESP_GATT_IF_NONE) {
+        return s_gatts_if;
+    }
+
+    return ESP_GATT_IF_NONE;
 }
 
 static void hid_add_id_tbl(void);
@@ -39,6 +44,7 @@ static void __attribute__((section(".iram1.text"))) esp_hidd_prf_cb_hdl(esp_gatt
             hidd_param.init_finish.state = param->reg.status;
             if (param->reg.app_id == HIDD_APP_ID) {
                 hidd_le_env.gatt_if = gatts_if;
+                s_gatts_if = gatts_if;
                 if (hidd_le_env.hidd_cb != NULL) {
                     (hidd_le_env.hidd_cb)(ESP_HIDD_EVENT_REG_FINISH, &hidd_param);
                     hidd_le_create_service(hidd_le_env.gatt_if);
