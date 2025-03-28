@@ -75,7 +75,6 @@ static void inactivity_timer_callback(TimerHandle_t xTimer) {
         s_ble_stack_active = true;
     } else {
         ESP_LOGI(TAG, "BLE stack stopped");
-        xSemaphoreGive(s_ble_stack_mutex);
         s_ble_stack_active = false;
         // esp_light_sleep_start();
     }
@@ -315,7 +314,7 @@ static esp_err_t process_keyboard_report(const usb_hid_report_t *report) {
 __attribute__((section(".iram1.text"))) static esp_err_t process_mouse_report(const usb_hid_report_t *report)
 {
     mouse_report_t ble_mouse_report = {0};
-    
+
     const usb_hid_field_t* const btn_field_info = &report->fields[report->info->mouse_fields.buttons];
     ble_mouse_report.buttons = ((uint8_t const*)btn_field_info->value)[0];
     if (report->fields[report->info->mouse_fields.x].attr.report_size == 16) {
@@ -370,6 +369,7 @@ esp_err_t hid_bridge_process_report(const usb_hid_report_t *report) {
                 return ret;
             }
 
+            xSemaphoreGive(s_ble_stack_mutex);
             return ESP_OK;
         }
 
