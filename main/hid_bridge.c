@@ -15,17 +15,9 @@
 #include "web/wifi_manager.h"
 #include "utils/storage.h"
 
-// ToDo can't increase this because of usb_hid_host
-#define HID_QUEUE_SIZE 1
-#define HID_QUEUE_ITEM_SIZE sizeof(usb_hid_report_t)
-
 static const char *TAG = "HID_BRIDGE";
-static StaticQueue_t s_hid_report_queue_struct;
-static uint8_t s_hid_report_queue_storage[HID_QUEUE_SIZE * HID_QUEUE_ITEM_SIZE];
-static QueueHandle_t s_hid_report_queue = NULL;
 static StaticTimer_t s_inactivity_timer_struct;
 static StaticSemaphore_t s_ble_stack_mutex_struct;
-static TaskHandle_t s_hid_bridge_task_handle = NULL;
 static TimerHandle_t s_inactivity_timer = NULL;
 static SemaphoreHandle_t s_ble_stack_mutex = NULL;
 static bool s_hid_bridge_initialized = false;
@@ -33,7 +25,6 @@ static bool s_hid_bridge_running = false;
 static bool s_ble_stack_active = true;
 static uint16_t s_sensitivity = 100;
 
-static void hid_bridge_task(void *arg);
 static void inactivity_timer_callback(TimerHandle_t xTimer);
 
 static int s_inactivity_timeout_ms = 30 * 1000;
@@ -112,32 +103,20 @@ esp_err_t hid_bridge_init(const bool verbose) {
     }
 
     s_ble_stack_active = true;
-    s_hid_report_queue = xQueueCreateStatic(HID_QUEUE_SIZE,
-        HID_QUEUE_ITEM_SIZE, s_hid_report_queue_storage, &s_hid_report_queue_struct);
-    if (s_hid_report_queue == NULL) {
-        ESP_LOGE(TAG, "Failed to create HID report queue");
-        vSemaphoreDelete(s_ble_stack_mutex);
-        s_ble_stack_mutex = NULL;
-        return ESP_ERR_NO_MEM;
-    }
 
     s_inactivity_timer = xTimerCreateStatic("inactivity_timer", pdMS_TO_TICKS(s_inactivity_timeout_ms),
         pdFALSE, NULL, inactivity_timer_callback, &s_inactivity_timer_struct);
     if (s_inactivity_timer == NULL) {
         ESP_LOGE(TAG, "Failed to create inactivity timer");
-        vQueueDelete(s_hid_report_queue);
-        s_hid_report_queue = NULL;
         vSemaphoreDelete(s_ble_stack_mutex);
         s_ble_stack_mutex = NULL;
         return ESP_ERR_NO_MEM;
     }
 
-    esp_err_t ret = usb_hid_host_init(s_hid_report_queue, verbose);
+    esp_err_t ret = usb_hid_host_init(hid_bridge_process_report, verbose);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize USB HID host: %s", esp_err_to_name(ret));
         xTimerDelete(s_inactivity_timer, 0);
-        vQueueDelete(s_hid_report_queue);
-        s_hid_report_queue = NULL;
         return ret;
     }
 
@@ -146,8 +125,6 @@ esp_err_t hid_bridge_init(const bool verbose) {
         ESP_LOGE(TAG, "Failed to initialize BLE HID device: %s", esp_err_to_name(ret));
         usb_hid_host_deinit();
         xTimerDelete(s_inactivity_timer, 0);
-        vQueueDelete(s_hid_report_queue);
-        s_hid_report_queue = NULL;
         return ret;
     }
 
@@ -206,11 +183,6 @@ esp_err_t hid_bridge_deinit(void) {
         return ret;
     }
 
-    if (s_hid_report_queue != NULL) {
-        vQueueDelete(s_hid_report_queue);
-        s_hid_report_queue = NULL;
-    }
-
     if (s_ble_stack_mutex != NULL) {
         vSemaphoreDelete(s_ble_stack_mutex);
         s_ble_stack_mutex = NULL;
@@ -234,13 +206,6 @@ esp_err_t hid_bridge_start(void) {
         return ESP_OK;
     }
 
-    const BaseType_t task_created = xTaskCreatePinnedToCore(hid_bridge_task, "hid_bridge", 2150, NULL, 12,
-                                                      &s_hid_bridge_task_handle, 1);
-    if (task_created != pdTRUE) {
-        ESP_LOGE(TAG, "Failed to create HID bridge task");
-        return ESP_ERR_NO_MEM;
-    }
-
     s_hid_bridge_running = true;
     ESP_LOGI(TAG, "HID bridge started");
     return ESP_OK;
@@ -255,11 +220,6 @@ esp_err_t hid_bridge_stop(void) {
     if (!s_hid_bridge_running) {
         ESP_LOGW(TAG, "HID bridge not running");
         return ESP_OK;
-    }
-
-    if (s_hid_bridge_task_handle != NULL) {
-        vTaskDelete(s_hid_bridge_task_handle);
-        s_hid_bridge_task_handle = NULL;
     }
 
     s_hid_bridge_running = false;
@@ -326,21 +286,21 @@ bool hid_bridge_is_ble_paused(void) {
     return !s_ble_stack_active && usb_hid_host_device_connected();
 }
 
-esp_err_t hid_bridge_process_report(const usb_hid_report_t *const report) {
+void hid_bridge_process_report(const usb_hid_report_t *const report) {
     if (!s_hid_bridge_initialized) {
         ESP_LOGE(TAG, "HID bridge not initialized");
-        return ESP_ERR_INVALID_STATE;
+        return;
     }
 
     if (report == NULL) {
         ESP_LOGE(TAG, "Report is NULL");
-        return ESP_ERR_INVALID_ARG;
+        return;
     }
 
     if (!s_ble_stack_active) {
         if (xSemaphoreTake(s_ble_stack_mutex, pdMS_TO_TICKS(25)) != pdTRUE) {
             ESP_LOGW(TAG, "Failed to take BLE stack mutex in process_report");
-            return ESP_FAIL;
+            return;
         }
 
         if (!s_ble_stack_active) {
@@ -351,50 +311,30 @@ esp_err_t hid_bridge_process_report(const usb_hid_report_t *const report) {
                 s_ble_stack_active = false;
                 ESP_LOGE(TAG, "Failed to initialize BLE HID device: %s", esp_err_to_name(ret));
                 xSemaphoreGive(s_ble_stack_mutex);
-                return ret;
+                return;
             }
 
             s_ble_stack_active = true;
             xSemaphoreGive(s_ble_stack_mutex);
-            return ESP_OK;
+            return;
         }
 
         xSemaphoreGive(s_ble_stack_mutex);
-        return ESP_OK;
+        return;
     }
 
     if (!ble_hid_device_connected()) {
         ESP_LOGD(TAG, "BLE HID device not connected");
-        return ESP_OK;
+        return;
     }
 
-    esp_err_t ret = ESP_OK;
     if (report->info->is_keyboard) {
-        ret = process_keyboard_report(report);
+        process_keyboard_report(report);
     } else if (report->info->is_mouse) {
-        ret = process_mouse_report(report);
+        process_mouse_report(report);
     }
 
     if (s_inactivity_timer != NULL && usb_hid_host_device_connected() && ble_hid_device_connected()) {
         xTimerReset(s_inactivity_timer, 0);
-    }
-
-    return ret;
-}
-
-static void hid_bridge_task(void *arg) {
-    ESP_LOGI(TAG, "HID bridge task started");
-    usb_hid_report_t report;
-
-    if (s_inactivity_timer != NULL) {
-        if (xTimerStart(s_inactivity_timer, 0) != pdPASS) {
-            ESP_LOGE(TAG, "Failed to start inactivity timer");
-        }
-    }
-
-    while (1) {
-        if (xQueueReceive(s_hid_report_queue, &report, portMAX_DELAY) == pdTRUE) {
-            hid_bridge_process_report(&report);
-        }
     }
 }

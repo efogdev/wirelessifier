@@ -9,7 +9,6 @@
 #include <stdint.h>
 #include "esp_err.h"
 #include "freertos/FreeRTOS.h"
-#include "freertos/queue.h"
 #include "hid_bridge.h"
 
 #ifdef __cplusplus
@@ -33,15 +32,15 @@ extern "C" {
 #define HID_OUTPUT          0x91
 #define HID_FEATURE         0xB1
 
-typedef void (*usb_hid_report_callback_t)(usb_hid_report_t *report);
+typedef void (*usb_hid_report_callback_t)(const usb_hid_report_t *report);
 
 /**
- * @brief Initialize the USB HID Host* 
- * @param report_queue Queue to receive HID reports
+ * @brief Initialize the USB HID Host
+ * @param report_callback Callback function to handle HID reports
  * @param verbose
  * @return esp_err_t ESP_OK on success, error code otherwise
  */
-esp_err_t usb_hid_host_init(QueueHandle_t report_queue, bool verbose);
+esp_err_t usb_hid_host_init(usb_hid_report_callback_t report_callback, bool verbose);
 
 /**
  * @brief Deinitialize the USB HID Host

@@ -4,7 +4,6 @@
 #include <inttypes.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "freertos/queue.h"
 #include "esp_err.h"
 #include "esp_log.h"
 #include "usb/usb_host.h"
@@ -16,13 +15,12 @@
 #include "descriptor_parser.h"
 
 #define USB_STATS_INTERVAL_SEC  1
-#define HOST_HID_QUEUE_SIZE     2
 #define DEVICE_EVENT_QUEUE_SIZE 4
 
 static const char *TAG = "USB_HID";
-static QueueHandle_t g_report_queue = NULL;
 static QueueHandle_t g_device_event_queue = NULL;
 static TaskHandle_t g_device_task_handle = NULL;
+static usb_hid_report_callback_t g_report_callback = NULL;
 
 typedef struct __attribute__((packed)) {
     hid_host_device_handle_t device_handle;
@@ -178,10 +176,10 @@ uint8_t usb_hid_host_get_num_fields(const uint8_t report_id, const uint8_t inter
 
 static void client_event_callback(const usb_host_client_event_msg_t *event_msg, void *);
 
-esp_err_t usb_hid_host_init(const QueueHandle_t report_queue, const bool verbose) {
+esp_err_t usb_hid_host_init(const usb_hid_report_callback_t report_callback, const bool verbose) {
     ESP_LOGI(TAG, "Initializing USB HID Host");
-    if (report_queue == NULL) {
-        ESP_LOGE(TAG, "Invalid report queue parameter");
+    if (report_callback == NULL) {
+        ESP_LOGE(TAG, "Invalid report callback parameter");
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -234,7 +232,7 @@ esp_err_t usb_hid_host_init(const QueueHandle_t report_queue, const bool verbose
     }
 
     g_verbose = verbose;
-    g_report_queue = report_queue;
+    g_report_callback = report_callback;
     g_device_event_queue = xQueueCreate(DEVICE_EVENT_QUEUE_SIZE, sizeof(usb_device_type_event_t));
     if (g_device_event_queue == NULL) {
         cleanup_all_resources();
@@ -326,7 +324,7 @@ esp_err_t usb_hid_host_deinit(void) {
     }
 
     cleanup_all_resources();
-    g_report_queue = NULL;
+    g_report_callback = NULL;
     g_device_connected = false;
     ESP_LOGI(TAG, "USB HID Host deinitialized");
     return ret;
@@ -341,8 +339,8 @@ static uint8_t *data_ptr = NULL;
 __attribute__((section(".iram1.text"))) static void process_report(uint8_t *const data, const size_t length,
                                                                    const uint8_t interface_num) {
     s_current_rps++;
-    if (!data || !g_report_queue || length <= 1 || interface_num >= USB_HOST_MAX_INTERFACES) {
-        ESP_LOGE(TAG, "Invalid parameters: data=%p, queue=%p, len=%d, iface=%u", data, g_report_queue, length,
+    if (!data || !g_report_callback || length <= 1 || interface_num >= USB_HOST_MAX_INTERFACES) {
+        ESP_LOGE(TAG, "Invalid parameters: data=%p, callback=%p, len=%d, iface=%u", data, g_report_callback, length,
                  interface_num);
         return;
     }
@@ -395,10 +393,10 @@ __attribute__((section(".iram1.text"))) static void process_report(uint8_t *cons
         g_fields[i].value = &g_field_values[i];
     }
 
-    xQueueSend(g_report_queue, &g_report, 0);
+    g_report_callback(&g_report);
 }
 
-static uint8_t cur_if_evt_data[256] = {0};
+static uint8_t cur_if_evt_data[128] = {0};
 
 __attribute__((section(".iram1.text"))) static void hid_host_interface_callback(
     const hid_host_device_handle_t hid_device_handle,
