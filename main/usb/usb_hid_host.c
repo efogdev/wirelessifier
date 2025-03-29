@@ -10,11 +10,9 @@
 #include "usb/usb_host.h"
 #include "usb/hid_host.h"
 #include "usb_hid_host.h"
-
 #include <const.h>
 #include <task_monitor.h>
 #include <lwip/mem.h>
-
 #include "descriptor_parser.h"
 
 #define USB_STATS_INTERVAL_SEC  1

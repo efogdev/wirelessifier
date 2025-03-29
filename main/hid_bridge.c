@@ -308,18 +308,11 @@ static mouse_report_t ble_mouse_report = {0};
 
 __attribute__((section(".iram1.text"))) static esp_err_t process_mouse_report(const usb_hid_report_t *report)
 {
-    const usb_hid_field_t* const btn_field_info = &report->fields[report->info->mouse_fields.buttons];
-    ble_mouse_report.buttons = ((uint8_t const*)btn_field_info->value)[0];
-    if (report->fields[report->info->mouse_fields.x].attr.report_size == 16) {
-        ble_mouse_report.x = ((int16_t const*)report->fields[report->info->mouse_fields.x].value)[0];
-        ble_mouse_report.y = ((int16_t const*)report->fields[report->info->mouse_fields.y].value)[0];
-    } else if (report->fields[report->info->mouse_fields.x].attr.report_size == 8) {
-        ble_mouse_report.x = ((int8_t const*)report->fields[report->info->mouse_fields.x].value)[0];
-        ble_mouse_report.y = ((int8_t const*)report->fields[report->info->mouse_fields.y].value)[0];
-    }
-
-    ble_mouse_report.wheel = ((uint8_t const*)report->fields[report->info->mouse_fields.wheel].value)[0];
-    ble_mouse_report.pan = ((uint8_t const*)report->fields[report->info->mouse_fields.pan].value)[0];
+    ble_mouse_report.buttons = *report->fields[report->info->mouse_fields.buttons].value;
+    ble_mouse_report.x = *report->fields[report->info->mouse_fields.x].value;
+    ble_mouse_report.y = *report->fields[report->info->mouse_fields.y].value;
+    ble_mouse_report.wheel = *report->fields[report->info->mouse_fields.wheel].value;
+    ble_mouse_report.pan = *report->fields[report->info->mouse_fields.pan].value;
 
     if (s_sensitivity != 100) {
         ble_mouse_report.x = (int32_t)(int16_t)ble_mouse_report.x * s_sensitivity / 100;
