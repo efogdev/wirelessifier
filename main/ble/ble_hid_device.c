@@ -315,9 +315,9 @@ esp_err_t ble_hid_device_init(const bool verbose) {
     update_tx_power();
     vTaskDelay(1);
 
-    // if (has_saved_device()) {
-    //     connect_to_saved_device(get_gatts_if());
-    // }
+    if (has_saved_device()) {
+        connect_to_saved_device(get_gatts_if());
+    }
 
     return ESP_OK;
 }
