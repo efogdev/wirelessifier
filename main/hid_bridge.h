@@ -293,12 +293,9 @@ typedef struct {
 } report_map_t;
 
 typedef struct {
-    bool is_mouse;
-    bool is_keyboard;
     uint8_t if_id;
     uint8_t report_id;
     usb_hid_field_type_t type;
-    uint8_t num_fields;
     usb_hid_field_t* fields;
     report_info_t* info;
 } usb_hid_report_t;

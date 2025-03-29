@@ -269,8 +269,8 @@ esp_err_t hid_bridge_stop(void) {
 
 static esp_err_t process_keyboard_report(const usb_hid_report_t *report) {
     const uint8_t expected_fields = usb_hid_host_get_num_fields(report->report_id, report->if_id);
-    if (expected_fields != report->num_fields) {
-        ESP_LOGW(TAG, "Unexpected number of fields: expected=%d, got=%d", expected_fields, report->num_fields);
+    if (expected_fields != report->info->num_fields) {
+        ESP_LOGW(TAG, "Unexpected number of fields: expected=%d, got=%d", expected_fields, report->info->num_fields);
         return ESP_OK;
     }
 
@@ -278,7 +278,7 @@ static esp_err_t process_keyboard_report(const usb_hid_report_t *report) {
     memset(&ble_kb_report, 0, sizeof(keyboard_report_t));
 
     uint8_t btn_idx = 0;
-    for (int i = 0; i < report->num_fields; i++) {
+    for (int i = 0; i < report->info->num_fields; i++) {
         const usb_hid_field_t *field = &report->fields[i];
         if (field->value == NULL) {
             continue;
@@ -289,17 +289,10 @@ static esp_err_t process_keyboard_report(const usb_hid_report_t *report) {
                 // field->value is a pointer to the first report array item out of field->attr.report_count
                 // for keyboard, field->value[0] will be HID_KEY_LEFT_CTRL
                 ble_kb_report.modifier = field->value[0];
-                // ESP_LOGI(TAG, "Field[%d]: usg=0x%02x, cnt=%d, sz=%d, value=%d",
-                //              i, field->attr.usage, field->attr.report_count, field->attr.report_size, *field->value);
             }
             else if (field->attr.usage == 0 && field->attr.array && !field->attr.constant) {
                 memcpy(&ble_kb_report.keycodes[btn_idx], &((uint8_t*)(field->value))[btn_idx], sizeof(uint8_t));
                 btn_idx++;
-
-                // ESP_LOGI(TAG, "Field[%d]: usg=0x%02x, cnt=%d, sz=%d, value=[%02X,%02X,%02X,%02X,%02X,%02X]",
-                //              i, field->attr.usage, field->attr.report_count, field->attr.report_size,
-                //              ble_kb_report.keycodes[0], ble_kb_report.keycodes[1], ble_kb_report.keycodes[2],
-                //              ble_kb_report.keycodes[3], ble_kb_report.keycodes[4], ble_kb_report.keycodes[5]);
             } 
         } 
     }
@@ -315,8 +308,6 @@ static mouse_report_t ble_mouse_report = {0};
 
 __attribute__((section(".iram1.text"))) static esp_err_t process_mouse_report(const usb_hid_report_t *report)
 {
-    memset(&ble_mouse_report, 0, sizeof(mouse_report_t));
-
     const usb_hid_field_t* const btn_field_info = &report->fields[report->info->mouse_fields.buttons];
     ble_mouse_report.buttons = ((uint8_t const*)btn_field_info->value)[0];
     if (report->fields[report->info->mouse_fields.x].attr.report_size == 16) {
@@ -384,9 +375,9 @@ esp_err_t hid_bridge_process_report(const usb_hid_report_t *const report) {
     }
 
     esp_err_t ret = ESP_OK;
-    if (report->is_keyboard) {
+    if (report->info->is_keyboard) {
         ret = process_keyboard_report(report);
-    } else if (report->is_mouse) {
+    } else if (report->info->is_mouse) {
         ret = process_mouse_report(report);
     }
 
