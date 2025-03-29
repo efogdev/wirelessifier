@@ -360,6 +360,7 @@ esp_err_t hid_bridge_process_report(const usb_hid_report_t *const report) {
         }
 
         xSemaphoreGive(s_ble_stack_mutex);
+        return ESP_OK;
     }
 
     if (!ble_hid_device_connected()) {

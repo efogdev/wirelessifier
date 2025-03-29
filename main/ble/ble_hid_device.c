@@ -312,8 +312,8 @@ esp_err_t ble_hid_device_init(const bool verbose) {
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_INIT_KEY, &init_key, sizeof(uint8_t));
     esp_ble_gap_set_security_param(ESP_BLE_SM_SET_RSP_KEY, &rsp_key, sizeof(uint8_t));
     esp_ble_gatt_set_local_mtu(64);
-    // esp_bt_sleep_enable();
     update_tx_power();
+    vTaskDelay(1);
 
     // if (has_saved_device()) {
     //     connect_to_saved_device(get_gatts_if());
@@ -374,7 +374,7 @@ esp_err_t ble_hid_device_start_advertising(void) {
     return ESP_OK;
 }
 
-bool ble_hid_device_connected(void) {
+__attribute__((section(".iram1.text"))) bool ble_hid_device_connected(void) {
     return s_connected;
 }
 
