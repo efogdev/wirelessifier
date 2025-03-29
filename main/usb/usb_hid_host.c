@@ -399,11 +399,14 @@ __attribute__((section(".iram1.text"))) static void process_report(uint8_t *cons
         // *(const int16_t *)&data_ptr[0], *(const int16_t *)&data_ptr[2], *(const int16_t *)&data_ptr[4], report_info);
     // }
 
+    // printf("\n");
     const report_field_info_t *const field_info = report_info->fields;
     for (uint8_t i = 0; i < report_info->num_fields; i++) {
         g_field_values[i] = extract_field_value(data_ptr, field_info[i].bit_offset, field_info[i].bit_size);
         g_fields[i].attr = field_info[i].attr;
         g_fields[i].value = &g_field_values[i];
+
+        // printf("0x%08lx%08lx ", (uint32_t)(*g_fields[i].value >> 32), (uint32_t)*g_fields[i].value);
 
         // if (g_report.is_keyboard) {
         // ESP_LOGI(TAG, "field #%d (usg=%02X, offset=%d, size=%d) = 0x%08X%08X", i, field_info[i].attr.usage,

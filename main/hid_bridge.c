@@ -342,7 +342,7 @@ bool hid_bridge_is_ble_paused(void) {
     return !s_ble_stack_active && usb_hid_host_device_connected();
 }
 
-esp_err_t hid_bridge_process_report(const usb_hid_report_t *report) {
+esp_err_t hid_bridge_process_report(const usb_hid_report_t *const report) {
     if (!s_hid_bridge_initialized) {
         ESP_LOGE(TAG, "HID bridge not initialized");
         return ESP_ERR_INVALID_STATE;
