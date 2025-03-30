@@ -8,6 +8,8 @@
 #include <const.h>
 #include <task_monitor.h>
 #include <lwip/mem.h>
+#include <soc/rtc_cntl_reg.h>
+
 #include "descriptor_parser.h"
 
 #define USB_STATS_INTERVAL_SEC  1
@@ -46,15 +48,6 @@ static void usb_stats_task(void *arg);
 static void device_event_task(void *arg);
 static void hid_host_device_callback(hid_host_device_handle_t hid_device_handle, hid_host_driver_event_t event, void *arg);
 static void hid_host_interface_callback(hid_host_device_handle_t hid_device_handle, hid_host_interface_event_t event, void *arg);
-
-static void cleanup_interface_resources(const uint8_t interface_num) {
-    if (g_hid_device_handles[interface_num]) {
-        hid_host_device_stop(g_hid_device_handles[interface_num]);
-        hid_host_device_close(g_hid_device_handles[interface_num]);
-        g_hid_device_handles[interface_num] = NULL;
-    }
-    g_device_connected[interface_num] = false;
-}
 
 static void cleanup_all_resources(void) {
     if (g_fields) {
@@ -209,7 +202,7 @@ esp_err_t usb_hid_host_init(const usb_hid_report_callback_t report_callback) {
     if (VERBOSE) {
         const esp_err_t err = task_monitor_init();
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to init task monitor: %d", err);
+            ESP_LOGE(TAG, "Failed to init task monitor: %s", esp_err_to_name(err));
         } else {
             task_monitor_start();
         }
@@ -241,7 +234,7 @@ esp_err_t usb_hid_host_init(const usb_hid_report_callback_t report_callback) {
 
     esp_err_t err = usb_host_install(&host_config);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to install USB HID Host: %d", err);
+        ESP_LOGE(TAG, "Failed to install USB HID Host: %s", esp_err_to_name(err));
         cleanup_all_resources();
         vTaskDelete(g_device_task_handle);
         vQueueDelete(g_device_event_queue);
@@ -265,7 +258,6 @@ esp_err_t usb_hid_host_init(const usb_hid_report_callback_t report_callback) {
             .client_event_callback = client_event_callback,
         }
     };
-
     err = usb_host_client_register(&client_config, &client_hdl);
     if (err != ESP_OK) {
         cleanup_all_resources();
@@ -286,16 +278,36 @@ esp_err_t usb_hid_host_init(const usb_hid_report_callback_t report_callback) {
     return ESP_OK;
 }
 
+static portMUX_TYPE mu = portMUX_INITIALIZER_UNLOCKED;
+
 esp_err_t usb_hid_host_deinit(void) {
     ESP_LOGI(TAG, "Deinitializing USB HID Host");
     esp_err_t ret = ESP_OK;
 
     for (int i = 0; i < USB_HOST_MAX_INTERFACES; i++) {
-        if (g_hid_device_handles[i] != NULL) {
-            cleanup_interface_resources(i);
-            g_hid_device_handles[i] = NULL;
+        if (g_hid_device_handles[i] != NULL && g_device_connected[i]) {
+            ESP_LOGD(TAG, "Stopping device on interface %d", i);
+            const esp_err_t stop_err = hid_host_device_stop(g_hid_device_handles[i]);
+            if (stop_err != ESP_OK) {
+                ESP_LOGW(TAG, "Failed to stop device on interface %d: %s", i, esp_err_to_name(stop_err));
+            }
+
+            vTaskDelay(pdMS_TO_TICKS(10));
         }
-        g_device_connected[i] = false;
+    }
+
+    for (int i = 0; i < USB_HOST_MAX_INTERFACES; i++) {
+        if (g_hid_device_handles[i] != NULL) {
+            ESP_LOGD(TAG, "Closing device on interface %d", i);
+
+            const esp_err_t close_err = hid_host_device_close(g_hid_device_handles[i]);
+            if (close_err != ESP_OK) {
+                ESP_LOGW(TAG, "Close failed for interface %d: %s", i, esp_err_to_name(close_err));
+            }
+
+            g_hid_device_handles[i] = NULL;
+            g_device_connected[i] = false;
+        }
     }
 
     g_report_callback = NULL;
@@ -303,13 +315,12 @@ esp_err_t usb_hid_host_deinit(void) {
     if (client_hdl != NULL) {
         ret = usb_host_client_deregister(client_hdl);
         if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to deregister client: %s", esp_err_to_name(ret));
+            ESP_LOGW(TAG, "Failed to deregister client: %s", esp_err_to_name(ret));
         }
         client_hdl = NULL;
     }
 
     if (g_usb_events_task_handle != NULL) {
-        vTaskDelay(pdMS_TO_TICKS(100));
         vTaskDelete(g_usb_events_task_handle);
         g_usb_events_task_handle = NULL;
     }
@@ -329,15 +340,17 @@ esp_err_t usb_hid_host_deinit(void) {
         g_stats_task_handle = NULL;
     }
 
+    portENTER_CRITICAL(&mu);
     ret = hid_host_uninstall();
+    portEXIT_CRITICAL(&mu);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to uninstall USB HID Host: %s", esp_err_to_name(ret));
         return ret;
     }
 
-    vTaskDelay(pdMS_TO_TICKS(50));
-
+    portENTER_CRITICAL(&mu);
     ret = usb_host_uninstall();
+    portEXIT_CRITICAL(&mu);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to uninstall USB host: %s", esp_err_to_name(ret));
         return ret;

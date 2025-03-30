@@ -89,6 +89,7 @@ static void init_pm() {
 }
 
 static void run_hid_bridge() {
+    gpio_set_level(GPIO_5V_EN, 1);
     gpio_set_level(GPIO_MUX_OE, 0);
 
 #ifdef HW01
@@ -235,7 +236,6 @@ static void init_gpio(void) {
     ESP_ERROR_CHECK(ledc_channel_config(&ledc_channel));
 #endif
 
-    gpio_set_level(GPIO_5V_EN, 1);
     gpio_set_level(GPIO_BAT_CE, 1);
 }
 

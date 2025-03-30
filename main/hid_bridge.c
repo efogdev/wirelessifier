@@ -79,9 +79,6 @@ static void inactivity_timer_callback(TimerHandle_t xTimer) {
         // usb_hid_host_deinit();
         // vTaskDelay(pdMS_TO_TICKS(100));
         //
-        // gpio_set_level(GPIO_5V_EN, 0);
-        // vTaskDelay(pdMS_TO_TICKS(100));
-        //
         // esp_sleep_enable_timer_wakeup(1000000);
         // ESP_ERROR_CHECK(esp_light_sleep_start());
         // vTaskDelay(pdMS_TO_TICKS(8));
