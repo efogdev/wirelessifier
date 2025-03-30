@@ -1,3 +1,6 @@
+#include <adc.h>
+#include <esp_log.h>
+#include <inttypes.h>
 #include <const.h>
 #include <esp_phy_init.h>
 #include <stdio.h>
@@ -33,6 +36,7 @@ static void run_hid_bridge(void);
 static void init_web_stack(void);
 static void rot_long_press_cb(void);
 static void rot_press_cb(void);
+static void vmon_task(void *pvParameters);
 
 void app_main(void) {
     ESP_LOGI(TAG, "Starting USB HID to BLE HID bridge");
@@ -52,12 +56,16 @@ void app_main(void) {
     led_control_init(NUM_LEDS, GPIO_WS2812B_PIN);
     led_update_pattern(usb_hid_host_device_connected(), ble_hid_device_connected(), hid_bridge_is_ble_paused());
 
+    adc_init();
     rotary_enc_init();
     rotary_enc_subscribe_long_press(rot_long_press_cb);
     rotary_enc_subscribe_click(rot_press_cb);
 
     run_hid_bridge();
     init_web_stack();
+
+    // voltage monitor
+    xTaskCreatePinnedToCore(vmon_task, "vmon", 2048, NULL, 5, NULL, 1);
 
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(35));
@@ -226,6 +234,16 @@ static void init_gpio(void) {
 #endif
 
     gpio_set_level(GPIO_5V_EN, 1);
+    gpio_set_level(GPIO_BAT_CE, 1);
+}
+
+static void vmon_task(void *pvParameters) {
+    while (1) {
+        const float bat_mv = (float)adc_get_battery_mv() * 2 / 1000;
+        const float vin_mv = (float)adc_get_vin_mv() * 2 / 1000;
+        ESP_LOGI(TAG, "Battery: %.2fV, VIN: %.2fV", bat_mv, vin_mv);
+        vTaskDelay(pdMS_TO_TICKS(5000));
+    }
 }
 
 static void rot_press_cb(void) {

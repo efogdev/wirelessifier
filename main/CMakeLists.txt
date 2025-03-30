@@ -14,6 +14,7 @@ SRCS "main.c"
      "web/ota_server.c"
      "web/ws_server.c"
      "web/wifi_manager.c"
+     "utils/adc.c"
      "utils/rgb_leds.c"
      "utils/task_monitor.c"
      "utils/temp_sensor.c"
@@ -28,6 +29,6 @@ SRCS "main.c"
      "web/front/lib/opensans-regular.woff2"
   INCLUDE_DIRS "." "ble" "usb" "utils" "web" "web/front"
   REQUIRES neopixel esp_hid bt nvs_flash esp_http_server app_update json
-  PRIV_REQUIRES usb)
+  PRIV_REQUIRES usb esp_adc)
 
 target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-error=unused-const-variable)

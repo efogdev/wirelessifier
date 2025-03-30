@@ -1,10 +1,12 @@
 #ifndef CONST_H
 #define CONST_H
 
+#include "hal/adc_types.h"
+
 // #define HW01
 #define HW02
-
 #define VERBOSE 0
+#define ADC_MULTISAMPLE 16
 #define DEVICE_NAME "Wirelessifier"
 #define FIRMWARE_VERSION "0.1.40"
 #define HARDWARE_VERSION "rev. 02"
@@ -19,8 +21,9 @@
 #define GPIO_5V_EN GPIO_NUM_35
 #define GPIO_BAT_CE GPIO_NUM_36
 #define NUM_LEDS 17
+#endif
 
-#elifdef HW02
+#ifdef HW02
 #define GPIO_MUX_OE 34
 #define GPIO_MUX_SEL 33
 #define GPIO_WS2812B_PIN GPIO_NUM_38
@@ -43,8 +46,10 @@
 #define GPIO_5V_EN GPIO_NUM_35
 #define GPIO_BAT_CE GPIO_NUM_36
 #define GPIO_ADC_BAT GPIO_NUM_5
+#define ADC_CHAN_BAT ADC_CHANNEL_4
 #define GPIO_ADC_VIN GPIO_NUM_6
+#define ADC_CHAN_VIN ADC_CHANNEL_5
 #define NUM_LEDS 17
-
 #endif
+
 #endif // CONST_H
