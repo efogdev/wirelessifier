@@ -15,21 +15,21 @@
 static const char *TAG = "mon";
 
 #define STATS_TICKS         pdMS_TO_TICKS(1000)
-#define MAX_TASKS           32
+#define MAX_TASKS           24
 #define STATS_TASK_PRIO     3
 
 static TaskStatus_t start_array[MAX_TASKS];
 static TaskStatus_t end_array[MAX_TASKS];
 static TaskHandle_t monitor_task_handle = NULL;
 
-#define HEADER_FORMAT " Task (core %d)  |     Took |     | Free "
-#define HEADER_SEPARATOR "----------------|----------|-----|------"
+#define HEADER_FORMAT " Task (core %d)   |     Took |     | Free "
+#define HEADER_SEPARATOR "-----------------|----------|-----|------"
 
-static void print_core_tasks(UBaseType_t start_array_size, UBaseType_t end_array_size,
-                           uint32_t total_elapsed_time, uint8_t core_id)
+static void print_core_tasks(const UBaseType_t start_array_size, const UBaseType_t end_array_size,
+                           const uint32_t total_elapsed_time, const uint8_t core_id)
 {
-    ESP_LOGI(TAG, HEADER_FORMAT, core_id);
-    ESP_LOGI(TAG, HEADER_SEPARATOR);
+    printf(HEADER_FORMAT "\n", core_id);
+    printf(HEADER_SEPARATOR "\n");
 
     uint32_t idle_time = 0;
     uint32_t core_total_time = 0;
@@ -57,15 +57,15 @@ static void print_core_tasks(UBaseType_t start_array_size, UBaseType_t end_array
             }
             core_total_time += task_elapsed_time;
             
-            ESP_LOGI(TAG, "%-16s| %5"PRIu32" ms | %2"PRIu32"%% | %d ",
+            printf(" %-16s| %5"PRIu32" ms | %2"PRIu32"%% | %d \n",
                     start_array[i].pcTaskName, task_elapsed_ms, percentage_time, bytes_free);
         }
     }
 
     if (core_total_time > 0) {
         const uint32_t core_load = ((core_total_time - idle_time) * 100UL) / core_total_time;
-        ESP_LOGI(TAG, HEADER_SEPARATOR);
-        ESP_LOGI(TAG, " Core load: %"PRIu32"%%", core_load);
+        printf(HEADER_SEPARATOR "\n");
+        printf(" Core load: %"PRIu32"%%\n", core_load);
     }
 }
 
@@ -91,14 +91,14 @@ static esp_err_t print_real_time_stats(const TickType_t xTicksToWait)
     }
 
     vTaskDelay(1);
-    ESP_LOGI(TAG, "");
-    ESP_LOGI(TAG, "     === Task monitor reporting ===");
-    ESP_LOGI(TAG, "");
+    printf("\n");
+    printf("     === Task monitor reporting ===\n");
+    printf("\n");
     print_core_tasks(start_array_size, end_array_size, total_elapsed_time, 0);
     vTaskDelay(1);
-    ESP_LOGI(TAG, "");
+    printf("\n");
     print_core_tasks(start_array_size, end_array_size, total_elapsed_time, 1);
-    ESP_LOGI(TAG, "");
+    printf("\n");
     
     return ESP_OK;
 }
@@ -116,8 +116,8 @@ static void monitor_task(void *pvParameter)
         }
 
         const size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
-        ESP_LOGI(TAG, "[I] Heap: %d kb, SoC temp: %.1f°C", free_heap / 1024, tsens_value);
-        ESP_LOGI(TAG, "");
+        printf("[I] Heap: %d kb, SoC temp: %.1f°C\n", free_heap / 1024, tsens_value);
+        printf("\n");
 
         vTaskDelay(pdMS_TO_TICKS(10000));
     }

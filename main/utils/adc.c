@@ -14,7 +14,7 @@ static adc_cali_handle_t adc1_cali_vin_handle = NULL;
 static bool do_calibration_bat = false;
 static bool do_calibration_vin = false;
 
-static bool adc_calibration_init(adc_unit_t unit, const adc_channel_t channel, adc_atten_t atten, adc_cali_handle_t *out_handle)
+static bool adc_calibration_init(const adc_unit_t unit, const adc_channel_t channel, const adc_atten_t atten, adc_cali_handle_t *out_handle)
 {
     adc_cali_handle_t handle = NULL;
     esp_err_t ret = ESP_FAIL;
