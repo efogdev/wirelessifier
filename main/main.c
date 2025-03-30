@@ -32,6 +32,7 @@ static void init_gpio(void);
 static void run_hid_bridge(void);
 static void init_web_stack(void);
 static void rot_long_press_cb(void);
+static void rot_press_cb(void);
 
 void app_main(void) {
     ESP_LOGI(TAG, "Starting USB HID to BLE HID bridge");
@@ -52,8 +53,8 @@ void app_main(void) {
     led_update_pattern(usb_hid_host_device_connected(), ble_hid_device_connected(), hid_bridge_is_ble_paused());
 
     rotary_enc_init();
-    // rotary_enc_subscribe_long_press(rot_long_press_cb);
-    rotary_enc_subscribe_click(rot_long_press_cb);
+    rotary_enc_subscribe_long_press(rot_long_press_cb);
+    rotary_enc_subscribe_click(rot_press_cb);
 
     run_hid_bridge();
     init_web_stack();
@@ -225,6 +226,11 @@ static void init_gpio(void) {
 #endif
 
     gpio_set_level(GPIO_5V_EN, 1);
+}
+
+static void rot_press_cb(void) {
+    storage_set_boot_with_wifi();
+    esp_restart();
 }
 
 static void rot_long_press_cb(void) {

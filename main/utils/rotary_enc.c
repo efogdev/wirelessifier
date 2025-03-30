@@ -46,7 +46,7 @@ void rotary_enc_init() {
     gpio_isr_handler_add(GPIO_ROT_B, enc_isr_handler, NULL);
     gpio_isr_handler_add(GPIO_ROT_E, click_isr_handler, NULL);
     
-    xTaskCreate(rotary_enc_task, "rotary_task", 1500, NULL, 18, NULL);
+    xTaskCreate(rotary_enc_task, "rotary_task", 1800, NULL, 18, NULL);
 }
 
 void rotary_enc_subscribe(const rotary_callback_t callback) {

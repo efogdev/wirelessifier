@@ -1,7 +1,12 @@
 #include "hid_bridge.h"
 
+#include <connection.h>
+#include <const.h>
 #include <esp_gap_ble_api.h>
+#include <hid_device_le_prf.h>
 #include <string.h>
+#include <soc/rtc_cntl_reg.h>
+
 #include "esp_log.h"
 #include "esp_sleep.h"
 #include "esp_pm.h"
@@ -67,7 +72,28 @@ static void inactivity_timer_callback(TimerHandle_t xTimer) {
     } else {
         ESP_LOGI(TAG, "BLE stack stopped");
         s_ble_stack_active = false;
-        // esp_light_sleep_start();
+
+        //////////////////////////////////////////////
+        //////////////////////////////////////////////
+        //////////////////////////////////////////////
+        // usb_hid_host_deinit();
+        // vTaskDelay(5 / portTICK_PERIOD_MS);
+        //
+        // esp_sleep_enable_timer_wakeup(10000);
+        // ESP_ERROR_CHECK(esp_light_sleep_start());
+        //
+        // const uint32_t save = REG_READ(RTC_CNTL_USB_CONF_REG);
+        // SET_PERI_REG_MASK(RTC_CNTL_USB_CONF_REG, RTC_CNTL_USB_PAD_PULL_OVERRIDE);
+        // SET_PERI_REG_MASK(RTC_CNTL_USB_CONF_REG, RTC_CNTL_USB_DP_PULLDOWN);
+        // vTaskDelay(5 / portTICK_PERIOD_MS);
+        //
+        // REG_WRITE(RTC_CNTL_USB_CONF_REG, save);
+        // vTaskDelay(20 / portTICK_PERIOD_MS);
+        //
+        // usb_hid_host_init(hid_bridge_process_report, VERBOSE);
+        //////////////////////////////////////////////
+        /////////////////////////////////////////////////
+        /////////////////////////////////////////////////
     }
 
     xSemaphoreGive(s_ble_stack_mutex);
@@ -113,7 +139,7 @@ esp_err_t hid_bridge_init(const bool verbose) {
         return ESP_ERR_NO_MEM;
     }
 
-    esp_err_t ret = usb_hid_host_init(hid_bridge_process_report, verbose);
+    esp_err_t ret = usb_hid_host_init(hid_bridge_process_report, VERBOSE);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize USB HID host: %s", esp_err_to_name(ret));
         xTimerDelete(s_inactivity_timer, 0);
@@ -136,6 +162,10 @@ esp_err_t hid_bridge_init(const bool verbose) {
 
     s_hid_bridge_initialized = true;
     ESP_LOGI(TAG, "HID bridge initialized");
+
+    if (has_saved_device()) {
+        connect_to_saved_device(get_gatts_if());
+    }
 
     if (xTimerStart(s_inactivity_timer, 0) != pdPASS) {
         ESP_LOGE(TAG, "Failed to start inactivity timer");
@@ -312,6 +342,10 @@ void hid_bridge_process_report(const usb_hid_report_t *const report) {
                 ESP_LOGE(TAG, "Failed to initialize BLE HID device: %s", esp_err_to_name(ret));
                 xSemaphoreGive(s_ble_stack_mutex);
                 return;
+            }
+
+            if (has_saved_device()) {
+                connect_to_saved_device(get_gatts_if());
             }
 
             s_ble_stack_active = true;

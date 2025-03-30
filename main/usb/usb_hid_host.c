@@ -58,21 +58,21 @@ static void hid_host_interface_callback(hid_host_device_handle_t hid_device_hand
                                         void *arg);
 
 static void cleanup_interface_resources(uint8_t interface_num) {
-    if (g_field_counts && g_field_counts[interface_num]) {
-        free(g_field_counts[interface_num]);
-        g_field_counts[interface_num] = NULL;
-    }
-
-    if (report_lookup_table && report_lookup_table[interface_num]) {
-        for (int i = 0; i < MAX_REPORTS_PER_INTERFACE; i++) {
-            if (report_lookup_table[interface_num][i]) {
-                free(report_lookup_table[interface_num][i]);
-                report_lookup_table[interface_num][i] = NULL;
-            }
-        }
-        free(report_lookup_table[interface_num]);
-        report_lookup_table[interface_num] = NULL;
-    }
+    // if (g_field_counts && g_field_counts[interface_num]) {
+    //     free(g_field_counts[interface_num]);
+    //     g_field_counts[interface_num] = NULL;
+    // }
+    //
+    // if (report_lookup_table && report_lookup_table[interface_num]) {
+    //     for (int i = 0; i < MAX_REPORTS_PER_INTERFACE; i++) {
+    //         if (report_lookup_table[interface_num][i]) {
+    //             free(report_lookup_table[interface_num][i]);
+    //             report_lookup_table[interface_num][i] = NULL;
+    //         }
+    //     }
+    //     free(report_lookup_table[interface_num]);
+    //     report_lookup_table[interface_num] = NULL;
+    // }
 }
 
 static void cleanup_all_resources(void) {
@@ -183,7 +183,6 @@ esp_err_t usb_hid_host_init(const usb_hid_report_callback_t report_callback, con
         return ESP_ERR_INVALID_ARG;
     }
 
-    // Allocate dynamic memory
     g_interface_report_maps = calloc(USB_HOST_MAX_INTERFACES, sizeof(report_map_t));
     if (!g_interface_report_maps) {
         ESP_LOGE(TAG, "Failed to allocate report maps");
@@ -215,17 +214,11 @@ esp_err_t usb_hid_host_init(const usb_hid_report_callback_t report_callback, con
     }
 
     if (verbose) {
-        esp_err_t err = task_monitor_init();
+        const esp_err_t err = task_monitor_init();
         if (err != ESP_OK) {
-            cleanup_all_resources();
             ESP_LOGE(TAG, "Failed to init task monitor: %d", err);
-            return err;
-        }
-        err = task_monitor_start();
-        if (err != ESP_OK) {
-            cleanup_all_resources();
-            ESP_LOGE(TAG, "Failed to start task monitor: %d", err);
-            return err;
+        } else {
+            task_monitor_start();
         }
 
         xTaskCreatePinnedToCore(usb_stats_task, "usb_stats", 1500, NULL, 5, &g_stats_task_handle, 1);
@@ -311,6 +304,11 @@ esp_err_t usb_hid_host_deinit(void) {
     if (g_usb_events_task_handle != NULL) {
         vTaskDelete(g_usb_events_task_handle);
         g_usb_events_task_handle = NULL;
+    }
+
+    if (g_device_task_handle != NULL) {
+        vTaskDelete(g_device_task_handle);
+        g_device_task_handle = NULL;
     }
 
     if (g_stats_task_handle != NULL) {
