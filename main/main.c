@@ -9,9 +9,7 @@
 #include <esp_private/system_internal.h>
 #include <hal/usb_wrap_hal.h>
 #include <soc/rtc_cntl_reg.h>
-#include <ulp/ulp_internal.h>
-
-#include "esp_sleep.h"
+#include <utils/ulp.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -66,10 +64,7 @@ void app_main(void) {
     run_hid_bridge();
     init_web_stack();
 
-    // voltage monitor
-    if (VERBOSE) {
-        xTaskCreatePinnedToCore(vmon_task, "vmon", 2048, NULL, 5, NULL, 1);
-    }
+    xTaskCreatePinnedToCore(vmon_task, "vmon", 2048, NULL, 5, NULL, 1);
 
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(35));
@@ -247,7 +242,10 @@ static void vmon_task(void *pvParameters) {
     while (1) {
         const float bat_volts = (float)adc_read_channel(ADC_CHAN_BAT) * 2 / 1000;
         const float vin_volts = (float)adc_read_channel(ADC_CHAN_VIN) * 2 / 1000;
-        ESP_LOGI(TAG, "BAT: %.2fV, VIN: %.2fV", bat_volts, vin_volts);
+
+        if (VERBOSE) {
+            ESP_LOGI(TAG, "BAT: %.2fV, VIN: %.2fV", bat_volts, vin_volts);
+        }
 
         if (bat_volts < 3.3 && vin_volts < 4.5) {
             ESP_LOGI(TAG, "Battery is dead. So am I…");

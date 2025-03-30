@@ -29,8 +29,7 @@ SRCS "main.c"
      "web/front/lib/react.production.min.js"
      "web/front/lib/opensans-regular.woff2"
   INCLUDE_DIRS "." "ble" "usb" "utils" "web" "web/front"
-  REQUIRES neopixel esp_http_server app_update json
-  PRIV_REQUIRES esp_hid bt nvs_flash usb esp_adc ulp soc driver)
+  REQUIRES neopixel esp_http_server app_update json esp_hid bt nvs_flash usb esp_adc ulp soc driver)
 
 set(ulp_app_name ulp_bat)
 set(ulp_s_sources "ulp/bat.S")
