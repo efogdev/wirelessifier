@@ -40,7 +40,7 @@ typedef void (*usb_hid_report_callback_t)(const usb_hid_report_t *report);
  * @param verbose
  * @return esp_err_t ESP_OK on success, error code otherwise
  */
-esp_err_t usb_hid_host_init(usb_hid_report_callback_t report_callback, bool verbose);
+esp_err_t usb_hid_host_init(usb_hid_report_callback_t report_callback);
 
 /**
  * @brief Deinitialize the USB HID Host

@@ -305,7 +305,7 @@ typedef struct {
  * 
  * @return esp_err_t ESP_OK on success
  */
-esp_err_t hid_bridge_init(bool verbose);
+esp_err_t hid_bridge_init();
 
 /**
  * @brief Deinitialize HID bridge

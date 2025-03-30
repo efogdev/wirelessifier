@@ -34,7 +34,6 @@ static uint16_t s_current_rps = 0;
 static StaticSemaphore_t g_report_maps_mutex_buffer;
 static SemaphoreHandle_t g_report_maps_mutex;
 static usb_hid_report_t g_report;
-static bool g_verbose = false;
 static usb_host_client_handle_t client_hdl;
 static uint8_t client_addr;
 static uint8_t g_num_fields;
@@ -176,7 +175,7 @@ uint8_t usb_hid_host_get_num_fields(const uint8_t report_id, const uint8_t inter
 
 static void client_event_callback(const usb_host_client_event_msg_t *event_msg, void *);
 
-esp_err_t usb_hid_host_init(const usb_hid_report_callback_t report_callback, const bool verbose) {
+esp_err_t usb_hid_host_init(const usb_hid_report_callback_t report_callback) {
     ESP_LOGI(TAG, "Initializing USB HID Host");
     if (report_callback == NULL) {
         ESP_LOGE(TAG, "Invalid report callback parameter");
@@ -213,7 +212,7 @@ esp_err_t usb_hid_host_init(const usb_hid_report_callback_t report_callback, con
         }
     }
 
-    if (verbose) {
+    if (VERBOSE) {
         const esp_err_t err = task_monitor_init();
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "Failed to init task monitor: %d", err);
@@ -224,7 +223,6 @@ esp_err_t usb_hid_host_init(const usb_hid_report_callback_t report_callback, con
         xTaskCreatePinnedToCore(usb_stats_task, "usb_stats", 1500, NULL, 5, &g_stats_task_handle, 1);
     }
 
-    g_verbose = verbose;
     g_report_callback = report_callback;
     g_device_event_queue = xQueueCreate(DEVICE_EVENT_QUEUE_SIZE, sizeof(usb_device_type_event_t));
     if (g_device_event_queue == NULL) {

@@ -20,7 +20,7 @@ typedef struct {
  * @brief Initialize BLE HID device
  * @return ESP_OK on success
  */
-esp_err_t ble_hid_device_init(bool verbose);
+esp_err_t ble_hid_device_init();
 
 /**
  * @brief Deinitialize BLE HID device

@@ -39,7 +39,6 @@ static int8_t s_acc_wheel = 0;
 static int8_t s_acc_pan = 0;
 static uint8_t s_acc_buttons = 0;
 static uint8_t s_batch_size = 3;
-static bool g_verbose = false;
 static bool g_enabled = true;
 typedef enum {
     SPEED_MODE_SLOW = 0,
@@ -220,9 +219,8 @@ static void accumulator_timer_callback(TimerHandle_t timer) {
 
 static TickType_t acc_window = pdMS_TO_TICKS(8);
 
-esp_err_t ble_hid_device_init(const bool verbose) {
+esp_err_t ble_hid_device_init() {
     g_enabled = true;
-    g_verbose = verbose;
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
@@ -297,7 +295,7 @@ esp_err_t ble_hid_device_init(const bool verbose) {
     esp_ble_gap_register_callback(gap_event_handler);
     esp_hidd_register_callbacks(hidd_event_callback);
 
-    if (g_verbose) {
+    if (VERBOSE) {
         xTaskCreatePinnedToCore(ble_stats_task, "ble_stats", 1600, NULL, 5, &s_stats_task_handle, 1);
     }
 

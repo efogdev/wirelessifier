@@ -65,7 +65,9 @@ void app_main(void) {
     init_web_stack();
 
     // voltage monitor
-    xTaskCreatePinnedToCore(vmon_task, "vmon", 2048, NULL, 5, NULL, 1);
+    if (VERBOSE) {
+        xTaskCreatePinnedToCore(vmon_task, "vmon", 2048, NULL, 5, NULL, 1);
+    }
 
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(35));
@@ -241,8 +243,8 @@ static void vmon_task(void *pvParameters) {
     while (1) {
         const float bat_mv = (float)adc_get_by_channel(ADC_CHAN_BAT) * 2 / 1000;
         const float vin_mv = (float)adc_get_by_channel(ADC_CHAN_VIN) * 2 / 1000;
-        ESP_LOGI(TAG, "Battery: %.2fV, VIN: %.2fV", bat_mv, vin_mv);
-        vTaskDelay(pdMS_TO_TICKS(5000));
+        ESP_LOGI(TAG, "BAT: %.2fV, VIN: %.2fV", bat_mv, vin_mv);
+        vTaskDelay(pdMS_TO_TICKS(2500));
     }
 }
 
