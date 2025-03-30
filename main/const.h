@@ -4,9 +4,9 @@
 // #define HW01
 #define HW02
 
-#define VERBOSE 1
+#define VERBOSE 0
 #define DEVICE_NAME "Wirelessifier"
-#define FIRMWARE_VERSION "0.1.39"
+#define FIRMWARE_VERSION "0.1.40"
 #define HARDWARE_VERSION "rev. 02"
 
 #ifdef HW01
