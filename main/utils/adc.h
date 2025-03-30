@@ -2,6 +2,7 @@
 #define ADC_H
 
 #include <esp_err.h>
+#include <hal/adc_types.h>
 
 /**
  * @brief Initialize ADC for battery and VIN voltage measurements
@@ -11,17 +12,10 @@
 esp_err_t adc_init(void);
 
 /**
- * @brief Get battery voltage in millivolts
+ * @brief Get voltage by ADC channel (in millivolts)
  * 
- * @return Battery voltage in mV
+ * @return Voltage in mV, multisampled
  */
-uint32_t adc_get_battery_mv(void);
-
-/**
- * @brief Get VIN voltage in millivolts
- * 
- * @return VIN voltage in mV
- */
-uint32_t adc_get_vin_mv(void);
+uint32_t adc_get_by_channel(adc_channel_t chan);
 
 #endif // ADC_H

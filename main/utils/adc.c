@@ -44,12 +44,6 @@ static bool adc_calibration_init(adc_unit_t unit, const adc_channel_t channel, a
     return calibrated;
 }
 
-static void adc_calibration_deinit(const adc_cali_handle_t handle)
-{
-    ESP_LOGI(TAG, "Deregister %s calibration scheme", "Curve Fitting");
-    ESP_ERROR_CHECK(adc_cali_delete_scheme_curve_fitting(handle));
-}
-
 esp_err_t adc_init(void)
 {
     esp_err_t ret;
@@ -86,14 +80,14 @@ esp_err_t adc_init(void)
     return ESP_OK;
 }
 
-uint32_t adc_get_battery_mv(void)
+uint32_t adc_get_by_channel(const adc_channel_t chan)
 {
     int adc_raw;
     int voltage = 0;
     int adc_sum = 0;
-    
+
     for (int i = 0; i < ADC_MULTISAMPLE; i++) {
-        const esp_err_t ret = adc_oneshot_read(adc1_handle, ADC_CHAN_BAT, &adc_raw);
+        const esp_err_t ret = adc_oneshot_read(adc1_handle, chan, &adc_raw);
         if (ret != ESP_OK) {
             ESP_LOGE(TAG, "ADC1 read BAT failed: %s", esp_err_to_name(ret));
             return 0;
@@ -106,35 +100,6 @@ uint32_t adc_get_battery_mv(void)
         const esp_err_t ret = adc_cali_raw_to_voltage(adc1_cali_bat_handle, adc_raw, &voltage);
         if (ret != ESP_OK) {
             ESP_LOGE(TAG, "ADC1 BAT calibration failed: %s", esp_err_to_name(ret));
-            return 0;
-        }
-    } else {
-        voltage = (adc_raw * 3300) / 4095;
-    }
-
-    return (uint32_t)voltage;
-}
-
-uint32_t adc_get_vin_mv(void)
-{
-    int adc_raw;
-    int voltage = 0;
-    int adc_sum = 0;
-    
-    for (int i = 0; i < ADC_MULTISAMPLE; i++) {
-        const esp_err_t ret = adc_oneshot_read(adc1_handle, ADC_CHAN_VIN, &adc_raw);
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "ADC1 read VIN failed: %s", esp_err_to_name(ret));
-            return 0;
-        }
-        adc_sum += adc_raw;
-    }
-    adc_raw = adc_sum / ADC_MULTISAMPLE;
-
-    if (do_calibration_vin) {
-        const esp_err_t ret = adc_cali_raw_to_voltage(adc1_cali_vin_handle, adc_raw, &voltage);
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "ADC1 VIN calibration failed: %s", esp_err_to_name(ret));
             return 0;
         }
     } else {

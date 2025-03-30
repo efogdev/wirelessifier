@@ -239,8 +239,8 @@ static void init_gpio(void) {
 
 static void vmon_task(void *pvParameters) {
     while (1) {
-        const float bat_mv = (float)adc_get_battery_mv() * 2 / 1000;
-        const float vin_mv = (float)adc_get_vin_mv() * 2 / 1000;
+        const float bat_mv = (float)adc_get_by_channel(ADC_CHAN_BAT) * 2 / 1000;
+        const float vin_mv = (float)adc_get_by_channel(ADC_CHAN_VIN) * 2 / 1000;
         ESP_LOGI(TAG, "Battery: %.2fV, VIN: %.2fV", bat_mv, vin_mv);
         vTaskDelay(pdMS_TO_TICKS(5000));
     }
