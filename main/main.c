@@ -5,14 +5,16 @@
 #include <esp_phy_init.h>
 #include <stdio.h>
 #include <limits.h>
-#include <inttypes.h>
+#include <esp_adc/adc_oneshot.h>
 #include <esp_private/system_internal.h>
 #include <hal/usb_wrap_hal.h>
 #include <soc/rtc_cntl_reg.h>
+#include <ulp/ulp_internal.h>
+
+#include "esp_sleep.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
-#include "esp_log.h"
 #include "esp_pm.h"
 #include "esp_err.h"
 #include "nvs_flash.h"
@@ -167,7 +169,9 @@ static void init_gpio(void) {
             (1ULL<<GPIO_BUTTON_SW4) |
             (1ULL<<GPIO_BUTTON_SW3) |
             (1ULL<<GPIO_BUTTON_SW2) |
-            (1ULL<<GPIO_BUTTON_SW1)
+            (1ULL<<GPIO_BUTTON_SW1) |
+            (1ULL<<GPIO_PGOOD) |
+            (1ULL<<GPIO_BAT_CHRG)
         ),
         .mode = GPIO_MODE_INPUT,
         .pull_up_en = GPIO_PULLUP_ENABLE,
@@ -181,8 +185,6 @@ static void init_gpio(void) {
         .pin_bit_mask = (
             (1ULL<<GPIO_ADC_BAT) |
             (1ULL<<GPIO_ADC_VIN) |
-            (1ULL<<GPIO_BAT_CHRG) |
-            (1ULL<<GPIO_BAT_PGOOD) |
             (1ULL<<GPIO_ROT_A) |
             (1ULL<<GPIO_ROT_B)
         ),
@@ -240,10 +242,22 @@ static void init_gpio(void) {
 }
 
 static void vmon_task(void *pvParameters) {
+    vTaskDelay(pdMS_TO_TICKS(500));
+
     while (1) {
-        const float bat_mv = (float)adc_get_by_channel(ADC_CHAN_BAT) * 2 / 1000;
-        const float vin_mv = (float)adc_get_by_channel(ADC_CHAN_VIN) * 2 / 1000;
-        ESP_LOGI(TAG, "BAT: %.2fV, VIN: %.2fV", bat_mv, vin_mv);
+        const float bat_volts = (float)adc_read_channel(ADC_CHAN_BAT) * 2 / 1000;
+        const float vin_volts = (float)adc_read_channel(ADC_CHAN_VIN) * 2 / 1000;
+        ESP_LOGI(TAG, "BAT: %.2fV, VIN: %.2fV", bat_volts, vin_volts);
+
+        if (bat_volts < 3.3 && vin_volts < 4.5) {
+            ESP_LOGI(TAG, "Battery is dead. So am I…");
+            led_update_status(STATUS_COLOR_RED, STATUS_MODE_ON);
+            ble_hid_device_deinit();
+            adc_deinit();
+            vTaskDelay(pdMS_TO_TICKS(50));
+            gracefullyDie();
+        }
+
         vTaskDelay(pdMS_TO_TICKS(2500));
     }
 }

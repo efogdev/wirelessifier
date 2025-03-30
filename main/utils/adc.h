@@ -12,10 +12,15 @@
 esp_err_t adc_init(void);
 
 /**
+ * @brief Deinitialize ADC
+ */
+void adc_deinit(void);
+
+/**
  * @brief Get voltage by ADC channel (in millivolts)
  * 
  * @return Voltage in mV, multisampled
  */
-uint32_t adc_get_by_channel(adc_channel_t chan);
+uint32_t adc_read_channel(adc_channel_t chan);
 
 #endif // ADC_H

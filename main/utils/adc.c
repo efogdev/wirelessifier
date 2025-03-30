@@ -44,6 +44,10 @@ static bool adc_calibration_init(const adc_unit_t unit, const adc_channel_t chan
     return calibrated;
 }
 
+void adc_deinit(void) {
+    adc_oneshot_del_unit(adc1_handle);
+}
+
 esp_err_t adc_init(void)
 {
     esp_err_t ret;
@@ -80,7 +84,7 @@ esp_err_t adc_init(void)
     return ESP_OK;
 }
 
-uint32_t adc_get_by_channel(const adc_channel_t chan)
+uint32_t adc_read_channel(const adc_channel_t chan)
 {
     int adc_raw;
     int voltage = 0;

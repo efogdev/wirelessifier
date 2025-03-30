@@ -1,6 +1,5 @@
 #ifndef CONST_H
 #define CONST_H
-
 #include "hal/adc_types.h"
 
 // #define HW01
@@ -41,7 +40,7 @@
 #define GPIO_BAT_ISET4 GPIO_NUM_42
 #define GPIO_BAT_ISET5 GPIO_NUM_45
 #define GPIO_BAT_ISET6 GPIO_NUM_46
-#define GPIO_BAT_PGOOD GPIO_NUM_21
+#define GPIO_PGOOD GPIO_NUM_21
 #define GPIO_BAT_CHRG GPIO_NUM_37
 #define GPIO_5V_EN GPIO_NUM_35
 #define GPIO_BAT_CE GPIO_NUM_36

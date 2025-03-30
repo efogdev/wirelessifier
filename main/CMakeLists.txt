@@ -14,6 +14,7 @@ SRCS "main.c"
      "web/ota_server.c"
      "web/ws_server.c"
      "web/wifi_manager.c"
+     "utils/ulp.c"
      "utils/adc.c"
      "utils/rgb_leds.c"
      "utils/task_monitor.c"
@@ -28,7 +29,11 @@ SRCS "main.c"
      "web/front/lib/react.production.min.js"
      "web/front/lib/opensans-regular.woff2"
   INCLUDE_DIRS "." "ble" "usb" "utils" "web" "web/front"
-  REQUIRES neopixel esp_hid bt nvs_flash esp_http_server app_update json
-  PRIV_REQUIRES usb esp_adc)
+  REQUIRES neopixel esp_http_server app_update json
+  PRIV_REQUIRES esp_hid bt nvs_flash usb esp_adc ulp soc driver)
 
+set(ulp_app_name ulp_bat)
+set(ulp_s_sources "ulp/bat.S")
+set(ulp_exp_dep_srcs "utils/ulp.c")
+ulp_embed_binary(${ulp_app_name} "${ulp_s_sources}" "${ulp_exp_dep_srcs}")
 target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-error=unused-const-variable)
