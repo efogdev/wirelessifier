@@ -35,7 +35,7 @@ uint16_t get_gatts_if(void) {
 
 static void hid_add_id_tbl(void);
 
-static void __attribute__((section(".iram1.text"))) esp_hidd_prf_cb_hdl(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
+static void IRAM_ATTR esp_hidd_prf_cb_hdl(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
                          esp_ble_gatts_cb_param_t *param) {
     switch (event) {
         case ESP_GATTS_REG_EVT: {
@@ -133,7 +133,7 @@ void hidd_le_create_service(const esp_gatt_if_t gatts_if) {
     esp_ble_gatts_create_attr_tab(bas_att_db, gatts_if, BAS_IDX_NB, 0);
 }
 
-void __attribute__((section(".iram1.text"))) hidd_clcb_alloc(const uint16_t conn_id, esp_bd_addr_t bda) {
+void IRAM_ATTR hidd_clcb_alloc(const uint16_t conn_id, esp_bd_addr_t bda) {
     uint8_t i_clcb = 0;
     hidd_clcb_t *p_clcb = NULL;
 
@@ -148,7 +148,7 @@ void __attribute__((section(".iram1.text"))) hidd_clcb_alloc(const uint16_t conn
     }
 }
 
-bool __attribute__((section(".iram1.text"))) hidd_clcb_dealloc(uint16_t conn_id) {
+bool IRAM_ATTR hidd_clcb_dealloc(uint16_t conn_id) {
     uint8_t i_clcb = 0;
     hidd_clcb_t *p_clcb = NULL;
     for (i_clcb = 0, p_clcb = hidd_le_env.hidd_clcb; i_clcb < HID_MAX_APPS; i_clcb++, p_clcb++) {
@@ -165,7 +165,7 @@ static struct gatts_profile_inst hid_profile_tab[PROFILE_NUM] = {
     },
 };
 
-static void __attribute__((section(".iram1.text"))) gatts_event_handler(const esp_gatts_cb_event_t event, const esp_gatt_if_t gatts_if,
+static void IRAM_ATTR gatts_event_handler(const esp_gatts_cb_event_t event, const esp_gatt_if_t gatts_if,
                                 esp_ble_gatts_cb_param_t *param) {
     if (event == ESP_GATTS_REG_EVT) {
         if (param->reg.status == ESP_GATT_OK) {
@@ -212,7 +212,7 @@ void hidd_get_attr_value(const uint16_t handle, uint16_t *length, uint8_t **valu
     }
 }
 
-static void __attribute__((section(".iram1.text"))) hid_add_id_tbl(void) {
+static IRAM_ATTR void hid_add_id_tbl(void) {
     // Mouse input report
     hid_rpt_map[0].id = hidReportRefMouseIn[0];
     hid_rpt_map[0].type = hidReportRefMouseIn[1];

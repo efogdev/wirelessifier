@@ -372,7 +372,7 @@ bool usb_hid_host_device_connected(void) {
 
 static uint8_t *data_ptr = NULL;
 
-__attribute__((section(".iram1.text"))) static void process_report(uint8_t *const data, const size_t length,
+static IRAM_ATTR void process_report(uint8_t *const data, const size_t length,
                                                                    const uint8_t interface_num) {
     s_current_rps++;
     if (!data || !g_report_callback || length <= 1 || interface_num >= USB_HOST_MAX_INTERFACES) {
@@ -433,7 +433,7 @@ __attribute__((section(".iram1.text"))) static void process_report(uint8_t *cons
 
 static uint8_t cur_if_evt_data[64] = {0};
 
-__attribute__((section(".iram1.text"))) static void hid_host_interface_callback(
+static IRAM_ATTR void hid_host_interface_callback(
     const hid_host_device_handle_t hid_device_handle,
     const hid_host_interface_event_t event, void *arg) {
     static size_t data_length = 0;

@@ -24,13 +24,13 @@ static uint16_t s_current_fps = BASE_FPS;
 static int s_gpio_pin = 0;
 uint8_t g_rgb_brightness = 35;
 
-__attribute__((section(".iram1.text"))) static uint32_t get_cycle_time_ms(const uint8_t speed) {
+IRAM_ATTR static uint32_t get_cycle_time_ms(const uint8_t speed) {
     if (speed == 0) return MAX_CYCLE_TIME_MS;
     return MIN_CYCLE_TIME_MS + ((MAX_CYCLE_TIME_MS - MIN_CYCLE_TIME_MS) * (100 - speed)) / 100;
 }
 
 // Color utility functions
-__attribute__((section(".iram1.text"))) static uint32_t color_with_brightness(const uint32_t color, const uint8_t brightness) {
+IRAM_ATTR static uint32_t color_with_brightness(const uint32_t color, const uint8_t brightness) {
     uint8_t r = (color >> 16) & 0xFF;
     uint8_t g = (color >> 8) & 0xFF;
     uint8_t b = color & 0xFF;
@@ -42,7 +42,7 @@ __attribute__((section(".iram1.text"))) static uint32_t color_with_brightness(co
     return NP_RGB(r, g, b);
 }
 
-__attribute__((section(".iram1.text"))) static uint32_t blend_colors(const uint32_t color1, const uint32_t color2, const float blend_factor) {
+IRAM_ATTR static uint32_t blend_colors(const uint32_t color1, const uint32_t color2, const float blend_factor) {
     const uint8_t r1 = (color1 >> 16) & 0xFF;
     const uint8_t g1 = (color1 >> 8) & 0xFF;
     const uint8_t b1 = color1 & 0xFF;
@@ -58,7 +58,7 @@ __attribute__((section(".iram1.text"))) static uint32_t blend_colors(const uint3
     return NP_RGB(r, g, b);
 }
 
-__attribute__((section(".iram1.text"))) static void extract_rgb(const uint32_t color, uint8_t *r, uint8_t *g, uint8_t *b) {
+IRAM_ATTR static void extract_rgb(const uint32_t color, uint8_t *r, uint8_t *g, uint8_t *b) {
     *r = (color >> 16) & 0xFF;
     *g = (color >> 8) & 0xFF;
     *b = color & 0xFF;
@@ -99,7 +99,7 @@ typedef struct {
     status_animation_type_t animation;
 } status_led_state_t;
 
-__attribute__((section(".iram1.text"))) static void update_status_led_state(status_led_state_t *state, tNeopixel* pixel) {
+IRAM_ATTR static void update_status_led_state(status_led_state_t *state, tNeopixel* pixel) {
     const uint32_t current_time = pdTICKS_TO_MS(xTaskGetTickCount());
     
     if (state->animation != WIFI_ANIM_NONE) {
@@ -212,7 +212,7 @@ static bool is_task_suspended = false;
 static bool is_in_flash_mode = false;
 
 // Function to check if the task should be suspended and handle suspension/resumption
-__attribute__((section(".iram1.text"))) static void check_and_update_task_suspension(void)
+IRAM_ATTR static void check_and_update_task_suspension(void)
 {
     if (is_in_flash_mode) {
         return;
@@ -323,7 +323,7 @@ void led_control_deinit(void)
     s_in_transition = false;
 }
 
-__attribute__((section(".iram1.text"))) void led_update_pattern(const bool usb_connected, const bool ble_connected, const bool ble_paused)
+IRAM_ATTR void led_update_pattern(const bool usb_connected, const bool ble_connected, const bool ble_paused)
 {
     if (is_in_flash_mode) {
         return;
@@ -440,7 +440,7 @@ __attribute__((section(".text"))) static void update_status_led(tNeopixel* pixel
     update_status_led_state(&s_status_led_state, &pixels[0]);
 }
 
-__attribute__((section(".iram1.text"))) static void apply_pattern(tNeopixel* pixels, const led_pattern_t* pattern)
+IRAM_ATTR static void apply_pattern(tNeopixel* pixels, const led_pattern_t* pattern)
 {
     if (is_task_suspended || is_in_flash_mode) {
         return;
@@ -543,7 +543,7 @@ __attribute__((section(".iram1.text"))) static void apply_pattern(tNeopixel* pix
     }
 }
 
-__attribute__((section(".iram1.text"))) static void blend_pixel_colors(tNeopixel* dest, const tNeopixel* src1, const tNeopixel* src2, const float blend_factor)
+IRAM_ATTR static void blend_pixel_colors(tNeopixel* dest, const tNeopixel* src1, const tNeopixel* src2, const float blend_factor)
 {
     dest->rgb = blend_colors(src1->rgb, src2->rgb, blend_factor);
 }

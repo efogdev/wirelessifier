@@ -1,10 +1,12 @@
-#include "ulp/ulp_internal.h"
 #include "ulp.h"
 #include <const.h>
 #include "ulp_adc.h"
 #include "ulp_bat.h"
+#include "ulp/ulp_bat.h"
 #include <esp_err.h>
 #include <esp_sleep.h>
+#include <ulp_common.h>
+#include <ulp_fsm_common.h>
 
 extern const uint8_t ulp_main_bin_start[] asm("_binary_ulp_bat_bin_start");
 extern const uint8_t ulp_main_bin_end[]   asm("_binary_ulp_bat_bin_end");
@@ -24,9 +26,9 @@ void IRAM_ATTR gracefullyDie(void) {
     ESP_ERROR_CHECK(ulp_adc_init(&cfg));
     ulp_set_wakeup_period(0, 100000);
     esp_deep_sleep_disable_rom_logging();
+    ESP_ERROR_CHECK(esp_sleep_enable_ulp_wakeup());
 
     err = ulp_run(&ulp_entry - RTC_SLOW_MEM);
     ESP_ERROR_CHECK(err);
-    ESP_ERROR_CHECK(esp_sleep_enable_ulp_wakeup());
     esp_deep_sleep_start();
 }

@@ -9,6 +9,7 @@ endif
 build:
 	cd main/web/front && bun run build
 	idf.py build
+	cp build/esp-idf/main/ulp_bat/ulp_bat.h main/ulp
 
 kill:
 	- kill `ps aux | grep idf.py | cut -d' ' -s -f6`

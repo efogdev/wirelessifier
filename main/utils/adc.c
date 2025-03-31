@@ -21,7 +21,7 @@ static bool adc_calibration_init(const adc_unit_t unit, const adc_channel_t chan
     bool calibrated = false;
 
     ESP_LOGI(TAG, "Calibration scheme version is %s", "Curve Fitting");
-    adc_cali_curve_fitting_config_t cali_config = {
+    const adc_cali_curve_fitting_config_t cali_config = {
         .unit_id = unit,
         .chan = channel,
         .atten = atten,

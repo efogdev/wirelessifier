@@ -70,7 +70,7 @@ void hid_dev_register_reports(const uint8_t num_reports, hid_report_map_t *p_rep
     memset(direct_cache, 0, sizeof(direct_cache));
 }
 
-__attribute__((section(".iram1.text"))) void hid_dev_send_report(const esp_gatt_if_t gatts_if, const uint16_t conn_id,
+IRAM_ATTR void hid_dev_send_report(const esp_gatt_if_t gatts_if, const uint16_t conn_id,
                          const uint8_t id, const uint8_t type, const uint8_t length, uint8_t *data) {
     hid_report_map_t *p_rpt;
     if ((p_rpt = hid_dev_rpt_by_id(id, type)) != NULL) {

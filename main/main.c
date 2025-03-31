@@ -25,6 +25,7 @@
 #include "utils/storage.h"
 #include "utils/rotary_enc.h"
 #include "web/http_server.h"
+#include "ulp/ulp_bat.h"
 
 static const char *TAG = "MAIN";
 static QueueHandle_t intrQueue = NULL;
@@ -244,7 +245,7 @@ static void vmon_task(void *pvParameters) {
         const float vin_volts = (float)adc_read_channel(ADC_CHAN_VIN) * 2 / 1000;
 
         if (VERBOSE) {
-            ESP_LOGI(TAG, "BAT: %.2fV, VIN: %.2fV", bat_volts, vin_volts);
+            ESP_LOGI(TAG, "BAT: %.2fV, VIN: %.2fV", bat_volts, vin_volts, ulp_last_result);
         }
 
         if (bat_volts < 3.3 && vin_volts < 4.5) {

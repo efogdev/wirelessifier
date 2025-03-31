@@ -14,13 +14,13 @@ last_result:
 entry:
     /* measure BAT */
     adc r0, 0, 5
-    
+
     /* store result */
     move r3, last_result
     st r0, r3, 0
 
     /* compare with threshold */
-    move r2, 1900
+    move r2, 0x76c
     sub r2, r2, r0
     jump wake_up, ov
 
@@ -32,7 +32,7 @@ entry:
     st r0, r3, 0
 
     /* compare with threshold */
-    move r2, 2200
+    move r2, 0x898
     sub r2, r2, r0
     jump wake_up, ov
 
@@ -46,7 +46,7 @@ wake_up:
     /* Check if the system can be woken up */
     READ_RTC_FIELD(RTC_CNTL_LOW_POWER_ST_REG, RTC_CNTL_RDY_FOR_WAKEUP)
     and r0, r0, 1
-    jump exit, eq
+    jump wake_up, eq
 
     /* Wake up the SoC, end program */
     wake

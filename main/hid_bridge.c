@@ -259,7 +259,7 @@ esp_err_t hid_bridge_stop(void) {
     return ESP_OK;
 }
 
-static esp_err_t process_keyboard_report(const usb_hid_report_t *report) {
+static IRAM_ATTR esp_err_t process_keyboard_report(const usb_hid_report_t *report) {
     const uint8_t expected_fields = usb_hid_host_get_num_fields(report->report_id, report->if_id);
     if (expected_fields != report->info->num_fields) {
         ESP_LOGW(TAG, "Unexpected number of fields: expected=%d, got=%d", expected_fields, report->info->num_fields);
@@ -298,7 +298,7 @@ static esp_err_t process_keyboard_report(const usb_hid_report_t *report) {
 
 static mouse_report_t ble_mouse_report = {0};
 
-__attribute__((section(".iram1.text"))) static esp_err_t process_mouse_report(const usb_hid_report_t *report)
+static IRAM_ATTR esp_err_t process_mouse_report(const usb_hid_report_t *report)
 {
     ble_mouse_report.buttons = *report->fields[report->info->mouse_fields.buttons].value;
     ble_mouse_report.x = *report->fields[report->info->mouse_fields.x].value;
@@ -318,7 +318,7 @@ bool hid_bridge_is_ble_paused(void) {
     return !s_ble_stack_active && usb_hid_host_device_connected();
 }
 
-void hid_bridge_process_report(const usb_hid_report_t *const report) {
+void IRAM_ATTR hid_bridge_process_report(const usb_hid_report_t *const report) {
     if (!s_hid_bridge_initialized) {
         ESP_LOGE(TAG, "HID bridge not initialized");
         return;
@@ -346,12 +346,14 @@ void hid_bridge_process_report(const usb_hid_report_t *const report) {
                 return;
             }
 
+            s_ble_stack_active = true;
+            xSemaphoreGive(s_ble_stack_mutex);
+
+            vTaskDelay(pdMS_TO_TICKS(50));
             if (has_saved_device()) {
                 connect_to_saved_device(get_gatts_if());
             }
 
-            s_ble_stack_active = true;
-            xSemaphoreGive(s_ble_stack_mutex);
             return;
         }
 
