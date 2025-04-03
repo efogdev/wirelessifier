@@ -44,6 +44,9 @@ typedef struct __attribute__((packed)) {
 #define LED_PATTERN_BLE_CONNECTED 2
 #define LED_PATTERN_BOTH_CONNECTED 3
 #define LED_PATTERN_SLEEPING 4
+#define LED_PATTERN_CHARGING 5
+#define LED_PATTERN_BAT_WARNING 6
+#define LED_PATTERN_BAT_LOW 7
 
 // Global brightness setting (0-100%)
 extern uint8_t g_rgb_brightness;

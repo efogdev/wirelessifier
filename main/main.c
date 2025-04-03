@@ -250,8 +250,6 @@ static void init_gpio(void) {
                 return;
             }
 
-            ESP_LOGI(TAG, "Duty cycle: %.02f", duty);
-
             ledc_timer_config_t ledc_timer = {
                 .speed_mode       = LEDC_LOW_SPEED_MODE,
                 .duty_resolution  = LEDC_TIMER_10_BIT,

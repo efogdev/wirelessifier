@@ -7,6 +7,8 @@
 #include "rgb_leds.h"
 #include "neopixel.h"
 #include <math.h>
+#include <vmon.h>
+
 #include "esp_wifi.h"
 #include "storage.h"
 
@@ -173,7 +175,31 @@ static const led_pattern_t led_patterns[] __attribute__((section(".rodata"))) = 
         .trail_length = 1,
         .speed = 1,
         .direction_up = true
-    }
+    },
+    // CHARGING
+    {
+        .colors = {NP_RGB(0, 127, 0), 0},
+        .type = ANIM_TYPE_RUNNING_LIGHT,
+        .trail_length = 4,
+        .speed = 15,
+        .direction_up = false
+    },
+    // BAT_WARNING
+    {
+        .colors = {NP_RGB(127, 127, 0), 0},
+        .type = ANIM_TYPE_BREATHING,
+        .trail_length = 1,
+        .speed = 1,
+        .direction_up = false
+    },
+    // BAT_LOW
+    {
+        .colors = {NP_RGB(64, 0, 0), 0},
+        .type = ANIM_TYPE_BREATHING,
+        .trail_length = 1,
+        .speed = 25,
+        .direction_up = false
+    },
 };
 
 static int s_led_pattern = LED_PATTERN_IDLE;
@@ -331,7 +357,14 @@ IRAM_ATTR void led_update_pattern(const bool usb_connected, const bool ble_conne
 
     int new_pattern = LED_PATTERN_IDLE;
     const uint32_t current_time = pdTICKS_TO_MS(xTaskGetTickCount());
-    
+    const battery_state_t battery_state = get_battery_state();
+
+    // low priority
+    if (battery_state == BATTERY_WARNING) {
+        new_pattern = LED_PATTERN_BAT_WARNING;
+    }
+
+    // medium priority
     if (ble_paused) {
         new_pattern = LED_PATTERN_SLEEPING;
         s_in_wakeup_debounce = false;
@@ -342,7 +375,14 @@ IRAM_ATTR void led_update_pattern(const bool usb_connected, const bool ble_conne
     } else if (ble_connected) {
         new_pattern = LED_PATTERN_BLE_CONNECTED;
     }
-    
+
+    // high priority
+    if (battery_state == BATTERY_CHARGING) {
+        new_pattern = LED_PATTERN_CHARGING;
+    } else if (battery_state == BATTERY_LOW) {
+        new_pattern = LED_PATTERN_BAT_LOW;
+    }
+
     if (s_led_pattern == LED_PATTERN_SLEEPING && new_pattern != LED_PATTERN_SLEEPING && !s_in_wakeup_debounce) {
         s_in_wakeup_debounce = true;
         s_wakeup_debounce_start_time = current_time;
