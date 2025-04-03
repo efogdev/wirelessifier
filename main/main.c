@@ -2,6 +2,7 @@
 #include <esp_log.h>
 #include <inttypes.h>
 #include <const.h>
+#include <descriptor_parser.h>
 #include <esp_phy_init.h>
 #include <stdio.h>
 #include <limits.h>
@@ -13,6 +14,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
+#include "utils/vmon.h"
 #include "esp_pm.h"
 #include "esp_err.h"
 #include "nvs_flash.h"
@@ -37,7 +39,6 @@ static void run_hid_bridge(void);
 static void init_web_stack(void);
 static void rot_long_press_cb(void);
 static void rot_press_cb(void);
-static void vmon_task(void *pvParameters);
 
 void app_main(void) {
     ESP_LOGI(TAG, "Starting USB HID to BLE HID bridge");
@@ -54,11 +55,11 @@ void app_main(void) {
     init_gpio();
     init_global_settings();
 
-    led_control_init(NUM_LEDS, GPIO_WS2812B_PIN);
-    led_update_pattern(usb_hid_host_device_connected(), ble_hid_device_connected(), hid_bridge_is_ble_paused());
-
     adc_init();
     rotary_enc_init();
+    led_control_init(NUM_LEDS, GPIO_WS2812B_PIN);
+    descriptor_parser_init();
+
     rotary_enc_subscribe_long_press(rot_long_press_cb);
     rotary_enc_subscribe_click(rot_press_cb);
 
@@ -66,7 +67,6 @@ void app_main(void) {
     init_web_stack();
 
     xTaskCreatePinnedToCore(vmon_task, "vmon", 2048, NULL, 5, NULL, 1);
-
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(35));
         led_update_pattern(usb_hid_host_device_connected(), ble_hid_device_connected(), hid_bridge_is_ble_paused());
@@ -79,7 +79,7 @@ static void init_variables() {
 
 static void init_pm() {
     const esp_pm_config_t cfg = {
-        .light_sleep_enable = false,
+        .light_sleep_enable = true,
         .max_freq_mhz = 80,
         .min_freq_mhz = 10,
     };
@@ -91,9 +91,9 @@ static void run_hid_bridge() {
     gpio_set_level(GPIO_MUX_OE, 0);
 
 #ifdef HW01
-    gpio_set_level(GPIO_MUX_SEL, 0);
+    gpio_set_level(GPIO_MUX_SEL, GPIO_MUX_SEL_MC);
 #elifdef HW02
-    gpio_set_level(GPIO_MUX_SEL, 1);
+    gpio_set_level(GPIO_MUX_SEL, GPIO_MUX_SEL_MC);
 #endif
 
     esp_err_t ret = hid_bridge_init(VERBOSE);
@@ -112,7 +112,7 @@ static void init_web_stack(void) {
     bool start_web_services = false;
     
     if (gpio_get_level(GPIO_BUTTON_SW4) == 0) {
-        vTaskDelay(pdMS_TO_TICKS(60));
+        vTaskDelay(pdMS_TO_TICKS(20));
         ESP_LOGI(TAG, "Initializing web services because SW4 held on boot");
         start_web_services = true;
     } else {
@@ -237,29 +237,6 @@ static void init_gpio(void) {
     gpio_set_level(GPIO_BAT_CE, 1);
 }
 
-static void vmon_task(void *pvParameters) {
-    vTaskDelay(pdMS_TO_TICKS(500));
-
-    while (1) {
-        const float bat_volts = (float)adc_read_channel(ADC_CHAN_BAT) * 2 / 1000;
-        const float vin_volts = (float)adc_read_channel(ADC_CHAN_VIN) * 2 / 1000;
-
-        if (VERBOSE) {
-            ESP_LOGI(TAG, "BAT: %.2fV, VIN: %.2fV", bat_volts, vin_volts, ulp_last_result);
-        }
-
-        if (bat_volts < 3.3 && vin_volts < 4.5) {
-            ESP_LOGI(TAG, "Battery is dead. So am I…");
-            led_update_status(STATUS_COLOR_RED, STATUS_MODE_ON);
-            ble_hid_device_deinit();
-            adc_deinit();
-            vTaskDelay(pdMS_TO_TICKS(50));
-            gracefullyDie();
-        }
-
-        vTaskDelay(pdMS_TO_TICKS(2500));
-    }
-}
 
 static void rot_press_cb(void) {
     storage_set_boot_with_wifi();

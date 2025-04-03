@@ -1,13 +1,12 @@
 #include "hid_bridge.h"
-
 #include <connection.h>
 #include <const.h>
 #include <esp_gap_ble_api.h>
 #include <hid_device_le_prf.h>
 #include <string.h>
+#include <vmon.h>
 #include <driver/gpio.h>
 #include <soc/rtc_cntl_reg.h>
-
 #include "esp_log.h"
 #include "esp_sleep.h"
 #include "esp_pm.h"
@@ -31,8 +30,6 @@ static bool s_hid_bridge_running = false;
 static bool s_ble_stack_active = true;
 static uint16_t s_sensitivity = 100;
 
-static void inactivity_timer_callback(TimerHandle_t xTimer);
-
 static int s_inactivity_timeout_ms = 30 * 1000;
 static bool s_enable_sleep = true;
 
@@ -42,12 +39,8 @@ static void inactivity_timer_callback(TimerHandle_t xTimer) {
         return;
     }
 
-    if (!s_ble_stack_active) {
-        xSemaphoreGive(s_ble_stack_mutex);
-        return;
-    }
-
-    if (!usb_hid_host_device_connected() || !ble_hid_device_connected()) {
+    if (!usb_hid_host_device_connected() || !ble_hid_device_connected() || !s_ble_stack_active) {
+        xTimerReset(xTimer, 0);
         xSemaphoreGive(s_ble_stack_mutex);
         return;
     }
@@ -64,42 +57,41 @@ static void inactivity_timer_callback(TimerHandle_t xTimer) {
         return;
     }
 
+    if (is_psu_connected()) {
+        xTimerReset(xTimer, 0);
+        ESP_LOGD(TAG, "Not sleeping while connected to a power source");
+        xSemaphoreGive(s_ble_stack_mutex);
+        return;
+    }
+
     ESP_LOGI(TAG, "No USB HID events for a while, stopping BLE stack");
     const esp_err_t ret = ble_hid_device_deinit();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to deinitialize BLE HID device: %s", esp_err_to_name(ret));
         s_ble_stack_active = true;
+        xSemaphoreGive(s_ble_stack_mutex);
     } else {
         ESP_LOGI(TAG, "BLE stack stopped");
         s_ble_stack_active = false;
-
-        //////////////////////////////////////////////
-        //////////////////////////////////////////////
-        //////////////////////////////////////////////
-        // usb_hid_host_deinit();
-        // vTaskDelay(pdMS_TO_TICKS(100));
-        //
-        // esp_sleep_enable_timer_wakeup(1000000);
-        // ESP_ERROR_CHECK(esp_light_sleep_start());
-        // vTaskDelay(pdMS_TO_TICKS(8));
-        //
-        // const uint32_t save = REG_READ(RTC_CNTL_USB_CONF_REG);
-        // SET_PERI_REG_MASK(RTC_CNTL_USB_CONF_REG, RTC_CNTL_USB_PAD_PULL_OVERRIDE);
-        // SET_PERI_REG_MASK(RTC_CNTL_USB_CONF_REG, RTC_CNTL_USB_DP_PULLDOWN);
-        // vTaskDelay(pdMS_TO_TICKS(8));
-        //
-        // REG_WRITE(RTC_CNTL_USB_CONF_REG, save);
-        // vTaskDelay(pdMS_TO_TICKS(8));
-        //
-        // usb_hid_host_init(hid_bridge_process_report);
-        // gpio_set_level(GPIO_5V_EN, 1);
-        // vTaskDelay(pdMS_TO_TICKS(100));
-        //////////////////////////////////////////////
-        //////////////////////////////////////////////
-        //////////////////////////////////////////////
+        xSemaphoreGive(s_ble_stack_mutex);
     }
+}
 
-    xSemaphoreGive(s_ble_stack_mutex);
+// ToDo test if it makes any better
+static void sleep_task(void *pvParameters) {
+    while (1) {
+        if (s_ble_stack_active) {
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            continue;
+        }
+
+        // sleep for 250ms
+        esp_sleep_enable_timer_wakeup(250 * 1000); // microseconds
+        esp_light_sleep_start();
+
+        // idle for 1000ms
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
 }
 
 esp_err_t hid_bridge_init() {
@@ -131,6 +123,7 @@ esp_err_t hid_bridge_init() {
     }
 
     s_ble_stack_active = true;
+    // xTaskCreatePinnedToCore(sleep_task, "sleep", 1500, NULL, 2, NULL, 1);
 
     s_inactivity_timer = xTimerCreateStatic("inactivity_timer", pdMS_TO_TICKS(s_inactivity_timeout_ms),
         pdFALSE, NULL, inactivity_timer_callback, &s_inactivity_timer_struct);

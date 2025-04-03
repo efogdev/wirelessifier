@@ -254,8 +254,8 @@ esp_err_t scan_wifi_networks(void) {
         .channel = 0,
         .show_hidden = false,
         .scan_type = WIFI_SCAN_TYPE_ACTIVE,
-        .scan_time.active.min = 100,
-        .scan_time.active.max = 300
+        .scan_time.active.min = 200,
+        .scan_time.active.max = 600
     };
     
     // Start scan asynchronously - results will be processed in the WIFI_EVENT_SCAN_DONE event handler

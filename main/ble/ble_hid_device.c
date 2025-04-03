@@ -59,9 +59,9 @@ static esp_ble_adv_data_t hidd_adv_data = {
     .set_scan_rsp = false,
     .include_name = true,
     .include_txpower = true,
-    .min_interval = 0x6, // slave connection min interval, Time = min_interval * 1.25 msec
-    .max_interval = 0x80, // slave connection max interval, Time = max_interval * 1.25 msec
-    .appearance = ESP_BLE_APPEARANCE_GENERIC_HID,
+    .min_interval = 0x6,
+    .max_interval = 0x20,
+    .appearance = ESP_BLE_APPEARANCE_HID_GAMEPAD,
     .manufacturer_len = 0,
     .p_manufacturer_data = NULL,
     .service_data_len = 0,
@@ -72,8 +72,8 @@ static esp_ble_adv_data_t hidd_adv_data = {
 };
 
 static esp_ble_adv_params_t hidd_adv_params = {
-    .adv_int_min = 0x20,
-    .adv_int_max = 0x30,
+    .adv_int_min = 0x40,
+    .adv_int_max = 0x120,
     .adv_type = ADV_TYPE_IND,
     .own_addr_type = BLE_ADDR_TYPE_PUBLIC,
     .channel_map = ADV_CHNL_ALL,

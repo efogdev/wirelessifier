@@ -1,14 +1,99 @@
 #include <stdio.h>
 #include <string.h>
 #include "esp_log.h"
+#include "nvs_flash.h"
 #include "descriptor_parser.h"
 #include <usb_hid_host.h>
 #include "hid_bridge.h"
 
+#define HID_NVS_NAMESPACE "hid_desc"
+#define MAX_CACHED_INTERFACES 4
+
 static const char *TAG = "HID_DSC_PARSE";
+
+typedef struct {
+    uint8_t desc[256];
+    size_t length;
+    report_map_t report_map;
+    bool valid;
+} cached_interface_t;
+
+static cached_interface_t cached_interfaces[MAX_CACHED_INTERFACES];
+
+void descriptor_parser_init(void) {
+    nvs_handle_t nvs;
+    esp_err_t err;
+
+    memset(cached_interfaces, 0, sizeof(cached_interfaces));
+
+    err = nvs_open(HID_NVS_NAMESPACE, NVS_READONLY, &nvs);
+    if (err != ESP_OK) return;
+
+    for (uint8_t i = 0; i < MAX_CACHED_INTERFACES; i++) {
+        char key[16];
+        size_t length = sizeof(cached_interfaces[i].desc);
+        
+        snprintf(key, sizeof(key), "desc_%u", i);
+        err = nvs_get_blob(nvs, key, cached_interfaces[i].desc, &length);
+        if (err == ESP_OK) {
+            cached_interfaces[i].length = length;
+            snprintf(key, sizeof(key), "%u", i);
+            size_t size = sizeof(report_map_t);
+            err = nvs_get_blob(nvs, key, &cached_interfaces[i].report_map, &size);
+            if (err == ESP_OK) {
+                cached_interfaces[i].valid = true;
+            }
+        }
+    }
+    
+    nvs_close(nvs);
+}
+
+static esp_err_t save_report_cache(const uint8_t *desc, const size_t length, const report_map_t *report_map, const uint8_t interface_num) {
+    if (interface_num >= MAX_CACHED_INTERFACES) return ESP_ERR_INVALID_ARG;
+
+    nvs_handle_t nvs;
+    char key[16];
+    esp_err_t err;
+
+    err = nvs_open(HID_NVS_NAMESPACE, NVS_READWRITE, &nvs);
+    if (err != ESP_OK) return err;
+
+    snprintf(key, sizeof(key), "desc_%u", interface_num);
+    err = nvs_set_blob(nvs, key, desc, length);
+    if (err == ESP_OK) {
+        snprintf(key, sizeof(key), "%u", interface_num);
+        err = nvs_set_blob(nvs, key, report_map, sizeof(report_map_t));
+        if (err == ESP_OK) {
+            err = nvs_commit(nvs);
+            if (err == ESP_OK) {
+                memcpy(cached_interfaces[interface_num].desc, desc, length);
+                cached_interfaces[interface_num].length = length;
+                memcpy(&cached_interfaces[interface_num].report_map, report_map, sizeof(report_map_t));
+                cached_interfaces[interface_num].valid = true;
+            }
+        }
+    }
+    
+    nvs_close(nvs);
+    return err;
+}
 
 void parse_report_descriptor(const uint8_t *desc, const size_t length, const uint8_t interface_num,
                              report_map_t *report_map) {
+    if (interface_num >= MAX_CACHED_INTERFACES) {
+        ESP_LOGE(TAG, "Interface number %d exceeds maximum cached interfaces", interface_num);
+        return;
+    }
+
+    if (cached_interfaces[interface_num].valid) {
+        if (cached_interfaces[interface_num].length == length && 
+            memcmp(cached_interfaces[interface_num].desc, desc, length) == 0) {
+            memcpy(report_map, &cached_interfaces[interface_num].report_map, sizeof(report_map_t));
+            return;
+        }
+    }
+
     uint16_t current_usage_page = 0;
     uint8_t report_size = 0;
     uint8_t report_count = 0;
@@ -286,32 +371,6 @@ void parse_report_descriptor(const uint8_t *desc, const size_t length, const uin
         }
     }
 
-    // ESP_LOGI(TAG, "=== Report Descriptor Summary ===");
-    // ESP_LOGI(TAG, "Interface: %d, Total Reports: %d", interface_num, report_map->num_reports);
-    //
-    // for (int i = 0; i < report_map->num_reports; i++) {
-    //     report_info_t *report = &report_map->reports[i];
-    //     ESP_LOGI(TAG, "\nReport %d (ID: 0x%02x):", i, report_map->report_ids[i]);
-    //     ESP_LOGI(TAG, "Total Fields: %d, Total Bits: %d", report->num_fields, report->total_bits);
-    //
-    //     for (int j = 0; j < report->num_fields; j++) {
-    //         const report_field_info_t *field = &report->fields[j];
-    //         ESP_LOGI(TAG, "  Field %d:", j);
-    //         ESP_LOGI(TAG, "    Usage Page: 0x%04x", field->attr.usage_page);
-    //         ESP_LOGI(TAG, "    Usage: 0x%04x-0x%04x", field->attr.usage, field->attr.usage_maximum);
-    //         ESP_LOGI(TAG, "    Report Size: %d bits", field->attr.report_size);
-    //         ESP_LOGI(TAG, "    Report Count: %d", field->attr.report_count);
-    //         ESP_LOGI(TAG, "    Logical Range: %d to %d", field->attr.logical_min, field->attr.logical_max);
-    //         ESP_LOGI(TAG, "    Attributes: %s%s%s%s",
-    //             field->attr.constant ? "Constant " : "",
-    //             field->attr.variable ? "Variable " : "",
-    //             field->attr.relative ? "Relative " : "",
-    //             field->attr.array ? "Array" : "");
-    //         ESP_LOGI(TAG, "    Bit Offset: %d, Size: %d", field->bit_offset, field->bit_size);
-    //     }
-    // }
-    // ESP_LOGI(TAG, "==============================");
-
     for (int i = 0; i < report_map->num_reports; i++) {
         report_info_t *report = &report_map->reports[i];
         for (int j = 0; j < report->num_fields; j++) {
@@ -343,6 +402,9 @@ void parse_report_descriptor(const uint8_t *desc, const size_t length, const uin
             report->is_mouse = false;
         }
     }
+
+    // Cache the descriptor and parsed report map
+    save_report_cache(desc, length, report_map, interface_num);
 }
 
 IRAM_ATTR int64_t extract_field_value(const uint8_t *data, const uint16_t bit_offset,

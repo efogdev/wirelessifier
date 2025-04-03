@@ -7,9 +7,9 @@
 #include "hid_bridge.h"
 #include <const.h>
 #include <task_monitor.h>
+#include <vmon.h>
 #include <lwip/mem.h>
 #include <soc/rtc_cntl_reg.h>
-
 #include "descriptor_parser.h"
 
 #define USB_STATS_INTERVAL_SEC  1
@@ -199,16 +199,13 @@ esp_err_t usb_hid_host_init(const usb_hid_report_callback_t report_callback) {
         }
     }
 
-    if (VERBOSE) {
-        const esp_err_t err = task_monitor_init();
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to init task monitor: %s", esp_err_to_name(err));
-        } else {
-            task_monitor_start();
-        }
-
-        xTaskCreatePinnedToCore(usb_stats_task, "usb_stats", 1500, NULL, 5, &g_stats_task_handle, 1);
+    esp_err_t err = task_monitor_init();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to init task monitor: %s", esp_err_to_name(err));
+    } else {
+        task_monitor_start();
     }
+    xTaskCreatePinnedToCore(usb_stats_task, "usb_stats", 1500, NULL, 5, &g_stats_task_handle, 1);
 
     g_report_callback = report_callback;
     g_device_event_queue = xQueueCreate(DEVICE_EVENT_QUEUE_SIZE, sizeof(usb_device_type_event_t));
@@ -232,7 +229,7 @@ esp_err_t usb_hid_host_init(const usb_hid_report_callback_t report_callback) {
         .intr_flags = ESP_INTR_FLAG_LEVEL1,
     };
 
-    esp_err_t err = usb_host_install(&host_config);
+    err = usb_host_install(&host_config);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to install USB HID Host: %s", esp_err_to_name(err));
         cleanup_all_resources();
@@ -277,8 +274,6 @@ esp_err_t usb_hid_host_init(const usb_hid_report_callback_t report_callback) {
     ESP_LOGI(TAG, "USB HID Host initialized successfully");
     return ESP_OK;
 }
-
-static portMUX_TYPE mu = portMUX_INITIALIZER_UNLOCKED;
 
 esp_err_t usb_hid_host_deinit(void) {
     ESP_LOGI(TAG, "Deinitializing USB HID Host");
@@ -340,17 +335,13 @@ esp_err_t usb_hid_host_deinit(void) {
         g_stats_task_handle = NULL;
     }
 
-    portENTER_CRITICAL(&mu);
     ret = hid_host_uninstall();
-    portEXIT_CRITICAL(&mu);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to uninstall USB HID Host: %s", esp_err_to_name(ret));
         return ret;
     }
 
-    portENTER_CRITICAL(&mu);
     ret = usb_host_uninstall();
-    portEXIT_CRITICAL(&mu);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to uninstall USB host: %s", esp_err_to_name(ret));
         return ret;
@@ -362,6 +353,10 @@ esp_err_t usb_hid_host_deinit(void) {
 }
 
 bool usb_hid_host_device_connected(void) {
+    if (is_psu_connected()) {
+        return true;
+    }
+
     for (int i = 0; i < USB_HOST_MAX_INTERFACES; i++) {
         if (g_device_connected[i]) {
             return true;

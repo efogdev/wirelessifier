@@ -9,6 +9,9 @@
 #include "esp_heap_caps.h"
 #include "esp_clk_tree.h"
 #include "task_monitor.h"
+
+#include <const.h>
+
 #include "hid_bridge.h"
 #include "temp_sensor.h"
 
@@ -133,6 +136,9 @@ esp_err_t task_monitor_start(void)
 {
     if (monitor_task_handle != NULL) {
         return ESP_ERR_INVALID_STATE;
+    }
+    if (!TASK_MON) {
+        return ESP_OK;
     }
 
     const BaseType_t ret = xTaskCreatePinnedToCore(monitor_task, "monitor", 2200, NULL, STATS_TASK_PRIO, &monitor_task_handle, 1);

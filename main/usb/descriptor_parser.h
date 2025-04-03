@@ -9,6 +9,11 @@ extern "C" {
 #endif
 
 /**
+ * @brief Initialize descriptor parser and load cache from NVS
+ */
+void descriptor_parser_init(void);
+
+/**
  * @brief Parse a HID report descriptor
  * @param desc Report descriptor data
  * @param length Length of descriptor data

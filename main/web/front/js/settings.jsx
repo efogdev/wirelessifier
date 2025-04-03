@@ -196,10 +196,12 @@ const App = () => {
             return;
         }
 
+        const keepWifi = confirm('Do you want to keep WiFi and web stack on after reboot? Press "Ok" to keep it enabled.');
+
         socketRef.current.send(JSON.stringify({
             type: 'command',
             command: 'update_settings',
-            content: settings
+            content: { ...settings, keepWifi }
         }));
 
         showStatus('Saving settings…', 'info');
@@ -308,7 +310,7 @@ const App = () => {
                 <div className="header-controls">
                     <div>
                         <button className="save-button" onClick={saveSettings} disabled={!connected || otaInProgress || (initialSettingsRef.current && JSON.stringify(settings) === initialSettingsRef.current)}>
-                            Save & Reboot
+                            Save and restart
                         </button>
                         <button className="return-button" onClick={() => window.location.href = '/'} disabled={otaInProgress}>
                             Return
@@ -345,6 +347,16 @@ const App = () => {
                         <div className="setting-item">
                             <div className="setting-title">SoC temperature</div>
                             <div>{systemInfo.temp.toFixed(0)}°C</div>
+                        </div>
+
+                        <div className="setting-item">
+                            <div className="setting-title">Device name</div>
+                            <input
+                                type="text"
+                                value={settings.deviceInfo.name}
+                                onChange={(e) => updateSetting('deviceInfo', 'name', e.target.value)}
+                                placeholder="Enter device name"
+                            />
                         </div>
                     </div>
                 </div>
