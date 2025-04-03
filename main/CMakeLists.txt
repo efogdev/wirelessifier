@@ -23,12 +23,12 @@ SRCS "main.c"
      "utils/storage.c"
      "utils/rotary_enc.c"
   EMBED_TXTFILES
-     "web/front/lib/index.min.html"
-     "web/front/lib/settings.min.html"
-     "web/front/lib/settings.js"
-     "web/front/lib/react-dom.production.min.js"
-     "web/front/lib/react.production.min.js"
-     "web/front/lib/opensans-regular.woff2"
+     "web/front/lib/gz/index.min.html.gz"
+     "web/front/lib/gz/settings.min.html.gz"
+     "web/front/lib/gz/settings.js.gz"
+     "web/front/lib/gz/react-dom.production.min.js.gz"
+     "web/front/lib/gz/react.production.min.js.gz"
+     "web/front/lib/gz/opensans-regular.woff2.gz"
   INCLUDE_DIRS "." "ble" "usb" "utils" "web" "web/front"
   REQUIRES neopixel esp_http_server app_update json esp_hid bt nvs_flash usb esp_adc ulp soc driver)
 

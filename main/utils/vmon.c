@@ -32,6 +32,7 @@ void vmon_task(void *pvParameters) {
         }
 
         if (vin_volts > 4.5 && !s_psu_connected) {
+            gpio_set_level(GPIO_BAT_CE, 0);
             s_psu_connected = true;
 #ifdef HW01
             gpio_set_level(GPIO_MUX_SEL, GPIO_MUX_SEL_PC);
@@ -39,6 +40,7 @@ void vmon_task(void *pvParameters) {
             gpio_set_level(GPIO_MUX_SEL, GPIO_MUX_SEL_PC);
 #endif
         } else if (vin_volts < 4.5 && s_psu_connected) {
+            gpio_set_level(GPIO_BAT_CE, 1);
             s_psu_connected = false;
 #ifdef HW01
             gpio_set_level(GPIO_MUX_SEL, GPIO_MUX_SEL_MC);

@@ -136,7 +136,7 @@ IRAM_ATTR static void update_status_led_state(status_led_state_t *state, tNeopix
 static const led_pattern_t led_patterns[] __attribute__((section(".rodata"))) = {
     // IDLE 
     {
-        .colors = {NP_RGB(255, 0, 0), 0},
+        .colors = {NP_RGB(64, 0, 0), 0},
         .type = ANIM_TYPE_BREATHING,
         .trail_length = 1,
         .speed = 25,

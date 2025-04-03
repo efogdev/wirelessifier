@@ -27,61 +27,64 @@ EventGroupHandle_t wifi_event_group;
 
 static esp_err_t root_get_handler(httpd_req_t *req)
 {
-    extern const char web_front_index_html_start[] asm("_binary_index_min_html_start");
-    extern const char web_front_index_html_end[] asm("_binary_index_min_html_end");
-    const size_t index_html_size = (web_front_index_html_end - web_front_index_html_start);
-    
+    extern const char web_front_index_html_gz_start[] asm("_binary_index_min_html_gz_start");
+    extern const char web_front_index_html_gz_end[] asm("_binary_index_min_html_gz_end");
+    const size_t index_html_size = (web_front_index_html_gz_end - web_front_index_html_gz_start);
+
+    httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
     httpd_resp_set_type(req, "text/html");
-    httpd_resp_send(req, web_front_index_html_start, index_html_size);
+    httpd_resp_send(req, web_front_index_html_gz_start, index_html_size);
     return ESP_OK;
 }
 
 static esp_err_t settings_get_handler(httpd_req_t *req)
 {
-    extern const char web_front_settings_html_start[] asm("_binary_settings_min_html_start");
-    extern const char web_front_settings_html_end[] asm("_binary_settings_min_html_end");
-    const size_t settings_html_size = (web_front_settings_html_end - web_front_settings_html_start);
-    
+    extern const char web_front_settings_html_gz_start[] asm("_binary_settings_min_html_gz_start");
+    extern const char web_front_settings_html_gz_end[] asm("_binary_settings_min_html_gz_end");
+    const size_t settings_html_size = (web_front_settings_html_gz_end - web_front_settings_html_gz_start);
+
+    httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
     httpd_resp_set_type(req, "text/html");
-    httpd_resp_send(req, web_front_settings_html_start, settings_html_size);
+    httpd_resp_send(req, web_front_settings_html_gz_start, settings_html_size);
     return ESP_OK;
 }
 
 static esp_err_t lib_get_handler(httpd_req_t *req)
 {
+    httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
     const char *req_uri = req->uri;
     
     if (strstr(req_uri, "react.production.min.js")) {
-        extern const char web_front_lib_react_production_min_js_start[] asm("_binary_react_production_min_js_start");
-        extern const char web_front_lib_react_production_min_js_end[] asm("_binary_react_production_min_js_end");
-        const size_t js_size = (web_front_lib_react_production_min_js_end - web_front_lib_react_production_min_js_start) - 1;
+        extern const char web_front_lib_react_production_min_js_gz_start[] asm("_binary_react_production_min_js_gz_start");
+        extern const char web_front_lib_react_production_min_js_gz_end[] asm("_binary_react_production_min_js_gz_end");
+        const size_t js_size = (web_front_lib_react_production_min_js_gz_end - web_front_lib_react_production_min_js_gz_start) - 1;
         
         httpd_resp_set_type(req, "application/javascript");
-        httpd_resp_send(req, web_front_lib_react_production_min_js_start, js_size);
+        httpd_resp_send(req, web_front_lib_react_production_min_js_gz_start, js_size);
     } 
     else if (strstr(req_uri, "react-dom.production.min.js")) {
-        extern const char web_front_lib_react_dom_production_min_js_start[] asm("_binary_react_dom_production_min_js_start");
-        extern const char web_front_lib_react_dom_production_min_js_end[] asm("_binary_react_dom_production_min_js_end");
-        const size_t js_size = (web_front_lib_react_dom_production_min_js_end - web_front_lib_react_dom_production_min_js_start) - 1;
+        extern const char web_front_lib_react_dom_production_min_js_gz_start[] asm("_binary_react_dom_production_min_js_gz_start");
+        extern const char web_front_lib_react_dom_production_min_js_gz_end[] asm("_binary_react_dom_production_min_js_gz_end");
+        const size_t js_size = (web_front_lib_react_dom_production_min_js_gz_end - web_front_lib_react_dom_production_min_js_gz_start) - 1;
         
         httpd_resp_set_type(req, "application/javascript");
-        httpd_resp_send(req, web_front_lib_react_dom_production_min_js_start, js_size);
+        httpd_resp_send(req, web_front_lib_react_dom_production_min_js_gz_start, js_size);
     }
     else if (strstr(req_uri, "settings.js")) {
-        extern const char web_front_lib_settings_js_start[] asm("_binary_settings_js_start");
-        extern const char web_front_lib_settings_js_end[] asm("_binary_settings_js_end");
-        const size_t js_size = (web_front_lib_settings_js_end - web_front_lib_settings_js_start) - 1;
+        extern const char web_front_lib_settings_js_gz_start[] asm("_binary_settings_js_gz_start");
+        extern const char web_front_lib_settings_js_gz_end[] asm("_binary_settings_js_gz_end");
+        const size_t js_size = (web_front_lib_settings_js_gz_end - web_front_lib_settings_js_gz_start) - 1;
         
         httpd_resp_set_type(req, "application/javascript");
-        httpd_resp_send(req, web_front_lib_settings_js_start, js_size);
+        httpd_resp_send(req, web_front_lib_settings_js_gz_start, js_size);
     }
     else if (strstr(req_uri, "opensans_regular.woff2")) {
-        extern const char web_front_lib_opensans_regular_woff2_start[] asm("_binary_opensans_regular_woff2_start");
-        extern const char web_front_lib_opensans_regular_woff2_end[] asm("_binary_opensans_regular_woff2_end");
-        const size_t js_size = (web_front_lib_opensans_regular_woff2_end - web_front_lib_opensans_regular_woff2_start) - 1;
+        extern const char web_front_lib_opensans_regular_woff2_gz_start[] asm("_binary_opensans_regular_woff2_gz_start");
+        extern const char web_front_lib_opensans_regular_woff2_gz_end[] asm("_binary_opensans_regular_woff2_gz_end");
+        const size_t js_size = (web_front_lib_opensans_regular_woff2_gz_end - web_front_lib_opensans_regular_woff2_gz_start) - 1;
 
         httpd_resp_set_type(req, "font/woff2");
-        httpd_resp_send(req, web_front_lib_opensans_regular_woff2_start, js_size);
+        httpd_resp_send(req, web_front_lib_opensans_regular_woff2_gz_start, js_size);
     }
     else {
         return ESP_ERR_NOT_FOUND;

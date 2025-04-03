@@ -14,7 +14,8 @@
 typedef enum {
     CACHE_TYPE_STRING,
     CACHE_TYPE_INT,
-    CACHE_TYPE_BOOL
+    CACHE_TYPE_BOOL,
+    CACHE_TYPE_FLOAT
 } cache_value_type_t;
 
 typedef struct {
@@ -24,6 +25,7 @@ typedef struct {
         char str[48];
         int num;
         bool flag;
+        float fnum;
     } value;
 } cache_entry_t;
 
@@ -68,7 +70,8 @@ static const char *default_settings = "{"
         "\"separateSleepTimeouts\":true,"
         "\"sleepTimeout\":60,"
         "\"deepSleep\":true,"
-        "\"deepSleepTimeout\":180"
+        "\"deepSleepTimeout\":180,"
+        "\"output\":5.0"
     "},"
     "\"led\":{"
         "\"brightness\":25"
@@ -389,6 +392,33 @@ esp_err_t storage_get_bool_setting(const char* path, bool* value) {
     return ESP_ERR_INVALID_ARG;
 }
 
+// Get a specific setting value as a float
+esp_err_t storage_get_float_setting(const char* path, float* value) {
+    if (!path || !value) return ESP_ERR_INVALID_ARG;
+    
+    cache_entry_t* entry = cache_find(path);
+    if(entry && entry->type == CACHE_TYPE_FLOAT) {
+        *value = entry->value.fnum;
+        return ESP_OK;
+    }
+    
+    cJSON *item = find_json_by_path(path);
+    if (!item) return ESP_ERR_NOT_FOUND;
+    
+    if (cJSON_IsNumber(item)) {
+        entry = cache_add(path);
+        entry->type = CACHE_TYPE_FLOAT;
+        entry->value.fnum = (float)item->valuedouble;
+        
+        *value = (float)item->valuedouble;
+        cJSON_Delete(item);
+        return ESP_OK;
+    }
+    
+    cJSON_Delete(item);
+    return ESP_ERR_INVALID_ARG;
+}
+
 // Set the one-time boot with WiFi flag
 esp_err_t storage_set_boot_with_wifi(void) {
     // Open NVS
@@ -418,4 +448,3 @@ esp_err_t storage_set_boot_with_wifi(void) {
     nvs_close(nvs_handle);
     return err;
 }
-

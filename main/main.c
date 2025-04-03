@@ -6,6 +6,7 @@
 #include <esp_phy_init.h>
 #include <stdio.h>
 #include <limits.h>
+#include <driver/ledc.h>
 #include <esp_adc/adc_oneshot.h>
 #include <esp_private/system_internal.h>
 #include <hal/usb_wrap_hal.h>
@@ -50,10 +51,10 @@ void app_main(void) {
     }
     ESP_ERROR_CHECK(ret);
 
-    init_pm();
     init_variables();
-    init_gpio();
     init_global_settings();
+    init_pm();
+    init_gpio();
 
     adc_init();
     rotary_enc_init();
@@ -234,7 +235,46 @@ static void init_gpio(void) {
     ESP_ERROR_CHECK(ledc_channel_config(&ledc_channel));
 #endif
 
-    gpio_set_level(GPIO_BAT_CE, 1);
+    float voltage;
+    esp_err_t err;
+    if ((err = storage_get_float_setting("power.output", &voltage) == ESP_OK)) {
+        ESP_LOGW(TAG, "Desired output voltage: %.02fV", voltage);
+        if (voltage >= 4.19 && voltage < 5.01) {
+            const int max_duty_dif = 300;
+            const float duty = 1023 - (max_duty_dif - (voltage - 4.2) * 1.25 * max_duty_dif);
+
+            // PWM for 5V_EN
+            // duty >=720 works for Adept
+            if (duty > 1023 || duty < 680) {
+                ESP_LOGW(TAG, "Unexpected duty cycle: %.02f", duty);
+                return;
+            }
+
+            ESP_LOGI(TAG, "Duty cycle: %.02f", duty);
+
+            ledc_timer_config_t ledc_timer = {
+                .speed_mode       = LEDC_LOW_SPEED_MODE,
+                .duty_resolution  = LEDC_TIMER_10_BIT,
+                .timer_num        = LEDC_TIMER_0,
+                .freq_hz          = 5000,
+                .clk_cfg          = LEDC_AUTO_CLK
+            };
+            ESP_ERROR_CHECK(ledc_timer_config(&ledc_timer));
+
+            ledc_channel_config_t ledc_channel = {
+                .speed_mode     = LEDC_LOW_SPEED_MODE,
+                .channel        = LEDC_CHANNEL_0,
+                .timer_sel      = LEDC_TIMER_0,
+                .intr_type      = LEDC_INTR_DISABLE,
+                .gpio_num       = GPIO_5V_EN,
+                .duty           = (int) duty, // 100%
+                .hpoint         = 0
+            };
+            ESP_ERROR_CHECK(ledc_channel_config(&ledc_channel));
+        }
+    } else {
+        ESP_LOGE(TAG, "Failed to get output voltage: %s", esp_err_to_name(err));
+    }
 }
 
 

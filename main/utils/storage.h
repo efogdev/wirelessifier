@@ -60,6 +60,15 @@ esp_err_t storage_get_int_setting(const char* path, int* value);
 esp_err_t storage_get_bool_setting(const char* path, bool* value);
 
 /**
+ * @brief Get a specific setting value as a float
+ * 
+ * @param path JSON path to the setting (e.g., "power.output")
+ * @param value Pointer to store the float value
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t storage_get_float_setting(const char* path, float* value);
+
+/**
  * @brief Set the one-time boot with WiFi flag
  * 
  * @return esp_err_t ESP_OK on success
