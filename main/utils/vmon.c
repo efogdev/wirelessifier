@@ -28,9 +28,8 @@ void vmon_task(void *pvParameters) {
             ESP_LOGI(TAG, "Battery is dead. So am I…");
             led_update_status(STATUS_COLOR_RED, STATUS_MODE_ON);
             ble_hid_device_deinit();
-            adc_deinit();
             vTaskDelay(pdMS_TO_TICKS(50));
-            gracefullyDie();
+            gracefully_die();
         }
 
         if (vin_volts > 4.5f && !s_psu_connected) {

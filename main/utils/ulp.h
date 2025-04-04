@@ -4,7 +4,8 @@
 extern "C" {
 #endif
 
-void gracefullyDie(void);
+void gracefully_die(void);
+void deep_sleep(void);
 
 #ifdef __cplusplus
 }

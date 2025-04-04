@@ -61,7 +61,7 @@ static esp_ble_adv_data_t hidd_adv_data = {
     .include_txpower = true,
     .min_interval = 0x6,
     .max_interval = 0x20,
-    .appearance = ESP_BLE_APPEARANCE_HID_GAMEPAD,
+    .appearance = ESP_BLE_APPEARANCE_HID_JOYSTICK,
     .manufacturer_len = 0,
     .p_manufacturer_data = NULL,
     .service_data_len = 0,
@@ -72,8 +72,8 @@ static esp_ble_adv_data_t hidd_adv_data = {
 };
 
 static esp_ble_adv_params_t hidd_adv_params = {
-    .adv_int_min = 0x40,
-    .adv_int_max = 0x120,
+    .adv_int_min = 0x20,
+    .adv_int_max = 0x60,
     .adv_type = ADV_TYPE_IND,
     .own_addr_type = BLE_ADDR_TYPE_PUBLIC,
     .channel_map = ADV_CHNL_ALL,

@@ -9,9 +9,19 @@
 last_result:
     .long 0
 
+    .global check_vin_only
+check_vin_only:
+    .long 0
+
     .text
     .global entry
 entry:
+    /* check if we should skip to VIN measurement */
+    move r3, check_vin_only
+    ld r0, r3, 0
+    and r0, r0, 1
+    jump measure_vin, eq
+
     /* measure BAT */
     adc r0, 0, 5
 
@@ -24,6 +34,7 @@ entry:
     sub r2, r2, r0
     jump wake_up, ov
 
+measure_vin:
     /* measure VIN */
     adc r0, 0, 6
 
@@ -51,4 +62,5 @@ wake_up:
     /* Wake up the SoC, end program */
     wake
     WRITE_RTC_FIELD(RTC_CNTL_STATE0_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN, 0)
+    WRITE_RTC_FIELD(RTC_CNTL_ULP_CP_TIMER_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN, 0)
     halt

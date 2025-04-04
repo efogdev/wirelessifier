@@ -8,8 +8,9 @@
 #define TASK_MON 1
 #define ADC_MULTISAMPLE 12
 #define DEVICE_NAME "Wirelessifier"
-#define FIRMWARE_VERSION "0.1.40"
+#define FIRMWARE_VERSION "0.1.41"
 #define HARDWARE_VERSION "rev. 02"
+#define MAIN_LOOP_DELAY_MS 35
 
 #ifdef HW01
 #define GPIO_MUX_OE 34

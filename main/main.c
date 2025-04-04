@@ -6,7 +6,9 @@
 #include <esp_phy_init.h>
 #include <stdio.h>
 #include <limits.h>
+#include <ulp_common.h>
 #include <driver/ledc.h>
+#include <driver/rtc_io.h>
 #include <esp_adc/adc_oneshot.h>
 #include <esp_private/system_internal.h>
 #include <hal/usb_wrap_hal.h>
@@ -29,6 +31,7 @@
 #include "utils/rotary_enc.h"
 #include "web/http_server.h"
 #include "ulp/ulp_bat.h"
+#include "esp_sleep.h"
 
 static const char *TAG = "MAIN";
 static QueueHandle_t intrQueue = NULL;
@@ -68,9 +71,33 @@ void app_main(void) {
     init_web_stack();
 
     xTaskCreatePinnedToCore(vmon_task, "vmon", 2048, NULL, 5, NULL, 1);
+
+
+    if (esp_sleep_get_wakeup_cause() != ESP_SLEEP_WAKEUP_UNDEFINED) {
+        ulp_check_vin_only = 0;
+        ulp_timer_stop();
+    }
+
+    static uint32_t sleep_counter = 0;
+    const uint32_t sleep_threshold = (5 * 60 * 1000) / MAIN_LOOP_DELAY_MS; // 5 minutes
     while (1) {
-        vTaskDelay(pdMS_TO_TICKS(35));
+        vTaskDelay(pdMS_TO_TICKS(MAIN_LOOP_DELAY_MS));
         led_update_pattern(usb_hid_host_device_connected(), ble_hid_device_connected(), hid_bridge_is_ble_paused());
+
+        if (!is_psu_connected() &&
+            !usb_hid_host_device_connected() &&
+            !ble_hid_device_connected()) {
+            if (++sleep_counter >= sleep_threshold) {
+                led_update_pattern(true, true, false); // all black, we good
+                hid_bridge_stop();
+                ble_hid_device_deinit();
+                vTaskDelay(pdMS_TO_TICKS(20));
+                ESP_LOGW(TAG, "Entering deep sleep - no devices connected for 5 minutes");
+                deep_sleep();
+            }
+        } else {
+            sleep_counter = 0;
+        }
     }
 }
 
@@ -163,10 +190,10 @@ static void init_gpio(void) {
 
     const gpio_config_t input_pullup_conf = {
         .pin_bit_mask = (
-            (1ULL<<GPIO_BUTTON_SW4) |
-            (1ULL<<GPIO_BUTTON_SW3) |
-            (1ULL<<GPIO_BUTTON_SW2) |
             (1ULL<<GPIO_BUTTON_SW1) |
+            (1ULL<<GPIO_BUTTON_SW2) |
+            (1ULL<<GPIO_BUTTON_SW3) |
+            (1ULL<<GPIO_BUTTON_SW4) |
             (1ULL<<GPIO_PGOOD) |
             (1ULL<<GPIO_BAT_CHRG)
         ),
@@ -175,7 +202,16 @@ static void init_gpio(void) {
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .intr_type = GPIO_INTR_DISABLE
     };
+    rtc_gpio_deinit(GPIO_BUTTON_SW1);
+    rtc_gpio_deinit(GPIO_BUTTON_SW2);
+    rtc_gpio_deinit(GPIO_BUTTON_SW3);
+    rtc_gpio_deinit(GPIO_BUTTON_SW4);
     gpio_config(&input_pullup_conf);
+    esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
+    esp_sleep_enable_ext0_wakeup(GPIO_BUTTON_SW1, 0);
+    esp_sleep_enable_ext0_wakeup(GPIO_BUTTON_SW2, 0);
+    esp_sleep_enable_ext0_wakeup(GPIO_BUTTON_SW3, 0);
+    esp_sleep_enable_ext0_wakeup(GPIO_BUTTON_SW4, 0);
 
 #ifdef HW02
     const gpio_config_t input_nopull_conf = {
