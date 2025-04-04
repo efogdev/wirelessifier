@@ -5,7 +5,6 @@
 #include <descriptor_parser.h>
 #include <esp_phy_init.h>
 #include <stdio.h>
-#include <limits.h>
 #include <ulp_common.h>
 #include <driver/ledc.h>
 #include <driver/rtc_io.h>

@@ -39,7 +39,7 @@ void IRAM_ATTR gracefully_die(void) {
 void IRAM_ATTR deep_sleep(void) {
     const ulp_adc_cfg_t cfg = {
         .adc_n    = ADC_UNIT_1,
-        .channel  = ADC_CHAN_BAT,
+        .channel  = ADC_CHAN_VIN,
         .width    = ADC_BITWIDTH_12,
         .atten    = ADC_ATTEN_DB_12,
         .ulp_mode = ADC_ULP_MODE_FSM,
