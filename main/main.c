@@ -167,16 +167,9 @@ static void init_gpio(void) {
         .pin_bit_mask = (
             (1ULL<<GPIO_BAT_CE) |
             (1ULL<<GPIO_5V_EN) |
-            (1ULL<<GPIO_WS2812B_PIN) |
             (1ULL<<GPIO_MUX_SEL) |
             (1ULL<<GPIO_MUX_OE)
 #ifdef HW02
-            | (1ULL<<GPIO_BAT_ISET1)
-            | (1ULL<<GPIO_BAT_ISET2)
-            | (1ULL<<GPIO_BAT_ISET3)
-            | (1ULL<<GPIO_BAT_ISET4)
-            | (1ULL<<GPIO_BAT_ISET5)
-            | (1ULL<<GPIO_BAT_ISET6)
             | (1ULL<<GPIO_ROT_D)
 #endif
         ),
@@ -186,6 +179,25 @@ static void init_gpio(void) {
         .intr_type = GPIO_INTR_DISABLE
     };
     gpio_config(&output_pullup_conf);
+
+#ifdef HW02
+    const gpio_config_t output_nopull_conf = {
+        .pin_bit_mask = (
+            (1ULL<<GPIO_BAT_ISET1)
+            | (1ULL<<GPIO_BAT_ISET2)
+            | (1ULL<<GPIO_BAT_ISET3)
+            | (1ULL<<GPIO_BAT_ISET4)
+            | (1ULL<<GPIO_BAT_ISET5)
+            | (1ULL<<GPIO_BAT_ISET6)
+            | (1ULL<<GPIO_WS2812B_PIN)
+        ),
+        .mode = GPIO_MODE_OUTPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE
+    };
+    gpio_config(&output_nopull_conf);
+#endif
 
     const gpio_config_t input_pullup_conf = {
         .pin_bit_mask = (
@@ -207,10 +219,12 @@ static void init_gpio(void) {
     rtc_gpio_deinit(GPIO_BUTTON_SW4);
     gpio_config(&input_pullup_conf);
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
-    esp_sleep_enable_ext0_wakeup(GPIO_BUTTON_SW1, 0);
-    esp_sleep_enable_ext0_wakeup(GPIO_BUTTON_SW2, 0);
-    esp_sleep_enable_ext0_wakeup(GPIO_BUTTON_SW3, 0);
-    esp_sleep_enable_ext0_wakeup(GPIO_BUTTON_SW4, 0);
+    esp_sleep_enable_ext1_wakeup(
+        (1ULL<<GPIO_BUTTON_SW1) |
+        (1ULL<<GPIO_BUTTON_SW2) |
+        (1ULL<<GPIO_BUTTON_SW3) |
+        (1ULL<<GPIO_BUTTON_SW4),
+    ESP_EXT1_WAKEUP_ANY_LOW);
 
 #ifdef HW02
     const gpio_config_t input_nopull_conf = {
