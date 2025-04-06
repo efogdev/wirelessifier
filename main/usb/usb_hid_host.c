@@ -467,7 +467,7 @@ static IRAM_ATTR void hid_host_interface_callback(
     }
 }
 
-static void client_event_callback(const usb_host_client_event_msg_t *event_msg, void *arg) {
+static IRAM_ATTR void client_event_callback(const usb_host_client_event_msg_t *event_msg, void *arg) {
     ESP_LOGI(TAG, "HID Client Event Received: %d", event_msg->event);
 
     if (event_msg->event == USB_HOST_CLIENT_EVENT_NEW_DEV) {
@@ -477,7 +477,7 @@ static void client_event_callback(const usb_host_client_event_msg_t *event_msg, 
     }
 }
 
-static void device_event_task(void *arg) {
+static IRAM_ATTR void device_event_task(void *arg) {
     usb_device_type_event_t evt;
     esp_err_t err;
 
@@ -560,7 +560,7 @@ static void device_event_task(void *arg) {
     }
 }
 
-static void hid_host_device_callback(const hid_host_device_handle_t hid_device_handle,
+static IRAM_ATTR void hid_host_device_callback(const hid_host_device_handle_t hid_device_handle,
                                      const hid_host_driver_event_t event, void *arg) {
     const usb_device_type_event_t evt = {
         .device_handle = hid_device_handle,

@@ -100,15 +100,21 @@ uint32_t adc_read_channel(const adc_channel_t chan)
     }
     adc_raw = adc_sum / ADC_MULTISAMPLE;
 
-    if (do_calibration_bat) {
+    if (do_calibration_bat && chan == ADC_CHAN_BAT) {
         const esp_err_t ret = adc_cali_raw_to_voltage(adc1_cali_bat_handle, adc_raw, &voltage);
         if (ret != ESP_OK) {
             ESP_LOGE(TAG, "ADC1 BAT calibration failed: %s", esp_err_to_name(ret));
-            return 0;
+            return (adc_raw * 3300) / 4095;
+        }
+    } else if (do_calibration_bat && chan == ADC_CHAN_VIN) {
+        const esp_err_t ret = adc_cali_raw_to_voltage(adc1_cali_vin_handle, adc_raw, &voltage);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "ADC1 VIN calibration failed: %s", esp_err_to_name(ret));
+            return (adc_raw * 3300) / 4095;
         }
     } else {
         voltage = (adc_raw * 3300) / 4095;
     }
 
-    return (uint32_t)voltage;
+    return (uint32_t) voltage;
 }

@@ -116,12 +116,7 @@ static void init_pm() {
 static void run_hid_bridge() {
     gpio_set_level(GPIO_5V_EN, 1);
     gpio_set_level(GPIO_MUX_OE, 0);
-
-#ifdef HW01
     gpio_set_level(GPIO_MUX_SEL, GPIO_MUX_SEL_MC);
-#elifdef HW02
-    gpio_set_level(GPIO_MUX_SEL, GPIO_MUX_SEL_MC);
-#endif
 
     esp_err_t ret = hid_bridge_init(VERBOSE);
     if (ret != ESP_OK) {
@@ -314,7 +309,7 @@ static void init_gpio(void) {
                 .timer_sel      = LEDC_TIMER_0,
                 .intr_type      = LEDC_INTR_DISABLE,
                 .gpio_num       = GPIO_5V_EN,
-                .duty           = (int) duty, // 100%
+                .duty           = (int) duty, 
                 .hpoint         = 0
             };
             ESP_ERROR_CHECK(ledc_channel_config(&ledc_channel));

@@ -148,15 +148,15 @@ static const led_pattern_t led_patterns[] __attribute__((section(".rodata"))) = 
     {
         .colors = {NP_RGB(0, 0, 255), 0},
         .type = ANIM_TYPE_RUNNING_LIGHT_BOUNCE,
-        .trail_length = 4,
+        .trail_length = 2,
         .speed = 50, 
         .direction_up = true
     },
-    // BLE_CONNECTED 
+    // BLE_CONNECTED
     {
         .colors = {NP_RGB(255, 0, 255), 0},
         .type = ANIM_TYPE_RUNNING_LIGHT,
-        .trail_length = 2,
+        .trail_length = 1,
         .speed = 35, 
         .direction_up = false
     },
@@ -180,7 +180,7 @@ static const led_pattern_t led_patterns[] __attribute__((section(".rodata"))) = 
     {
         .colors = {NP_RGB(0, 127, 0), 0},
         .type = ANIM_TYPE_RUNNING_LIGHT,
-        .trail_length = 4,
+        .trail_length = 2,
         .speed = 15,
         .direction_up = false
     },

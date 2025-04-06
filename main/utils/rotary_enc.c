@@ -26,7 +26,6 @@ static void IRAM_ATTR enc_isr_handler(void* arg) {
 
     const int8_t direction = transitions[(prev_state << 2) | curr_state];
     prev_state = curr_state;
-    
     if (direction != 0) {
         xQueueSendFromISR(enc_queue, &direction, NULL);
     }
@@ -40,12 +39,10 @@ static void IRAM_ATTR click_isr_handler(void* arg) {
 void rotary_enc_init() {
     enc_queue = xQueueCreate(4, sizeof(int8_t));
     button_state_queue = xQueueCreate(4, sizeof(uint8_t));
-
     gpio_install_isr_service(0);
     gpio_isr_handler_add(GPIO_ROT_A, enc_isr_handler, NULL);
     gpio_isr_handler_add(GPIO_ROT_B, enc_isr_handler, NULL);
     gpio_isr_handler_add(GPIO_ROT_E, click_isr_handler, NULL);
-    
     xTaskCreate(rotary_enc_task, "rotary_task", 2000, NULL, 14, NULL);
 }
 

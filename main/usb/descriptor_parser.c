@@ -79,7 +79,7 @@ static esp_err_t save_report_cache(const uint8_t *desc, const size_t length, con
     return err;
 }
 
-void parse_report_descriptor(const uint8_t *desc, const size_t length, const uint8_t interface_num,
+void IRAM_ATTR parse_report_descriptor(const uint8_t *desc, const size_t length, const uint8_t interface_num,
                              report_map_t *report_map) {
     if (interface_num >= MAX_CACHED_INTERFACES) {
         ESP_LOGE(TAG, "Interface number %d exceeds maximum cached interfaces", interface_num);
