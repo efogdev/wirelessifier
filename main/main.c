@@ -34,6 +34,7 @@
 
 static const char *TAG = "MAIN";
 static QueueHandle_t intrQueue = NULL;
+static bool s_web_enabled = false;
 
 static void init_variables(void);
 static void init_pm(void);
@@ -71,7 +72,6 @@ void app_main(void) {
 
     xTaskCreatePinnedToCore(vmon_task, "vmon", 2048, NULL, 5, NULL, 1);
 
-
     if (esp_sleep_get_wakeup_cause() != ESP_SLEEP_WAKEUP_UNDEFINED) {
         ulp_check_vin_only = 0;
         ulp_timer_stop();
@@ -106,7 +106,7 @@ static void init_variables() {
 
 static void init_pm() {
     const esp_pm_config_t cfg = {
-        .light_sleep_enable = true,
+        .light_sleep_enable = false,
         .max_freq_mhz = 80,
         .min_freq_mhz = 10,
     };
@@ -131,19 +131,17 @@ static void run_hid_bridge() {
 }
 
 static void init_web_stack(void) {
-    bool start_web_services = false;
-    
     if (gpio_get_level(GPIO_BUTTON_SW4) == 0) {
         vTaskDelay(pdMS_TO_TICKS(20));
         ESP_LOGI(TAG, "Initializing web services because SW4 held on boot");
-        start_web_services = true;
+        s_web_enabled = true;
     } else {
         nvs_handle_t nvs_handle;
         uint8_t boot_with_wifi = 0;
         if (nvs_open("wifi_config", NVS_READWRITE, &nvs_handle) == ESP_OK) {
             if (nvs_get_u8(nvs_handle, "boot_wifi", &boot_with_wifi) == ESP_OK && boot_with_wifi == 1) {
                 ESP_LOGI(TAG, "Initializing web services because of one-time boot flag");
-                start_web_services = true;
+                s_web_enabled = true;
                 
                 nvs_set_u8(nvs_handle, "boot_wifi", 0);
                 nvs_commit(nvs_handle);
@@ -152,7 +150,7 @@ static void init_web_stack(void) {
         }
     }
     
-    if (start_web_services) {
+    if (s_web_enabled) {
         init_web_services();
     }
 }
@@ -279,49 +277,57 @@ static void init_gpio(void) {
     ESP_ERROR_CHECK(ledc_channel_config(&ledc_channel));
 #endif
 
-    float voltage;
-    esp_err_t err;
-    if ((err = storage_get_float_setting("power.output", &voltage) == ESP_OK)) {
-        ESP_LOGW(TAG, "Desired output voltage: %.02fV", voltage);
-        if (voltage >= 4.19 && voltage < 5.01) {
-            const int max_duty_dif = 300;
-            const float duty = 1023 - (max_duty_dif - (voltage - 4.2) * 1.25 * max_duty_dif);
-
-            // PWM for 5V_EN
-            // duty >=720 works for Adept
-            if (duty > 1023 || duty < 680) {
-                ESP_LOGW(TAG, "Unexpected duty cycle: %.02f", duty);
-                return;
-            }
-
-            ledc_timer_config_t ledc_timer = {
-                .speed_mode       = LEDC_LOW_SPEED_MODE,
-                .duty_resolution  = LEDC_TIMER_10_BIT,
-                .timer_num        = LEDC_TIMER_0,
-                .freq_hz          = 5000,
-                .clk_cfg          = LEDC_AUTO_CLK
-            };
-            ESP_ERROR_CHECK(ledc_timer_config(&ledc_timer));
-
-            ledc_channel_config_t ledc_channel = {
-                .speed_mode     = LEDC_LOW_SPEED_MODE,
-                .channel        = LEDC_CHANNEL_0,
-                .timer_sel      = LEDC_TIMER_0,
-                .intr_type      = LEDC_INTR_DISABLE,
-                .gpio_num       = GPIO_5V_EN,
-                .duty           = (int) duty, 
-                .hpoint         = 0
-            };
-            ESP_ERROR_CHECK(ledc_channel_config(&ledc_channel));
-        }
-    } else {
-        ESP_LOGE(TAG, "Failed to get output voltage: %s", esp_err_to_name(err));
-    }
+    // float voltage;
+    // esp_err_t err;
+    // if ((err = storage_get_float_setting("power.output", &voltage) == ESP_OK)) {
+    //     ESP_LOGW(TAG, "Desired output voltage: %.02fV", voltage);
+    //     if (voltage >= 4.19 && voltage < 5.01) {
+    //         const int max_duty_dif = 300;
+    //         const float duty = 1023 - (max_duty_dif - (voltage - 4.2) * 1.25 * max_duty_dif);
+    //
+    //         // PWM for 5V_EN
+    //         // duty >=720 works for Adept
+    //         if (duty > 1023 || duty < 680) {
+    //             ESP_LOGW(TAG, "Unexpected duty cycle: %.02f", duty);
+    //             return;
+    //         }
+    //
+    //         ledc_timer_config_t ledc_timer = {
+    //             .speed_mode       = LEDC_LOW_SPEED_MODE,
+    //             .duty_resolution  = LEDC_TIMER_10_BIT,
+    //             .timer_num        = LEDC_TIMER_0,
+    //             .freq_hz          = 5000,
+    //             .clk_cfg          = LEDC_AUTO_CLK
+    //         };
+    //         ESP_ERROR_CHECK(ledc_timer_config(&ledc_timer));
+    //
+    //         ledc_channel_config_t ledc_channel = {
+    //             .speed_mode     = LEDC_LOW_SPEED_MODE,
+    //             .channel        = LEDC_CHANNEL_0,
+    //             .timer_sel      = LEDC_TIMER_0,
+    //             .intr_type      = LEDC_INTR_DISABLE,
+    //             .gpio_num       = GPIO_5V_EN,
+    //             .duty           = (int) duty,
+    //             .hpoint         = 0
+    //         };
+    //         ESP_ERROR_CHECK(ledc_channel_config(&ledc_channel));
+    //     }
+    // } else {
+    //     ESP_LOGE(TAG, "Failed to get output voltage: %s", esp_err_to_name(err));
+    // }
 }
 
-
 static void rot_press_cb(void) {
-    storage_set_boot_with_wifi();
+    if (s_web_enabled) {
+        nvs_handle_t nvs_handle;
+        nvs_open("wifi_config", NVS_READWRITE, &nvs_handle);
+        nvs_set_u8(nvs_handle, "boot_wifi", 0);
+        nvs_commit(nvs_handle);
+        nvs_close(nvs_handle);
+    } else {
+        storage_set_boot_with_wifi();
+    }
+
     esp_restart();
 }
 

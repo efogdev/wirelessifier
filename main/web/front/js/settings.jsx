@@ -360,25 +360,25 @@ const App = () => {
                             />
                         </div>
 
-                        <div className="setting-item">
-                            <div className="setting-title">Output voltage</div>
-                            <div className="setting-description">
-                                Some devices don't really need 5V to work correctly. 
-                                It's safe to try different values and very unlikely to damage something.
-                                By choosing the lowest working value you may save some power.
-                            </div>
-                            <div className="range-container">
-                                <input
-                                    type="range"
-                                    min="42"
-                                    max="50"
-                                    step="0.1"
-                                    value={settings.power.output * 10}
-                                    onChange={(e) => updateSetting('power', 'output', parseFloat(e.target.value)/10)}
-                                />
-                                <span className="range-value">{settings.power.output.toFixed(2)}V</span>
-                            </div>
-                        </div>
+                        {/*<div className="setting-item">*/}
+                        {/*    <div className="setting-title">Output voltage</div>*/}
+                        {/*    <div className="setting-description">*/}
+                        {/*        Some devices don't really need 5V to work correctly. */}
+                        {/*        It's safe to try different values and very unlikely to damage something.*/}
+                        {/*        By choosing the lowest working value you may save some power.*/}
+                        {/*    </div>*/}
+                        {/*    <div className="range-container">*/}
+                        {/*        <input*/}
+                        {/*            type="range"*/}
+                        {/*            min="42"*/}
+                        {/*            max="50"*/}
+                        {/*            step="0.1"*/}
+                        {/*            value={settings.power.output * 10}*/}
+                        {/*            onChange={(e) => updateSetting('power', 'output', parseFloat(e.target.value)/10)}*/}
+                        {/*        />*/}
+                        {/*        <span className="range-value">{settings.power.output.toFixed(2)}V</span>*/}
+                        {/*    </div>*/}
+                        {/*</div>*/}
                     </div>
                 </div>
 
