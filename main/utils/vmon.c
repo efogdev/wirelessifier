@@ -16,11 +16,13 @@ static float bat_volts = 0;
 void vmon_task(void *pvParameters) {
     vTaskDelay(pdMS_TO_TICKS(50));
 
+    uint16_t i = 0;
     while (1) {
+        i++;
         bat_volts = (float)adc_read_channel(ADC_CHAN_BAT) * 2 / 1000;
         const float vin_volts = (float)adc_read_channel(ADC_CHAN_VIN) * 2 / 1000;
 
-        if (VERBOSE) {
+        if (VERBOSE && i % 20 == 0) {
             ESP_LOGI(TAG, "BAT: %.2fV, VIN: %.2fV", bat_volts, vin_volts, ulp_last_result);
         }
 
@@ -29,7 +31,7 @@ void vmon_task(void *pvParameters) {
             led_update_status(STATUS_COLOR_RED, STATUS_MODE_ON);
             ble_hid_device_deinit();
             vTaskDelay(pdMS_TO_TICKS(50));
-            gracefully_die();
+            deep_sleep();
         }
 
         if (vin_volts > 4.5f && !s_psu_connected) {
@@ -48,10 +50,12 @@ void vmon_task(void *pvParameters) {
 }
 
 bool is_charging(void) {
+    // return false; // debug
     return s_psu_connected && s_charging;
 }
 
 bool is_psu_connected(void) {
+    // return false; // debug
     return s_psu_connected;
 }
 

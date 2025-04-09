@@ -78,21 +78,21 @@ static void inactivity_timer_callback(TimerHandle_t xTimer) {
 }
 
 // ToDo test if it makes any better
-static void sleep_task(void *pvParameters) {
-    while (1) {
-        if (s_ble_stack_active) {
-            vTaskDelay(pdMS_TO_TICKS(1000));
-            continue;
-        }
-
-        // sleep for 250ms
-        esp_sleep_enable_timer_wakeup(250 * 1000); // microseconds
-        esp_light_sleep_start();
-
-        // idle for 1000ms
-        vTaskDelay(pdMS_TO_TICKS(1000));
-    }
-}
+// static void sleep_task(void *pvParameters) {
+//     while (1) {
+//         if (s_ble_stack_active) {
+//             vTaskDelay(pdMS_TO_TICKS(1000));
+//             continue;
+//         }
+//
+//         // sleep for 250ms
+//         esp_sleep_enable_timer_wakeup(250 * 1000); // microseconds
+//         esp_light_sleep_start();
+//
+//         // idle for 1000ms
+//         vTaskDelay(pdMS_TO_TICKS(1000));
+//     }
+// }
 
 esp_err_t hid_bridge_init() {
     if (s_hid_bridge_initialized) {

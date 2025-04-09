@@ -29,6 +29,7 @@
 #include "utils/storage.h"
 #include "utils/rotary_enc.h"
 #include "web/http_server.h"
+#include "ulp_bat.h"
 #include "ulp/ulp_bat.h"
 #include "esp_sleep.h"
 
@@ -36,6 +37,7 @@ static const char *TAG = "MAIN";
 static QueueHandle_t intrQueue = NULL;
 static bool s_web_enabled = false;
 
+static void log_bits(uint32_t value, size_t size);
 static void init_variables(void);
 static void init_pm(void);
 static void init_gpio(void);
@@ -72,13 +74,19 @@ void app_main(void) {
 
     xTaskCreatePinnedToCore(vmon_task, "vmon", 2048, NULL, 5, NULL, 1);
 
-    if (esp_sleep_get_wakeup_cause() != ESP_SLEEP_WAKEUP_UNDEFINED) {
-        ulp_check_vin_only = 0;
-        ulp_timer_stop();
+    const esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
+    if (cause != ESP_SLEEP_WAKEUP_UNDEFINED) {
+        ESP_LOGW(TAG, "Woke up, reason=0x%02X, last reading: 0x%04X (%d)", cause, ulp_last_result, ulp_last_result);
+        if (cause == ESP_SLEEP_WAKEUP_EXT1) {
+            log_bits(esp_sleep_get_ext1_wakeup_status(), 4);
+        }
+
+        ulp_last_result = 0;
     }
 
     static uint32_t sleep_counter = 0;
-    const uint32_t sleep_threshold = (5 * 60 * 1000) / MAIN_LOOP_DELAY_MS; // 5 minutes
+    // const uint32_t sleep_threshold = (5 * 60 * 1000) / MAIN_LOOP_DELAY_MS; // 5 minutes
+    const uint32_t sleep_threshold = (20 * 1000) / MAIN_LOOP_DELAY_MS; // 20 sec (debug)
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(MAIN_LOOP_DELAY_MS));
         led_update_pattern(usb_hid_host_device_connected(), ble_hid_device_connected(), hid_bridge_is_ble_paused());
@@ -156,6 +164,38 @@ static void init_web_stack(void) {
 }
 
 static void init_gpio(void) {
+    rtc_gpio_deinit(GPIO_BUTTON_SW1);
+    rtc_gpio_deinit(GPIO_BUTTON_SW2);
+    rtc_gpio_deinit(GPIO_BUTTON_SW3);
+    rtc_gpio_deinit(GPIO_BUTTON_SW4);
+
+    rtc_gpio_pulldown_dis(GPIO_BUTTON_SW1);
+    rtc_gpio_pulldown_dis(GPIO_BUTTON_SW2);
+    rtc_gpio_pulldown_dis(GPIO_BUTTON_SW3);
+    rtc_gpio_pulldown_dis(GPIO_BUTTON_SW4);
+
+    rtc_gpio_pullup_dis(GPIO_BUTTON_SW1);
+    rtc_gpio_pullup_dis(GPIO_BUTTON_SW2);
+    rtc_gpio_pullup_dis(GPIO_BUTTON_SW3);
+    rtc_gpio_pullup_dis(GPIO_BUTTON_SW4);
+
+    rtc_gpio_hold_dis(GPIO_BUTTON_SW1);
+    rtc_gpio_hold_dis(GPIO_BUTTON_SW2);
+    rtc_gpio_hold_dis(GPIO_BUTTON_SW3);
+    rtc_gpio_hold_dis(GPIO_BUTTON_SW4);
+
+    gpio_deep_sleep_hold_dis();
+    esp_deep_sleep_disable_rom_logging();
+    // esp_sleep_enable_ulp_wakeup();
+    esp_sleep_enable_ext0_wakeup(GPIO_ADC_VIN, 1);
+    esp_sleep_enable_ext1_wakeup_io(
+        (1ULL<<GPIO_BUTTON_SW1) |
+        (1ULL<<GPIO_BUTTON_SW2) |
+        (1ULL<<GPIO_BUTTON_SW3) |
+        (1ULL<<GPIO_BUTTON_SW4),
+        ESP_EXT1_WAKEUP_ANY_LOW
+    );
+
     const gpio_config_t output_pullup_conf = {
         .pin_bit_mask = (
             (1ULL<<GPIO_BAT_CE) |
@@ -190,38 +230,13 @@ static void init_gpio(void) {
         .intr_type = GPIO_INTR_DISABLE
     };
     gpio_config(&output_nopull_conf);
-#endif
 
-    const gpio_config_t input_pullup_conf = {
+    const gpio_config_t input_nopull_conf = {
         .pin_bit_mask = (
             (1ULL<<GPIO_BUTTON_SW1) |
             (1ULL<<GPIO_BUTTON_SW2) |
             (1ULL<<GPIO_BUTTON_SW3) |
             (1ULL<<GPIO_BUTTON_SW4) |
-            (1ULL<<GPIO_PGOOD) |
-            (1ULL<<GPIO_BAT_CHRG)
-        ),
-        .mode = GPIO_MODE_INPUT,
-        .pull_up_en = GPIO_PULLUP_ENABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE
-    };
-    rtc_gpio_deinit(GPIO_BUTTON_SW1);
-    rtc_gpio_deinit(GPIO_BUTTON_SW2);
-    rtc_gpio_deinit(GPIO_BUTTON_SW3);
-    rtc_gpio_deinit(GPIO_BUTTON_SW4);
-    gpio_config(&input_pullup_conf);
-    esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
-    esp_sleep_enable_ext1_wakeup(
-        (1ULL<<GPIO_BUTTON_SW1) |
-        (1ULL<<GPIO_BUTTON_SW2) |
-        (1ULL<<GPIO_BUTTON_SW3) |
-        (1ULL<<GPIO_BUTTON_SW4),
-    ESP_EXT1_WAKEUP_ANY_LOW);
-
-#ifdef HW02
-    const gpio_config_t input_nopull_conf = {
-        .pin_bit_mask = (
             (1ULL<<GPIO_ADC_BAT) |
             (1ULL<<GPIO_ADC_VIN) |
             (1ULL<<GPIO_ROT_A) |
@@ -253,6 +268,18 @@ static void init_gpio(void) {
     gpio_config(&rot_btn_conf);
     gpio_set_level(GPIO_ROT_D, 1);
 #endif
+
+    const gpio_config_t input_pullup_conf = {
+        .pin_bit_mask = (
+            (1ULL<<GPIO_PGOOD) |
+            (1ULL<<GPIO_BAT_CHRG)
+        ),
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE
+    };
+    gpio_config(&input_pullup_conf);
 
 #ifdef HW01
     // PWR_LED: red, via 5.1kOhm
@@ -336,4 +363,18 @@ static void rot_long_press_cb(void) {
     rgb_enter_flash_mode();
     REG_WRITE(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
     esp_restart();
+}
+
+static void log_bits(const uint32_t value, const size_t size) {
+    char bit_str[size * 8 + 1];
+    bit_str[0] = '\0';
+    
+    for (int i = size - 1; i >= 0; i--) {
+        uint8_t byte = (value >> (i * 8)) & 0xFF;
+        for (int j = 7; j >= 0; j--) {
+            strcat(bit_str, (byte & (1 << j)) ? "1" : "0");
+        }
+    }
+    
+    ESP_LOGW(TAG, "EXT1 bitmask: %s", bit_str);
 }
