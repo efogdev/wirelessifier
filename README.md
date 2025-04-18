@@ -20,6 +20,9 @@ This project implements a Human Interface Device (HID) bridge using the ESP32-S3
 - ESP-IDF v5.5 (Espressif IoT Development Framework)
 - The Wirelessifier PCB
 
+![image](https://github.com/user-attachments/assets/04ed4701-40f1-4cf3-a14b-b6491a4c47bb)
+
+
 ## Building and Flashing
 
 This project uses the ESP-IDF build system. \
