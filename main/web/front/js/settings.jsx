@@ -1,8 +1,21 @@
+const Modal = ({ isOpen, onClose, children }) => {
+    if (!isOpen) return null;
+    return (
+        <div className="modal-overlay">
+            <div className="modal-content">
+                <button className="modal-close" onClick={onClose}>×</button>
+                {children}
+            </div>
+        </div>
+    );
+};
+
 const App = () => {
     const [connected, setConnected] = React.useState(false);
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState(null);
     const [lastMessageTime, setLastMessageTime] = React.useState(0);
+    const [isModalOpen, setIsModalOpen] = React.useState(false);
     
     const [systemInfo, setSystemInfo] = React.useState({
         heap: 0,
@@ -279,14 +292,14 @@ const App = () => {
             });
     };
 
-    if (loading || !connected) {
-        return (
-            <div id="loadingContainer">
-                <div className="spinner"></div>
-                <p>{connected ? 'Loading settings' : 'Waiting for connection…'}</p>
-            </div>
-        );
-    }
+    // if (loading || !connected) {
+    //     return (
+    //         <div id="loadingContainer">
+    //             <div className="spinner"></div>
+    //             <p>{connected ? 'Loading settings' : 'Waiting for connection…'}</p>
+    //         </div>
+    //     );
+    // }
 
     if (error) {
         return (
@@ -299,6 +312,10 @@ const App = () => {
 
     return (
         <div>
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
+                <HIDControlsConfigurator />
+            </Modal>
+
             <h1>Device Settings</h1>
 
             <div className="container">
@@ -359,26 +376,19 @@ const App = () => {
                                 placeholder="Enter device name"
                             />
                         </div>
+                    </div>
+                </div>
 
-                        {/*<div className="setting-item">*/}
-                        {/*    <div className="setting-title">Output voltage</div>*/}
-                        {/*    <div className="setting-description">*/}
-                        {/*        Some devices don't really need 5V to work correctly. */}
-                        {/*        It's safe to try different values and very unlikely to damage something.*/}
-                        {/*        By choosing the lowest working value you may save some power.*/}
-                        {/*    </div>*/}
-                        {/*    <div className="range-container">*/}
-                        {/*        <input*/}
-                        {/*            type="range"*/}
-                        {/*            min="42"*/}
-                        {/*            max="50"*/}
-                        {/*            step="0.1"*/}
-                        {/*            value={settings.power.output * 10}*/}
-                        {/*            onChange={(e) => updateSetting('power', 'output', parseFloat(e.target.value)/10)}*/}
-                        {/*        />*/}
-                        {/*        <span className="range-value">{settings.power.output.toFixed(2)}V</span>*/}
-                        {/*    </div>*/}
-                        {/*</div>*/}
+                <div className="setting-group">
+                    <h2>Device behavior</h2>
+
+
+                    <div className="setting-item">
+                        <div className="setting-title">On-device buttons</div>
+                        <div className="setting-description">
+                            Configure on-device buttons and the rotary encoder.
+                        </div>
+                        <button onClick={() => setIsModalOpen(true)}>Configure</button>
                     </div>
                 </div>
 

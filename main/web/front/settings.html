@@ -351,7 +351,6 @@
             margin-bottom: 0;
         }
 
-        /* Device info panel */
         .device-info-panel {
             max-height: 0;
             overflow: hidden;
@@ -362,13 +361,79 @@
             padding-top: 16px;
             max-height: 600px;
         }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.75);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: var(--bg-color);
+            padding: 20px;
+            border-radius: 8px;
+            position: relative;
+            width: 90%;
+            height: 90%;
+            overflow: auto;
+        }
+
+        .modal-close {
+            position: absolute;
+            right: 10px;
+            top: 10px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 5px;
+            line-height: 1;
+            color: var(--text-color);
+        }
+
+        .secondary {
+            color: var(--secondary-text);
+        }
+
+        .configurator h3 {
+            margin-top: 0;
+            margin-bottom: 8px;
+            color: var(--secondary-text);
+        }
+
+        .configurator button {
+            margin-top: 0;
+            margin-bottom: 12px;
+            margin-right: 8px;
+            font-size: 14px;
+        }
+
+        .configurator .setting-item {
+            margin-bottom: 0;
+        }
+
+        .configurator .setting-item select {
+            margin-bottom: 12px;
+        }
+
+        h1 {
+            margin-top: 8px;
+        }
     </style>
 
-    <script src="/lib/react.production.min.js" crossorigin></script>
-    <script src="/lib/react-dom.production.min.js" crossorigin></script>
+    <script src="lib/react.production.min.js" crossorigin></script>
+    <script src="lib/react-dom.production.min.js" crossorigin></script>
 </head>
 <body>
 <div id="root"></div>
-<script src="/lib/settings.js"></script>
+<script src="lib/action-config.js"></script>
+<script src="lib/settings.js"></script>
 </body>
 </html>

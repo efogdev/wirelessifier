@@ -78,6 +78,14 @@ static esp_err_t lib_get_handler(httpd_req_t *req)
         httpd_resp_set_type(req, "application/javascript");
         httpd_resp_send(req, web_front_lib_settings_js_gz_start, js_size);
     }
+    else if (strstr(req_uri, "action-config.js")) {
+        extern const char web_front_lib_action_config_js_gz_start[] asm("_binary_action_config_js_gz_start");
+        extern const char web_front_lib_action_config_js_gz_end[] asm("_binary_action_config_js_gz_end");
+        const size_t js_size = (web_front_lib_action_config_js_gz_end - web_front_lib_action_config_js_gz_start) - 1;
+        
+        httpd_resp_set_type(req, "application/javascript");
+        httpd_resp_send(req, web_front_lib_action_config_js_gz_start, js_size);
+    }
     else if (strstr(req_uri, "opensans_regular.woff2")) {
         extern const char web_front_lib_opensans_regular_woff2_gz_start[] asm("_binary_opensans_regular_woff2_gz_start");
         extern const char web_front_lib_opensans_regular_woff2_gz_end[] asm("_binary_opensans_regular_woff2_gz_end");
