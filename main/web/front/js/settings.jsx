@@ -36,6 +36,7 @@ const App = () => {
             enableSleep: true,
             deepSleep: true,
             separateSleepTimeouts: true,
+            fastCharge: true,
             highSpeedSubmode: 'slow',
             output: 5,
         },
@@ -450,6 +451,22 @@ const App = () => {
 
                 <div className="setting-group">
                     <h2>Power</h2>
+
+                    <div className="setting-item">
+                        <div className="setting-title">Fast charging</div>
+                        <div className="setting-description">
+                            Allows faster charging with current up to 1.5A.
+                            Recommended for ±1200 mAh batteries or more.
+                        </div>
+                        <label className="toggle-switch">
+                            <input
+                                type="checkbox"
+                                checked={settings.power.fastCharge}
+                                onChange={(e) => updateSetting('power', 'fastCharge', e.target.checked)}
+                            />
+                            <span className="slider"></span>
+                        </label>
+                    </div>
 
                     <div className="setting-item">
                         <div className="setting-title">Enable sleep</div>

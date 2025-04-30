@@ -1,9 +1,9 @@
 const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
   const actionTypes = [
-    "Keyboard Key",
-    "Keyboard Combo",
-    "Mouse Button",
-    "System Control"
+    { key: 'keyboard_key', value: 'Keyboard Key' },
+    { key: 'keyboard_combo', value: 'Keyboard Combo' },
+    { key: 'mouse_button', value: 'Mouse Button' },
+    { key: 'system_control', value: 'System Control' }
   ];
 
   const keyboardKeys = [
@@ -16,38 +16,38 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
     "Home", "End", "PageUp", "PageDown", "Insert", "PrintScreen"
   ];
 
-  const modifiers = ["Ctrl", "Shift", "Alt", "Win"];
+  const modifiers = [ "Ctrl", "Shift", "Alt", "Win" ];
 
   const actionOptions = {
-    "Keyboard Key": keyboardKeys,
-    "Mouse Button": [
+    keyboard_key: keyboardKeys,
+    mouse_button: [
       "Left Click", "Right Click", "Middle Click"
     ],
-    "System Control": [
+    system_control: [
       "Volume Up", "Volume Down", "Mute", "Media Play/Pause", "Media Next", "Media Previous",
       "Brightness Up", "Brightness Down", "Mouse Forward", "Mouse Back"
     ]
   };
 
   const encoderModes = [
-    "Standard Actions",
-    "Volume Control",
-    "Media Control",
-    "Mouse Navigation",
-    "Scroll"
+    { key: 'standard_actions', value: 'Standard Actions' },
+    { key: 'volume_control', value: 'Volume Control' },
+    { key: 'media_control', value: 'Media Control' },
+    { key: 'mouse_navigation', value: 'Mouse Navigation' },
+    { key: 'scroll', value: 'Scroll' }
   ];
 
-  const [keyConfigs, setKeyConfigs] = React.useState(
+  const [ keyConfigs, setKeyConfigs ] = React.useState(
     Array(numKeys).fill().map((_, index) => ({
-      actionType: "Keyboard Key",
-      action: actionOptions["Keyboard Key"][0],
+      actionType: 'keyboard_key',
+      action: actionOptions.keyboard_key[0],
       selectedModifiers: [],
       selectedKey: keyboardKeys[0],
     }))
   );
 
-  const [encoderConfig, setEncoderConfig] = React.useState({
-    mode: "Standard Actions",
+  const [ encoderConfig, setEncoderConfig ] = React.useState({
+    mode: 'standard_actions',
     rotateLeft: "Volume Down",
     rotateRight: "Volume Up",
     click: "Mute"
@@ -57,55 +57,55 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
     if (keyConfigs.length !== numKeys) {
       setKeyConfigs(
         Array(numKeys).fill().map((_, index) => {
-          return index < keyConfigs.length 
-            ? keyConfigs[index] 
+          return index < keyConfigs.length
+            ? keyConfigs[index]
             : {
-                actionType: "Keyboard Key",
-                action: actionOptions["Keyboard Key"][0],
-                selectedModifiers: [],
-                selectedKey: keyboardKeys[0]
-              };
+              actionType: 'keyboard_key',
+              action: actionOptions.keyboard_key[0],
+              selectedModifiers: [],
+              selectedKey: keyboardKeys[0]
+            };
         })
       );
     }
-  }, [numKeys]);
+  }, [ numKeys ]);
 
   const handleKeyConfigChange = (index, field, value) => {
-    const newConfigs = [...keyConfigs];
+    const newConfigs = [ ...keyConfigs ];
     newConfigs[index] = {
       ...newConfigs[index],
       [field]: value
     };
-    
+
     if (field === "actionType") {
-      if (value !== "Keyboard Combo") {
+      if (value !== 'keyboard_combo') {
         newConfigs[index].action = actionOptions[value][0];
       } else {
         newConfigs[index].selectedModifiers = [];
         newConfigs[index].selectedKey = keyboardKeys[0];
       }
     }
-    
+
     setKeyConfigs(newConfigs);
     onConfigChange?.({ keys: newConfigs, encoder: encoderConfig });
   };
-  
+
   const handleModifierToggle = (index, modifier) => {
-    const newConfigs = [...keyConfigs];
-    const currentModifiers = [...newConfigs[index].selectedModifiers];
-    
+    const newConfigs = [ ...keyConfigs ];
+    const currentModifiers = [ ...newConfigs[index].selectedModifiers ];
+
     if (currentModifiers.includes(modifier)) {
       newConfigs[index].selectedModifiers = currentModifiers.filter(mod => mod !== modifier);
     } else {
-      newConfigs[index].selectedModifiers = [...currentModifiers, modifier];
+      newConfigs[index].selectedModifiers = [ ...currentModifiers, modifier ];
     }
-    
+
     setKeyConfigs(newConfigs);
     onConfigChange?.({ keys: newConfigs, encoder: encoderConfig });
   };
-  
+
   const handleComboKeyChange = (index, key) => {
-    const newConfigs = [...keyConfigs];
+    const newConfigs = [ ...keyConfigs ];
     newConfigs[index].selectedKey = key;
     setKeyConfigs(newConfigs);
     onConfigChange?.({ keys: newConfigs, encoder: encoderConfig });
@@ -113,24 +113,24 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
 
   const handleEncoderModeChange = (mode) => {
     let rotateLeft, rotateRight, click;
-    
+
     switch (mode) {
-      case "Volume Control":
+      case 'volume_control':
         rotateLeft = "Volume Down";
         rotateRight = "Volume Up";
         click = "Mute";
         break;
-      case "Media Control":
+      case 'media_control':
         rotateLeft = "Media Previous";
         rotateRight = "Media Next";
         click = "Media Play/Pause";
         break;
-      case "Mouse Navigation":
+      case 'mouse_navigation':
         rotateLeft = "Mouse Back";
         rotateRight = "Mouse Forward";
         click = "Middle Click";
         break;
-      case "Scroll":
+      case 'scroll':
         rotateLeft = "Scroll Down";
         rotateRight = "Scroll Up";
         click = "Middle Click";
@@ -140,7 +140,7 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
         rotateRight = "Volume Up";
         click = "Media Play/Pause";
     }
-    
+
     const newConfig = {
       mode,
       rotateLeft,
@@ -161,12 +161,12 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
   };
 
   const renderEncoderConfig = () => {
-    if (encoderConfig.mode === "Standard Actions") {
+    if (encoderConfig.mode === 'standard_actions') {
       return (
         <div className="setting-group">
           <div className="setting-item">
             <div className="setting-title">Rotate Left</div>
-            <select 
+            <select
               value={encoderConfig.rotateLeft}
               onChange={(e) => handleEncoderActionChange(e, "rotateLeft")}
             >
@@ -177,7 +177,7 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
           </div>
           <div className="setting-item">
             <div className="setting-title">Rotate Right</div>
-            <select 
+            <select
               value={encoderConfig.rotateRight}
               onChange={(e) => handleEncoderActionChange(e, "rotateRight")}
             >
@@ -188,7 +188,7 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
           </div>
           <div className="setting-item">
             <div className="setting-title">Click</div>
-            <select 
+            <select
               value={encoderConfig.click}
               onChange={(e) => handleEncoderActionChange(e, "click")}
             >
@@ -231,19 +231,19 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
           {keyConfigs.map((config, idx) => (
             <div key={`key-${idx}`} className="container">
               <div className="setting-title secondary">Button #{idx + 1}</div>
-              
+
               <div className="setting-item">
                 <div className="setting-title">Action Type</div>
                 <select
                   value={config.actionType}
                   onChange={(e) => handleKeyConfigChange(idx, "actionType", e.target.value)}
                 >
-                  {actionTypes.map((type, typeIdx) => (
-                    <option key={`type-${typeIdx}`} value={type}>{type}</option>
+                  {actionTypes.map((type) => (
+                    <option key={type.key} value={type.key}>{type.value}</option>
                   ))}
                 </select>
-                
-                {config.actionType === "Keyboard Combo" ? (
+
+                {config.actionType === 'keyboard_combo' ? (
                   <div className="setting-group">
                     <div className="setting-item">
                       <div className="setting-title">Modifiers</div>
@@ -251,7 +251,7 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
                         {modifiers.map((modifier, modIdx) => (
                           <button
                             key={`mod-${modIdx}`}
-                            className={config.selectedModifiers.includes(modifier) ? "success" : ""}
+                            className={config.selectedModifiers.includes(modifier) ? "" : "success"}
                             onClick={() => handleModifierToggle(idx, modifier)}
                             type="button"
                           >
@@ -290,10 +290,10 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
           ))}
         </div>
       </div>
-      
+
       <div className="setting-group">
         <h3>Encoder</h3>
-        
+
         <div className="container">
           <div className="setting-item">
             <div className="setting-title">Mode</div>
@@ -301,12 +301,12 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
               value={encoderConfig.mode}
               onChange={(e) => handleEncoderModeChange(e.target.value)}
             >
-              {encoderModes.map((mode, modeIdx) => (
-                <option key={`mode-${modeIdx}`} value={mode}>{mode}</option>
+              {encoderModes.map((mode) => (
+                <option key={mode.key} value={mode.key}>{mode.value}</option>
               ))}
             </select>
           </div>
-          
+
           {renderEncoderConfig()}
         </div>
       </div>

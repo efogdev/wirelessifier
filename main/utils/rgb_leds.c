@@ -360,11 +360,6 @@ IRAM_ATTR void led_update_pattern(const bool usb_connected, const bool ble_conne
     const battery_state_t battery_state = get_battery_state();
 
     // low priority
-    if (battery_state == BATTERY_WARNING) {
-        new_pattern = LED_PATTERN_BAT_WARNING;
-    }
-
-    // medium priority
     if (ble_paused) {
         new_pattern = LED_PATTERN_SLEEPING;
         s_in_wakeup_debounce = false;
@@ -379,6 +374,8 @@ IRAM_ATTR void led_update_pattern(const bool usb_connected, const bool ble_conne
     // high priority
     if (battery_state == BATTERY_CHARGING) {
         new_pattern = LED_PATTERN_CHARGING;
+    } else if (battery_state == BATTERY_WARNING) {
+        new_pattern = LED_PATTERN_BAT_WARNING;
     } else if (battery_state == BATTERY_LOW) {
         new_pattern = LED_PATTERN_BAT_LOW;
     }

@@ -8,7 +8,7 @@
 #include <esp_mac.h>
 #include "const.h"
 
-#define MAX_CACHE_SIZE 6
+#define MAX_CACHE_SIZE 8
 #define MAX_PATH_LENGTH 48
 
 typedef enum {
@@ -70,6 +70,7 @@ static const char *default_settings = "{"
         "\"separateSleepTimeouts\":true,"
         "\"sleepTimeout\":60,"
         "\"deepSleep\":true,"
+        "\"fastCharge\":true,"
         "\"deepSleepTimeout\":180,"
         "\"output\":5.0"
     "},"

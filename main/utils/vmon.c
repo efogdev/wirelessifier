@@ -26,7 +26,7 @@ void vmon_task(void *pvParameters) {
             ESP_LOGI(TAG, "BAT: %.2fV, VIN: %.2fV", bat_volts, vin_volts, ulp_last_result);
         }
 
-        if (bat_volts < 3.3f && vin_volts < 4.5f) {
+        if (bat_volts < 3.3f && vin_volts < 4.2f) {
             ESP_LOGI(TAG, "Battery is dead. So am I…");
             led_update_status(STATUS_COLOR_RED, STATUS_MODE_ON);
             ble_hid_device_deinit();
@@ -34,11 +34,11 @@ void vmon_task(void *pvParameters) {
             deep_sleep();
         }
 
-        if (vin_volts > 4.5f && !s_psu_connected) {
+        if (vin_volts > 4.2f && !s_psu_connected) {
             gpio_set_level(GPIO_BAT_CE, 0);
             s_psu_connected = true;
             gpio_set_level(GPIO_MUX_SEL, GPIO_MUX_SEL_PC);
-        } else if (vin_volts < 4.5f && s_psu_connected) {
+        } else if (vin_volts < 4.2f && s_psu_connected) {
             gpio_set_level(GPIO_BAT_CE, 1);
             s_psu_connected = false;
             gpio_set_level(GPIO_MUX_SEL, GPIO_MUX_SEL_MC);

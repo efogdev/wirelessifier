@@ -44,7 +44,6 @@ static void init_gpio(void);
 static void run_hid_bridge(void);
 static void init_web_stack(void);
 static void rot_long_press_cb(void);
-static void rot_press_cb(void);
 
 void app_main(void) {
     ESP_LOGI(TAG, "Starting USB HID to BLE HID bridge");
@@ -66,12 +65,10 @@ void app_main(void) {
     led_control_init(NUM_LEDS, GPIO_WS2812B_PIN);
     descriptor_parser_init();
 
-    rotary_enc_subscribe_long_press(rot_long_press_cb);
-    rotary_enc_subscribe_click(rot_press_cb);
-
     run_hid_bridge();
     init_web_stack();
 
+    rotary_enc_subscribe_long_press(rot_long_press_cb);
     xTaskCreatePinnedToCore(vmon_task, "vmon", 2048, NULL, 5, NULL, 1);
 
     const esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
@@ -86,7 +83,8 @@ void app_main(void) {
 
     static uint32_t sleep_counter = 0;
     // const uint32_t sleep_threshold = (5 * 60 * 1000) / MAIN_LOOP_DELAY_MS; // 5 minutes
-    const uint32_t sleep_threshold = (20 * 1000) / MAIN_LOOP_DELAY_MS; // 20 sec (debug)
+    // const uint32_t sleep_threshold = (20 * 1000) / MAIN_LOOP_DELAY_MS; // 20 sec (debug)
+    const uint32_t sleep_threshold = (30 * 60 * 1000) / MAIN_LOOP_DELAY_MS; // 30 min (debug)
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(MAIN_LOOP_DELAY_MS));
         led_update_pattern(usb_hid_host_device_connected(), ble_hid_device_connected(), hid_bridge_is_ble_paused());
@@ -304,64 +302,47 @@ static void init_gpio(void) {
     ESP_ERROR_CHECK(ledc_channel_config(&ledc_channel));
 #endif
 
-    // float voltage;
-    // esp_err_t err;
-    // if ((err = storage_get_float_setting("power.output", &voltage) == ESP_OK)) {
-    //     ESP_LOGW(TAG, "Desired output voltage: %.02fV", voltage);
-    //     if (voltage >= 4.19 && voltage < 5.01) {
-    //         const int max_duty_dif = 300;
-    //         const float duty = 1023 - (max_duty_dif - (voltage - 4.2) * 1.25 * max_duty_dif);
-    //
-    //         // PWM for 5V_EN
-    //         // duty >=720 works for Adept
-    //         if (duty > 1023 || duty < 680) {
-    //             ESP_LOGW(TAG, "Unexpected duty cycle: %.02f", duty);
-    //             return;
-    //         }
-    //
-    //         ledc_timer_config_t ledc_timer = {
-    //             .speed_mode       = LEDC_LOW_SPEED_MODE,
-    //             .duty_resolution  = LEDC_TIMER_10_BIT,
-    //             .timer_num        = LEDC_TIMER_0,
-    //             .freq_hz          = 5000,
-    //             .clk_cfg          = LEDC_AUTO_CLK
-    //         };
-    //         ESP_ERROR_CHECK(ledc_timer_config(&ledc_timer));
-    //
-    //         ledc_channel_config_t ledc_channel = {
-    //             .speed_mode     = LEDC_LOW_SPEED_MODE,
-    //             .channel        = LEDC_CHANNEL_0,
-    //             .timer_sel      = LEDC_TIMER_0,
-    //             .intr_type      = LEDC_INTR_DISABLE,
-    //             .gpio_num       = GPIO_5V_EN,
-    //             .duty           = (int) duty,
-    //             .hpoint         = 0
-    //         };
-    //         ESP_ERROR_CHECK(ledc_channel_config(&ledc_channel));
-    //     }
-    // } else {
-    //     ESP_LOGE(TAG, "Failed to get output voltage: %s", esp_err_to_name(err));
-    // }
-}
+    bool fast_charge;
+    if (storage_get_bool_setting("power.fastCharge", &fast_charge) == ESP_OK && fast_charge) {
+        ESP_LOGW(TAG, "Fast charging enabled!");
+        gpio_set_level(GPIO_BAT_CE, 1);
 
-static void rot_press_cb(void) {
-    if (s_web_enabled) {
-        nvs_handle_t nvs_handle;
-        nvs_open("wifi_config", NVS_READWRITE, &nvs_handle);
-        nvs_set_u8(nvs_handle, "boot_wifi", 0);
-        nvs_commit(nvs_handle);
-        nvs_close(nvs_handle);
+        // ±5W
+        gpio_set_level(GPIO_BAT_ISET1, 0);
+        gpio_set_level(GPIO_BAT_ISET2, 0);
+        gpio_set_level(GPIO_BAT_ISET3, 0);
+        gpio_set_level(GPIO_BAT_ISET4, 0);
+        gpio_set_level(GPIO_BAT_ISET5, 0);
+        gpio_set_level(GPIO_BAT_ISET6, 0);
     } else {
-        storage_set_boot_with_wifi();
+        ESP_LOGW(TAG, "Fast charging disabled!");
+        gpio_set_level(GPIO_BAT_CE, 1);
+
+        // ±2W
+        gpio_set_level(GPIO_BAT_ISET1, 1);
+        gpio_set_level(GPIO_BAT_ISET2, 1);
+        gpio_set_level(GPIO_BAT_ISET3, 1);
     }
 
-    esp_restart();
+    gpio_set_level(GPIO_BAT_CE, 0);
 }
 
 static void rot_long_press_cb(void) {
     rotary_enc_deinit();
     rgb_enter_flash_mode();
-    REG_WRITE(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
+
+    // hold BTN1 to enter flash mode, otherwise just restart
+    const uint8_t btn1 = gpio_get_level(GPIO_BUTTON_SW1);
+    if (btn1 == 0) {
+        REG_WRITE(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
+    }
+
+    // hold BTN4 to restart with WiFi
+    const uint8_t btn4 = gpio_get_level(GPIO_BUTTON_SW4);
+    if (btn4 == 0) {
+        storage_set_boot_with_wifi();
+    }
+
     esp_restart();
 }
 
@@ -370,7 +351,7 @@ static void log_bits(const uint32_t value, const size_t size) {
     bit_str[0] = '\0';
     
     for (int i = size - 1; i >= 0; i--) {
-        uint8_t byte = (value >> (i * 8)) & 0xFF;
+        const uint8_t byte = (value >> (i * 8)) & 0xFF;
         for (int j = 7; j >= 0; j--) {
             strcat(bit_str, (byte & (1 << j)) ? "1" : "0");
         }
