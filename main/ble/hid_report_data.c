@@ -141,8 +141,8 @@ static const uint8_t hidInfo[HID_INFORMATION_LEN] = {
 
 static uint16_t hidExtReportRefDesc = ESP_GATT_UUID_BATTERY_LEVEL;
 static uint16_t hid_le_svc = ATT_SVC_HID;
-static const uint8_t bat_lev_ccc[2] = {0x00, 0x00};
-static uint8_t battery_lev = 95;
+static const uint8_t bat_lev_ccc[2] = {0x01, 0x00};
+uint8_t battery_lev = 1;
 
 static const uint16_t primary_service_uuid = ESP_GATT_UUID_PRI_SERVICE;
 static const uint16_t include_service_uuid = ESP_GATT_UUID_INCLUDE_SERVICE;

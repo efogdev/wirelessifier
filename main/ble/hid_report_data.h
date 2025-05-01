@@ -41,3 +41,6 @@ extern const esp_gatts_attr_db_t bas_att_db[BAS_IDX_NB];
 
 /// Full Hid device Database Description - Used to add attributes into the database
 extern esp_gatts_attr_db_t hidd_le_gatt_db[HIDD_LE_IDX_NB];
+
+// Battery level value
+extern uint8_t battery_lev;

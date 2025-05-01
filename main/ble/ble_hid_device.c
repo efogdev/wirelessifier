@@ -17,10 +17,13 @@
 #include "esp_bt_main.h"
 #include "storage.h"
 #include "connection.h"
+#include "hid_report_data.h"
+#include "vmon.h"
 
 #define BLE_STATS_INTERVAL_SEC 1
 #define HIGH_SPEED_DEVICE_THRESHOLD_MS 6
 #define HIGH_SPEED_DEVICE_THRESHOLD_EVENTS 5
+#define BATTERY_UPDATE_INTERVAL_MS 10000
 
 static const char *TAG = "BLE_HID";
 static uint16_t s_current_rps = 0;
@@ -33,6 +36,7 @@ static int64_t s_last_event_time = 0;
 static int s_fast_events_count = 0;
 static int s_batch_count = 0;
 static TimerHandle_t s_accumulator_timer = NULL;
+static TimerHandle_t s_battery_timer = NULL;
 static int16_t s_acc_x = 0;
 static int16_t s_acc_y = 0;
 static int8_t s_acc_wheel = 0;
@@ -61,7 +65,7 @@ static esp_ble_adv_data_t hidd_adv_data = {
     .include_txpower = true,
     .min_interval = 0x6,
     .max_interval = 0x20,
-    .appearance = ESP_BLE_APPEARANCE_HID_JOYSTICK,
+    .appearance = ESP_BLE_APPEARANCE_HID_GAMEPAD,
     .manufacturer_len = 0,
     .p_manufacturer_data = NULL,
     .service_data_len = 0,
@@ -113,6 +117,62 @@ static void update_tx_power(void) {
     esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_SCAN, power_level);
 }
 
+static void battery_timer_callback(TimerHandle_t timer) {
+    if (!s_connected) {
+        return;
+    }
+
+    uint8_t level;
+    float voltage = get_battery_level();
+    const bool chg = is_charging();
+    if (chg) {
+        voltage += .2f;
+    }
+    
+    // LiPo battery discharge curve is non-linear
+    // 4.2V = 100%, 3.7V = ~50%, 3.3V = 0%
+    if (voltage >= 4.2f) {
+        level = 100;
+    } else if (voltage <= 3.3f) {
+        level = 0;
+    } else {
+        if (voltage >= 3.7f) {
+            // 3.7V-4.2V = 50-100%
+            level = 50 + (uint8_t)((voltage - 3.7f) * (50.0f / 0.5f));
+        } else {
+            // 3.3V-3.7V = 0-50%
+            level = (uint8_t)((voltage - 3.3f) * (50.0f / 0.4f));
+        }
+    }
+
+    battery_lev = level;
+    esp_ble_gatts_set_attr_value(
+        hidd_le_env.hidd_inst.att_tbl[BAS_IDX_BATT_LVL_VAL],
+        sizeof(uint8_t),
+        &battery_lev);
+
+    // Check if notifications are enabled for this characteristic
+    uint16_t length = 0;
+    const uint8_t *ccc_value = NULL;
+    esp_ble_gatts_get_attr_value(
+        hidd_le_env.hidd_inst.att_tbl[BAS_IDX_BATT_LVL_NTF_CFG],
+        &length,
+        (const uint8_t **)&ccc_value);
+
+    // If notifications are enabled (CCCD value is 0x0001), send a notification
+    if (length >= 2 && ccc_value && (ccc_value[0] & 0x01)) {
+        esp_ble_gatts_send_indicate(
+            hidd_le_env.gatt_if,
+            s_conn_id,
+            hidd_le_env.hidd_inst.att_tbl[BAS_IDX_BATT_LVL_VAL],
+            sizeof(uint8_t),
+            &battery_lev,
+            false);  // false for notification, true for indication
+    }
+
+    ESP_LOGI(TAG, "Battery level = %d%%", level);
+}
+
 static void hidd_event_callback(const esp_hidd_cb_event_t event, esp_hidd_cb_param_t *param) {
     if (!is_ble_enabled() || !g_enabled)
         return;
@@ -135,11 +195,23 @@ static void hidd_event_callback(const esp_hidd_cb_event_t event, esp_hidd_cb_par
             save_connected_device(param->connect.remote_bda, s_connected_device_addr_type);
             s_conn_id = param->connect.conn_id;
             s_connected = true;
+
+            // Start battery level updates when connected
+            if (s_battery_timer == NULL) {
+                s_battery_timer = xTimerCreate("battery_timer", pdMS_TO_TICKS(BATTERY_UPDATE_INTERVAL_MS),
+                                             pdTRUE, NULL, battery_timer_callback);
+            }
+            xTimerStart(s_battery_timer, 0);
             break;
         }
         case ESP_HIDD_EVENT_BLE_DISCONNECT: {
             s_connected = false;
             ESP_LOGI(TAG, "ESP_HIDD_EVENT_BLE_DISCONNECT");
+
+            // Stop battery updates when disconnected
+            if (s_battery_timer != NULL) {
+                xTimerStop(s_battery_timer, 0);
+            }
 
             vTaskDelay(pdMS_TO_TICKS(s_reconnect_delay * 1000));
             esp_ble_gap_start_advertising(&hidd_adv_params);
@@ -329,6 +401,11 @@ esp_err_t ble_hid_device_deinit(void) {
     if (s_accumulator_timer != NULL) {
         xTimerDelete(s_accumulator_timer, 0);
         s_accumulator_timer = NULL;
+    }
+
+    if (s_battery_timer != NULL) {
+        xTimerDelete(s_battery_timer, 0);
+        s_battery_timer = NULL;
     }
 
     if (s_stats_task_handle != NULL) {

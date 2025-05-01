@@ -106,6 +106,7 @@ static void IRAM_ATTR esp_hidd_prf_cb_hdl(esp_gatts_cb_event_t event, esp_gatt_i
             if (param->add_attr_tab.num_handle == BAS_IDX_NB &&
                 param->add_attr_tab.svc_uuid.uuid.uuid16 == ESP_GATT_UUID_BATTERY_SERVICE_SVC &&
                 param->add_attr_tab.status == ESP_GATT_OK) {
+                memcpy(&hidd_le_env.hidd_inst.att_tbl[BAS_IDX_SVC], param->add_attr_tab.handles, BAS_IDX_NB * sizeof(uint16_t));
                 incl_svc.start_hdl = param->add_attr_tab.handles[BAS_IDX_SVC];
                 incl_svc.end_hdl = incl_svc.start_hdl + BAS_IDX_NB - 1;
                 ESP_LOGI(HID_LE_PRF_TAG, "%s(), start added the hid service to the stack database. incl_handle = %d",
