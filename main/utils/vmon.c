@@ -45,6 +45,10 @@ void vmon_task(void *pvParameters) {
         }
 
         s_charging = !gpio_get_level(GPIO_BAT_CHRG);
+        if (s_charging) {
+            bat_volts = bat_volts - 0.2f;
+        }
+        
         vTaskDelay(pdMS_TO_TICKS(60));
     }
 }

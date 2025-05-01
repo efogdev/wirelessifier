@@ -337,14 +337,14 @@ const App = () => {
             });
     };
 
-    // if (loading || !connected) {
-    //     return (
-    //         <div id="loadingContainer">
-    //             <div className="spinner"></div>
-    //             <p>{connected ? 'Loading settings' : 'Waiting for connection…'}</p>
-    //         </div>
-    //     );
-    // }
+    if (loading || !connected) {
+        return (
+            <div id="loadingContainer">
+                <div className="spinner"></div>
+                <p>{connected ? 'Loading settings' : 'Waiting for connection…'}</p>
+            </div>
+        );
+    }
 
     if (error) {
         return (
@@ -358,7 +358,9 @@ const App = () => {
     return (
         <div>
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-                <HIDControlsConfigurator onConfigChange={onConfigChange} />
+                {isModalOpen ? (
+                    <HIDControlsConfigurator defaultValues={settings.buttons} onConfigChange={onConfigChange} />
+                ) : null}
             </Modal>
 
             <h1>Device Settings</h1>

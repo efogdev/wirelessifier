@@ -1,4 +1,4 @@
-const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
+const HIDControlsConfigurator = ({ numKeys = 4, defaultValues, onConfigChange }) => {
   const actionTypes = [
     { key: 'keyboard_key', value: 'Keyboard Key' },
     { key: 'keyboard_combo', value: 'Keyboard Combo' },
@@ -176,38 +176,8 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
     { key: 'scroll', value: 'Scroll' }
   ];
 
-  const [ keyConfigs, setKeyConfigs ] = React.useState(
-    Array(numKeys).fill().map((_, index) => ({
-      actionType: 'keyboard_key',
-      action: actionOptions.keyboard_key[0].key,
-      selectedModifiers: [],
-      selectedKey: keyboardKeys[0].key,
-    }))
-  );
-
-  const [ encoderConfig, setEncoderConfig ] = React.useState({
-    mode: 'standard_actions',
-    rotateLeft: "KC_AUDIO_VOL_DOWN",
-    rotateRight: "KC_AUDIO_VOL_UP",
-    click: "KC_AUDIO_MUTE"
-  });
-
-  React.useEffect(() => {
-    if (keyConfigs.length !== numKeys) {
-      setKeyConfigs(
-        Array(numKeys).fill().map((_, index) => {
-          return index < keyConfigs.length
-            ? keyConfigs[index]
-            : {
-              actionType: 'keyboard_key',
-              action: actionOptions.keyboard_key[0].key,
-              selectedModifiers: [],
-              selectedKey: keyboardKeys[0].key
-            };
-        })
-      );
-    }
-  }, [ numKeys ]);
+  const [ keyConfigs, setKeyConfigs ] = React.useState(defaultValues.keys);
+  const [ encoderConfig, setEncoderConfig ] = React.useState(defaultValues.encoder);
 
   const handleKeyConfigChange = (index, field, value) => {
     const newConfigs = [ ...keyConfigs ];
