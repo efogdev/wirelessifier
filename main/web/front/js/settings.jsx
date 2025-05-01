@@ -53,35 +53,31 @@ const App = () => {
         buttons: {
             keys: [
                 {
-                    "acType": "",
-                    "action": "",
-                    "selectedModifiers": [],
-                    "key": ""
+                    "acType": "keyboard_key",
+                    "action": "KC_A",
+                    "mods": []
                 },
                 {
-                    "acType": "",
-                    "action": "",
-                    "selectedModifiers": [],
-                    "key": ""
+                    "acType": "keyboard_key",
+                    "action": "KC_A",
+                    "mods": []
                 },
                 {
-                    "acType": "",
-                    "action": "",
-                    "selectedModifiers": [],
-                    "key": ""
+                    "acType": "keyboard_key",
+                    "action": "KC_A",
+                    "mods": []
                 },
                 {
-                    "acType": "",
-                    "action": "",
-                    "selectedModifiers": [],
-                    "key": ""
+                    "acType": "keyboard_key",
+                    "action": "KC_A",
+                    "mods": []
                 },
             ],
             encoder: {
-                mode: "",
-                left: "",
-                right: "",
-                click: ""
+                mode: "scroll",
+                left: "KC_MS_WH_UP",
+                right: "KC_MS_WH_DOWN",
+                click: "KC_MS_WH_SWITCH",
             },
         },
     });
@@ -337,23 +333,23 @@ const App = () => {
             });
     };
 
-    if (loading || !connected) {
-        return (
-            <div id="loadingContainer">
-                <div className="spinner"></div>
-                <p>{connected ? 'Loading settings' : 'Waiting for connection…'}</p>
-            </div>
-        );
-    }
-
-    if (error) {
-        return (
-            <div className="container">
-                <div className="status error">{error}</div>
-                <button onClick={connectWebSocket}>Retry Connection</button>
-            </div>
-        );
-    }
+    // if (loading || !connected) {
+    //     return (
+    //         <div id="loadingContainer">
+    //             <div className="spinner"></div>
+    //             <p>{connected ? 'Loading settings' : 'Waiting for connection…'}</p>
+    //         </div>
+    //     );
+    // }
+    //
+    // if (error) {
+    //     return (
+    //         <div className="container">
+    //             <div className="status error">{error}</div>
+    //             <button onClick={connectWebSocket}>Retry Connection</button>
+    //         </div>
+    //     );
+    // }
 
     return (
         <div>

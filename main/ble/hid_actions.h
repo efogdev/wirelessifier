@@ -35,7 +35,12 @@ typedef enum {
 typedef enum {
     KC_MS_BTN1 = 0x01,  // Left click
     KC_MS_BTN2 = 0x02,  // Right click
-    KC_MS_BTN3 = 0x04   // Middle click
+    KC_MS_BTN3 = 0x04,  // Middle click
+    KC_MS_BTN4 = 0x08,  // Back
+    KC_MS_BTN5 = 0x10,  // Forward
+    KC_MS_BTN6 = 0x20,  // Extra button
+    KC_MS_BTN7 = 0x40,  // Extra button
+    KC_MS_BTN8 = 0x80   // Extra button
 } mouse_button_t;
 
 // System controls

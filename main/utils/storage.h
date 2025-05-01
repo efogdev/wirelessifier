@@ -69,6 +69,17 @@ esp_err_t storage_get_bool_setting(const char* path, bool* value);
 esp_err_t storage_get_float_setting(const char* path, float* value);
 
 /**
+ * @brief Get a specific setting value as a string array
+ * 
+ * @param path JSON path to the setting array
+ * @param values Array of char arrays to store the strings
+ * @param max_strings Maximum number of strings to read
+ * @param max_len Maximum length of each string
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t storage_get_string_array_setting(const char* path, char** values, size_t* max_strings, size_t max_len);
+
+/**
  * @brief Set the one-time boot with WiFi flag
  * 
  * @return esp_err_t ESP_OK on success

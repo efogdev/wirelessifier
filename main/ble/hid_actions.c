@@ -228,6 +228,11 @@ mouse_button_t string_to_mouse_button(const char* str) {
     if (strcmp(str, "KC_MS_BTN1") == 0) return KC_MS_BTN1;
     if (strcmp(str, "KC_MS_BTN2") == 0) return KC_MS_BTN2;
     if (strcmp(str, "KC_MS_BTN3") == 0) return KC_MS_BTN3;
+    if (strcmp(str, "KC_MS_BTN4") == 0) return KC_MS_BTN4;
+    if (strcmp(str, "KC_MS_BTN5") == 0) return KC_MS_BTN5;
+    if (strcmp(str, "KC_MS_BTN6") == 0) return KC_MS_BTN6;
+    if (strcmp(str, "KC_MS_BTN7") == 0) return KC_MS_BTN7;
+    if (strcmp(str, "KC_MS_BTN8") == 0) return KC_MS_BTN8;
     return 0;
 }
 
@@ -259,8 +264,8 @@ consumer_control_t string_to_consumer_control(const char* str) {
         {"KC_MY_COMPUTER", KC_MY_COMPUTER},
         {"KC_WWW_SEARCH", KC_WWW_SEARCH},
         {"KC_WWW_HOME", KC_WWW_HOME},
-        {"KC_WWW_BACK", KC_WWW_BACK},
-        {"KC_WWW_FORWARD", KC_WWW_FORWARD},
+        {"KC_MS_BTN4", KC_MS_BTN4},
+        {"KC_MS_BTN5", KC_MS_BTN5},
         {"KC_WWW_STOP", KC_WWW_STOP},
         {"KC_WWW_REFRESH", KC_WWW_REFRESH},
         {"KC_WWW_FAVORITES", KC_WWW_FAVORITES},

@@ -297,7 +297,7 @@ static cJSON* find_json_by_path(const char* path) {
             char *end_bracket = strchr(array_index, ']');
             if (end_bracket) {
                 *end_bracket = '\0';
-                int index = atoi(array_index);
+                const int index = atoi(array_index);
                 
                 if (token[0] != '\0') {
                     current = cJSON_GetObjectItem(current, token);
@@ -441,6 +441,33 @@ esp_err_t storage_get_float_setting(const char* path, float* value) {
     
     cJSON_Delete(item);
     return ESP_ERR_INVALID_ARG;
+}
+
+esp_err_t storage_get_string_array_setting(const char* path, char** values, size_t* max_strings, const size_t max_len) {
+    if (!path || !values || *max_strings == 0 || max_len == 0) return ESP_ERR_INVALID_ARG;
+    
+    cJSON *array = find_json_by_path(path);
+    if (!array) return ESP_ERR_NOT_FOUND;
+    
+    if (!cJSON_IsArray(array)) {
+        cJSON_Delete(array);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    const int array_size = cJSON_GetArraySize(array);
+    const size_t items_to_read = (array_size < *max_strings) ? array_size : *max_strings;
+    *max_strings = items_to_read;
+    
+    for (size_t i = 0; i < items_to_read; i++) {
+        const cJSON *item = cJSON_GetArrayItem(array, i);
+        if (cJSON_IsString(item)) {
+            strncpy(values[i], item->valuestring, max_len - 1);
+            values[i][max_len - 1] = '\0';
+        }
+    }
+    
+    cJSON_Delete(array);
+    return ESP_OK;
 }
 
 esp_err_t storage_set_boot_with_wifi(void) {

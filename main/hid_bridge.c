@@ -167,12 +167,22 @@ static void buttons_cb(const uint8_t button) {
     char keyAction[32];
     sprintf(keyAction, "buttons.keys[%d].action", button);
 
+    char *mods[4];
+    char mod_buffers[4][8];
+    for(int i = 0; i < 4; i++) {
+        mods[i] = mod_buffers[i];
+    }
+    char modsPath[32];
+    size_t mods_count = 4;
+    sprintf(modsPath, "buttons.keys[%d].mods", button);
+    storage_get_string_array_setting(modsPath, mods, &mods_count, 8);
+
     char acType[24], action[24];
     if (storage_get_string_setting(keyActionType, acType, sizeof(acType)) == ESP_OK &&
         storage_get_string_setting(keyAction, action, sizeof(action)) == ESP_OK) {
         ESP_LOGI(TAG, "Click, btn #%d, action type = %s, action = %s", button, acType, action);
 
-        execute_action_from_string(ble_conn_id(), acType, action, NULL, 0);
+        execute_action_from_string(ble_conn_id(), acType, action, (const char**)mods, mods_count);
     }
 
     xTimerReset(s_inactivity_timer, 0);

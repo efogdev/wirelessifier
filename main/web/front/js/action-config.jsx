@@ -104,7 +104,9 @@ const HIDControlsConfigurator = ({ numKeys = 4, defaultValues, onConfigChange })
   const mouseButtons = [
     { key: 'KC_MS_BTN1', value: 'Left Click' },
     { key: 'KC_MS_BTN2', value: 'Right Click' },
-    { key: 'KC_MS_BTN3', value: 'Middle Click' }
+    { key: 'KC_MS_BTN3', value: 'Middle Click' },
+    { key: 'KC_MS_BTN5', value: 'Forward' },
+    { key: 'KC_MS_BTN4', value: 'Back' },
   ];
 
   const systemControls = [
@@ -116,8 +118,8 @@ const HIDControlsConfigurator = ({ numKeys = 4, defaultValues, onConfigChange })
     { key: 'KC_MEDIA_PREV_TRACK', value: 'Media Previous' },
     { key: 'KC_BRIGHTNESS_UP', value: 'Brightness Up' },
     { key: 'KC_BRIGHTNESS_DOWN', value: 'Brightness Down' },
-    { key: 'KC_WWW_FORWARD', value: 'System Forward' },
-    { key: 'KC_WWW_BACK', value: 'System Back' },
+    { key: 'KC_MS_BTN5', value: 'System Forward' },
+    { key: 'KC_MS_BTN4', value: 'System Back' },
     { key: 'KC_EXECUTE', value: 'Execute' },
     { key: 'KC_HELP', value: 'Help' },
     { key: 'KC_MENU', value: 'Menu' },
@@ -162,6 +164,7 @@ const HIDControlsConfigurator = ({ numKeys = 4, defaultValues, onConfigChange })
 
   const actionOptions = {
     keyboard_key: keyboardKeys,
+    keyboard_combo: keyboardKeys,
     mouse_button: mouseButtons,
     system_control: systemControls,
     special: specialKeys,
@@ -187,8 +190,8 @@ const HIDControlsConfigurator = ({ numKeys = 4, defaultValues, onConfigChange })
       if (value !== 'keyboard_combo') {
         newConfigs[index].action = actionOptions[value][0].key;
       } else {
-        newConfigs[index].selectedModifiers = [];
-        newConfigs[index].key = keyboardKeys[0].key;
+        newConfigs[index].mods = [];
+        newConfigs[index].action = keyboardKeys[0].key;
       }
     }
 
@@ -198,12 +201,12 @@ const HIDControlsConfigurator = ({ numKeys = 4, defaultValues, onConfigChange })
 
   const handleModifierToggle = (index, modifier) => {
     const newConfigs = [ ...keyConfigs ];
-    const currentModifiers = [ ...newConfigs[index].selectedModifiers ];
+    const currentModifiers = [ ...newConfigs[index].mods ];
 
     if (currentModifiers.includes(modifier)) {
-      newConfigs[index].selectedModifiers = currentModifiers.filter(mod => mod !== modifier);
+      newConfigs[index].mods = currentModifiers.filter(mod => mod !== modifier);
     } else {
-      newConfigs[index].selectedModifiers = [ ...currentModifiers, modifier ];
+      newConfigs[index].mods = [ ...currentModifiers, modifier ];
     }
 
     setKeyConfigs(newConfigs);
@@ -212,7 +215,7 @@ const HIDControlsConfigurator = ({ numKeys = 4, defaultValues, onConfigChange })
 
   const handleComboKeyChange = (index, key) => {
     const newConfigs = [ ...keyConfigs ];
-    newConfigs[index].key = key;
+    newConfigs[index].action = key;
     setKeyConfigs(newConfigs);
     onConfigChange?.({ keys: newConfigs, encoder: encoderConfig });
   };
@@ -232,8 +235,8 @@ const HIDControlsConfigurator = ({ numKeys = 4, defaultValues, onConfigChange })
         click = "KC_MEDIA_PLAY_PAUSE";
         break;
       case 'system_navigation':
-        left = "KC_WWW_BACK";
-        right = "KC_WWW_FORWARD";
+        left = "KC_MS_BTN4";
+        right = "KC_MS_BTN5";
         click = "KC_WWW_HOME";
         break;
       case 'cursor_fine':
@@ -390,7 +393,7 @@ const HIDControlsConfigurator = ({ numKeys = 4, defaultValues, onConfigChange })
                         {modifiers.map((modifier, modIdx) => (
                           <button
                             key={`mod-${modIdx}`}
-                            className={config.selectedModifiers.includes(modifier) ? "" : "success"}
+                            className={config.mods.includes(modifier) ? "" : "success"}
                             onClick={() => handleModifierToggle(idx, modifier)}
                             type="button"
                           >
@@ -402,8 +405,8 @@ const HIDControlsConfigurator = ({ numKeys = 4, defaultValues, onConfigChange })
                     <div className="setting-item">
                       <div className="setting-title">Key</div>
                       <select
-                        value={config.key}
-                        onChange={(e) => handleComboKeyChange(idx, e.target.value)}
+                        value={config.action}
+                        onChange={(e) => handleKeyConfigChange(idx, "action", e.target.value)}
                       >
                         {keyboardKeys.map((key, keyIdx) => (
                           <option key={`combo-key-${keyIdx}`} value={key.key}>{key.value}</option>
