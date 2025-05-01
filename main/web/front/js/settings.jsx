@@ -438,7 +438,7 @@ const App = () => {
                             For high speed (polling rate) devices, it is possible to choose higher BLE report rate.
                             Please note that it is not supported by the BLE standard and may or may not work in your case.
                             This option will not affect normal speed (125 rps) devices in any way.
-                            Values are calculated for a 1000 Hz USB device.
+                            The values are calibrated for 1000 Hz USB devices, other rates not supported.
                             Some modes might work better than others with your device(s).
                         </div>
                         <select
