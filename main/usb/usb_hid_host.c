@@ -477,7 +477,7 @@ static IRAM_ATTR void client_event_callback(const usb_host_client_event_msg_t *e
     }
 }
 
-static IRAM_ATTR void device_event_task(void *arg) {
+static void device_event_task(void *arg) {
     usb_device_type_event_t evt;
     esp_err_t err;
 
@@ -560,7 +560,7 @@ static IRAM_ATTR void device_event_task(void *arg) {
     }
 }
 
-static IRAM_ATTR void hid_host_device_callback(const hid_host_device_handle_t hid_device_handle,
+static void hid_host_device_callback(const hid_host_device_handle_t hid_device_handle,
                                      const hid_host_driver_event_t event, void *arg) {
     const usb_device_type_event_t evt = {
         .device_handle = hid_device_handle,

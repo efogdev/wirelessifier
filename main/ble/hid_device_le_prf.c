@@ -165,7 +165,7 @@ static struct gatts_profile_inst hid_profile_tab[PROFILE_NUM] = {
     },
 };
 
-static void IRAM_ATTR gatts_event_handler(const esp_gatts_cb_event_t event, const esp_gatt_if_t gatts_if,
+static void gatts_event_handler(const esp_gatts_cb_event_t event, const esp_gatt_if_t gatts_if,
                                 esp_ble_gatts_cb_param_t *param) {
     if (event == ESP_GATTS_REG_EVT) {
         if (param->reg.status == ESP_GATT_OK) {

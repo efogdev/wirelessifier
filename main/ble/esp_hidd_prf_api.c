@@ -100,7 +100,7 @@ void IRAM_ATTR esp_hidd_send_mouse_value(const uint16_t conn_id, const uint8_t m
                         s_report_buffer);
 }
 
-void IRAM_ATTR esp_hidd_send_system_control_value(const uint16_t conn_id, const uint16_t sys_ctrl) {
+void esp_hidd_send_system_control_value(const uint16_t conn_id, const uint16_t sys_ctrl) {
     s_report_buffer[0] = sys_ctrl & 0xFF;
     s_report_buffer[1] = (sys_ctrl >> 8);
 
@@ -108,7 +108,7 @@ void IRAM_ATTR esp_hidd_send_system_control_value(const uint16_t conn_id, const 
                         s_report_buffer);
 }
 
-void IRAM_ATTR esp_hidd_send_consumer_value(const uint16_t conn_id, const uint16_t consumer_control) {
+void esp_hidd_send_consumer_value(const uint16_t conn_id, const uint16_t consumer_control) {
     s_report_buffer[0] = consumer_control & 0xFF;
     s_report_buffer[1] = (consumer_control >> 8);
 

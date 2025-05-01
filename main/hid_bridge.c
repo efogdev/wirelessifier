@@ -350,7 +350,7 @@ esp_err_t hid_bridge_stop(void) {
     return ESP_OK;
 }
 
-static IRAM_ATTR esp_err_t process_keyboard_report(const usb_hid_report_t *report) {
+static esp_err_t process_keyboard_report(const usb_hid_report_t *report) {
     const uint8_t expected_fields = usb_hid_host_get_num_fields(report->report_id, report->if_id);
     if (expected_fields != report->info->num_fields) {
         ESP_LOGW(TAG, "Unexpected number of fields: expected=%d, got=%d", expected_fields, report->info->num_fields);

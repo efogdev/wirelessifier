@@ -8,8 +8,8 @@
 #include <esp_mac.h>
 #include "const.h"
 
-#define MAX_CACHE_SIZE 16
-#define MAX_PATH_LENGTH 48
+#define MAX_CACHE_SIZE 8
+#define MAX_PATH_LENGTH 32
 
 typedef enum {
     CACHE_TYPE_STRING,
@@ -264,7 +264,7 @@ esp_err_t storage_update_settings(const char* settings_json) {
     return err;
 }
 
-static IRAM_ATTR cJSON* find_json_by_path(const char* path) {
+static cJSON* find_json_by_path(const char* path) {
     if (!path || !current_settings) return NULL;
     
     cJSON *root = cJSON_Parse(current_settings);
@@ -330,7 +330,7 @@ static IRAM_ATTR cJSON* find_json_by_path(const char* path) {
     return result;
 }
 
-IRAM_ATTR esp_err_t storage_get_string_setting(const char* path, char* value, const size_t max_len) {
+esp_err_t storage_get_string_setting(const char* path, char* value, const size_t max_len) {
     if (!path || !value || max_len == 0) return ESP_ERR_INVALID_ARG;
     
     cache_entry_t* entry = cache_find(path);
@@ -359,7 +359,7 @@ IRAM_ATTR esp_err_t storage_get_string_setting(const char* path, char* value, co
     return ESP_ERR_INVALID_ARG;
 }
 
-IRAM_ATTR esp_err_t storage_get_int_setting(const char* path, int* value) {
+esp_err_t storage_get_int_setting(const char* path, int* value) {
     if (!path || !value) return ESP_ERR_INVALID_ARG;
     
     cache_entry_t* entry = cache_find(path);
@@ -385,7 +385,7 @@ IRAM_ATTR esp_err_t storage_get_int_setting(const char* path, int* value) {
     return ESP_ERR_INVALID_ARG;
 }
 
-IRAM_ATTR esp_err_t storage_get_bool_setting(const char* path, bool* value) {
+esp_err_t storage_get_bool_setting(const char* path, bool* value) {
     if (!path || !value) return ESP_ERR_INVALID_ARG;
     
     cache_entry_t* entry = cache_find(path);

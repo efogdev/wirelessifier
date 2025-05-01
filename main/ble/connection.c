@@ -210,7 +210,7 @@ bool has_saved_device(void) {
 esp_err_t get_saved_device(esp_bd_addr_t bda, esp_ble_addr_type_t *addr_type) {
     // If cache is not valid, try to load from NVS
     if (!saved_device_cache.is_valid) {
-        esp_err_t err = load_saved_device_to_cache();
+        const esp_err_t err = load_saved_device_to_cache();
         if (err != ESP_OK) {
             return err;
         }

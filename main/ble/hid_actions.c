@@ -7,8 +7,8 @@
 static const char *TAG = "HID_ACTIONS";
 
 typedef struct {
-    char action_type[24];
-    char action[24];
+    char action_type[20];
+    char action[20];
     union {
         keyboard_key_t key;
         mouse_button_t button;
@@ -32,7 +32,7 @@ typedef struct {
     esp_timer_handle_t timer;
 } release_timer_t;
 
-#define CACHE_SIZE 16
+#define CACHE_SIZE 6
 static cache_entry_t cache[CACHE_SIZE];
 static int cache_count = 0;
 
@@ -44,7 +44,7 @@ static struct {
     .wheel_horizontal = false
 };
 
-static IRAM_ATTR void release_timer_callback(void* arg) {
+static void release_timer_callback(void* arg) {
     release_timer_t* timer_data = (release_timer_t*)arg;
     
     switch (timer_data->type) {
@@ -66,15 +66,15 @@ static IRAM_ATTR void release_timer_callback(void* arg) {
     free(timer_data);
 }
 
-static IRAM_ATTR void schedule_release(const uint16_t conn_id, const uint8_t type, void* data) {
+static void schedule_release(const uint16_t conn_id, const uint8_t type, const void* data) {
     release_timer_t* timer_data = malloc(sizeof(release_timer_t));
     if (!timer_data) return;
 
     timer_data->conn_id = conn_id;
     timer_data->type = type;
     memcpy(&timer_data->data, data, sizeof(timer_data->data));
-    
-    esp_timer_create_args_t timer_args = {
+
+    const esp_timer_create_args_t timer_args = {
         .callback = release_timer_callback,
         .arg = timer_data,
         .name = "release_timer"
@@ -87,31 +87,31 @@ static IRAM_ATTR void schedule_release(const uint16_t conn_id, const uint8_t typ
     esp_timer_start_once(timer_data->timer, 50000); // 50ms in microseconds
 }
 
-IRAM_ATTR void execute_keyboard_action(const uint16_t conn_id, const keyboard_key_t key, const uint8_t modifiers) {
+void execute_keyboard_action(const uint16_t conn_id, const keyboard_key_t key, const uint8_t modifiers) {
     uint8_t keyboard_cmd[8] = {0};  // 6 keys + 2 reserved
     keyboard_cmd[0] = key;
     esp_hidd_send_keyboard_value(conn_id, modifiers, keyboard_cmd);
-    
-    struct { keyboard_key_t key; uint8_t modifiers; } data = { key, modifiers };
+
+    const struct { keyboard_key_t key; uint8_t modifiers; } data = { key, modifiers };
     schedule_release(conn_id, 1, &data);
 }
 
-IRAM_ATTR void execute_mouse_button_action(const uint16_t conn_id, const mouse_button_t button) {
+void execute_mouse_button_action(const uint16_t conn_id, const mouse_button_t button) {
     esp_hidd_send_mouse_value(conn_id, button, 0, 0, 0, 0);
     schedule_release(conn_id, 2, &button);
 }
 
-IRAM_ATTR void execute_system_control_action(const uint16_t conn_id, const system_control_t control) {
+void execute_system_control_action(const uint16_t conn_id, const system_control_t control) {
     esp_hidd_send_system_control_value(conn_id, control);
     schedule_release(conn_id, 3, &control);
 }
 
-IRAM_ATTR void execute_consumer_control_action(const uint16_t conn_id, const consumer_control_t control) {
+void execute_consumer_control_action(const uint16_t conn_id, const consumer_control_t control) {
     esp_hidd_send_consumer_value(conn_id, control);
     schedule_release(conn_id, 4, &control);
 }
 
-IRAM_ATTR void execute_special_action(const uint16_t conn_id, const special_key_t action) {
+void execute_special_action(const uint16_t conn_id, const special_key_t action) {
     switch (action) {
         case KC_CURSOR_BACK:
             if (state.cursor_y_axis) {
@@ -155,7 +155,7 @@ IRAM_ATTR void execute_special_action(const uint16_t conn_id, const special_key_
     }
 }
 
-IRAM_ATTR keyboard_key_t string_to_keyboard_key(const char* str) {
+keyboard_key_t string_to_keyboard_key(const char* str) {
     if (strncmp(str, "KC_", 3) != 0) return 0;
     str += 3;  // Skip "KC_" prefix
 
@@ -224,7 +224,7 @@ IRAM_ATTR keyboard_key_t string_to_keyboard_key(const char* str) {
     return 0;
 }
 
-IRAM_ATTR mouse_button_t string_to_mouse_button(const char* str) {
+mouse_button_t string_to_mouse_button(const char* str) {
     if (strcmp(str, "KC_MS_BTN1") == 0) return KC_MS_BTN1;
     if (strcmp(str, "KC_MS_BTN2") == 0) return KC_MS_BTN2;
     if (strcmp(str, "KC_MS_BTN3") == 0) return KC_MS_BTN3;
@@ -236,14 +236,14 @@ IRAM_ATTR mouse_button_t string_to_mouse_button(const char* str) {
     return 0;
 }
 
-IRAM_ATTR system_control_t string_to_system_control(const char* str) {
+system_control_t string_to_system_control(const char* str) {
     if (strcmp(str, "KC_SYSTEM_POWER") == 0) return KC_SYSTEM_POWER;
     if (strcmp(str, "KC_SYSTEM_SLEEP") == 0) return KC_SYSTEM_SLEEP;
     if (strcmp(str, "KC_SYSTEM_WAKE") == 0) return KC_SYSTEM_WAKE;
     return 0;
 }
 
-IRAM_ATTR consumer_control_t string_to_consumer_control(const char* str) {
+consumer_control_t string_to_consumer_control(const char* str) {
     const struct {
         const char* name;
         consumer_control_t code;
@@ -282,7 +282,7 @@ IRAM_ATTR consumer_control_t string_to_consumer_control(const char* str) {
     return 0;
 }
 
-IRAM_ATTR special_key_t string_to_special_key(const char* str) {
+special_key_t string_to_special_key(const char* str) {
     if (strcmp(str, "KC_CURSOR_BACK") == 0) return KC_CURSOR_BACK;
     if (strcmp(str, "KC_CURSOR_FORWARD") == 0) return KC_CURSOR_FORWARD;
     if (strcmp(str, "KC_CURSOR_SWITCH") == 0) return KC_CURSOR_SWITCH;
@@ -292,7 +292,7 @@ IRAM_ATTR special_key_t string_to_special_key(const char* str) {
     return 0;
 }
 
-IRAM_ATTR uint8_t string_to_modifiers(const char** modifiers, const int count) {
+uint8_t string_to_modifiers(const char** modifiers, const int count) {
     uint8_t mod = 0;
     for (int i = 0; i < count; i++) {
         if (strcmp(modifiers[i], "Ctrl") == 0) mod |= MOD_CTRL;
@@ -313,7 +313,7 @@ static IRAM_ATTR cache_entry_t* find_in_cache(const char* action_type, const cha
     return NULL;
 }
 
-static IRAM_ATTR void add_to_cache(const char* action_type, const char* action, const uint8_t type, void* parsed) {
+static void add_to_cache(const char* action_type, const char* action, const uint8_t type, const void* parsed) {
     if (cache_count >= CACHE_SIZE) {
         memmove(&cache[0], &cache[1], sizeof(cache_entry_t) * (CACHE_SIZE - 1));
         cache_count--;
@@ -326,7 +326,7 @@ static IRAM_ATTR void add_to_cache(const char* action_type, const char* action, 
     memcpy(&entry->parsed, parsed, sizeof(entry->parsed));
 }
 
-IRAM_ATTR void execute_action_from_string(const uint16_t conn_id, const char* action_type, const char* action,
+void execute_action_from_string(const uint16_t conn_id, const char* action_type, const char* action,
                               const char** modifiers, const int modifier_count) {
     const char* effective_type = action_type;
     if (!action_type || action_type[0] == '\0') {
@@ -378,7 +378,7 @@ IRAM_ATTR void execute_action_from_string(const uint16_t conn_id, const char* ac
     }
 
     if (strcmp(effective_type, "keyboard_key") == 0 || strcmp(effective_type, "keyboard_combo") == 0) {
-        keyboard_key_t key = string_to_keyboard_key(action);
+        const keyboard_key_t key = string_to_keyboard_key(action);
         if (key) {
             add_to_cache(effective_type, action, 1, &key);
             execute_keyboard_action(conn_id, key, 
@@ -386,26 +386,26 @@ IRAM_ATTR void execute_action_from_string(const uint16_t conn_id, const char* ac
                 string_to_modifiers(modifiers, modifier_count) : 0);
         }
     } else if (strcmp(effective_type, "mouse_button") == 0) {
-        mouse_button_t button = string_to_mouse_button(action);
+        const mouse_button_t button = string_to_mouse_button(action);
         if (button) {
             add_to_cache(effective_type, action, 2, &button);
             execute_mouse_button_action(conn_id, button);
         }
     } else if (strcmp(effective_type, "system_control") == 0) {
-        system_control_t control = string_to_system_control(action);
+        const system_control_t control = string_to_system_control(action);
         if (control) {
             add_to_cache(effective_type, action, 3, &control);
             execute_system_control_action(conn_id, control);
         }
     } else {
-        special_key_t special = string_to_special_key(action);
+        const special_key_t special = string_to_special_key(action);
         if (special) {
             add_to_cache(effective_type, action, 5, &special);
             execute_special_action(conn_id, special);
             return;
         }
 
-        consumer_control_t consumer = string_to_consumer_control(action);
+        const consumer_control_t consumer = string_to_consumer_control(action);
         if (consumer) {
             add_to_cache(effective_type, action, 4, &consumer);
             execute_consumer_control_action(conn_id, consumer);

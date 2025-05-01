@@ -28,7 +28,7 @@ static uint16_t s_current_fps = BASE_FPS;
 static int s_gpio_pin = 0;
 uint8_t g_rgb_brightness = 35;
 
-IRAM_ATTR static uint32_t get_cycle_time_ms(const uint8_t speed) {
+static uint32_t get_cycle_time_ms(const uint8_t speed) {
     if (speed == 0) return MAX_CYCLE_TIME_MS;
     return MIN_CYCLE_TIME_MS + ((MAX_CYCLE_TIME_MS - MIN_CYCLE_TIME_MS) * (100 - speed)) / 100;
 }
@@ -103,7 +103,7 @@ typedef struct {
     status_animation_type_t animation;
 } status_led_state_t;
 
-IRAM_ATTR static void update_status_led_state(status_led_state_t *state, tNeopixel* pixel) {
+static void update_status_led_state(status_led_state_t *state, tNeopixel* pixel) {
     const uint32_t current_time = pdTICKS_TO_MS(xTaskGetTickCount());
     
     if (state->animation != WIFI_ANIM_NONE) {
