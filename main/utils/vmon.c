@@ -49,7 +49,7 @@ void vmon_task(void *pvParameters) {
             bat_volts = bat_volts - 0.2f;
         }
 
-        vTaskDelay(pdMS_TO_TICKS(60));
+        vTaskDelay(pdMS_TO_TICKS(128));
     }
 }
 
@@ -64,39 +64,32 @@ bool is_psu_connected(void) {
 }
 
 float get_battery_level(void) {
-    return bat_volts;
+    static float prev_level = 0;
+    if (prev_level == 0) {
+        prev_level = bat_volts;
+        return bat_volts;
+    }
+    
+    if (is_charging()) {
+        prev_level = bat_volts > prev_level ? bat_volts : prev_level;
+    } else {
+        prev_level = bat_volts < prev_level ? bat_volts : prev_level;
+    }
+    return prev_level;
 }
 
 battery_state_t get_battery_state(void) {
-    static battery_state_t prev_state = BATTERY_NORMAL;
     battery_state_t new_state;
 
     if (is_charging()) {
         new_state = BATTERY_CHARGING;
-    } else if (is_psu_connected()) {
+    } else if (get_battery_level() > 3.75f || is_psu_connected()) {
         new_state = BATTERY_NORMAL;
-    } else if (prev_state == BATTERY_NORMAL) {
-        if (bat_volts > 3.55f) {
-            new_state = BATTERY_NORMAL;
-        } else {
-            new_state = BATTERY_WARNING;
-        }
-    } else if (prev_state == BATTERY_WARNING) {
-        if (bat_volts > 3.65f) {
-            new_state = BATTERY_NORMAL;
-        } else if (bat_volts > 3.45f) {
-            new_state = BATTERY_WARNING;
-        } else {
-            new_state = BATTERY_LOW;
-        }
-    } else { 
-        if (bat_volts > 3.55f) {
-            new_state = BATTERY_WARNING;
-        } else {
-            new_state = BATTERY_LOW;
-        }
+    } else if (get_battery_level() > 3.65f) {
+        new_state = BATTERY_WARNING;
+    } else {
+        new_state = BATTERY_LOW;
     }
 
-    prev_state = new_state;
     return new_state;
 }

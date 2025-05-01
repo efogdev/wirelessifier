@@ -122,26 +122,52 @@ static void battery_timer_callback(TimerHandle_t timer) {
         return;
     }
 
-    uint8_t level;
+    uint8_t level = 0;
     float voltage = get_battery_level();
     const bool chg = is_charging();
     if (chg) {
         voltage += .2f;
     }
-    
-    // LiPo battery discharge curve is non-linear
-    // 4.2V = 100%, 3.7V = ~50%, 3.3V = 0%
-    if (voltage >= 4.2f) {
+
+    // LiPo battery discharge curve using piecewise linear interpolation
+    // Based on the provided voltage-percentage table
+    if (voltage >= 4.20f) {
         level = 100;
-    } else if (voltage <= 3.3f) {
+    } else if (voltage <= 3.27f) {
         level = 0;
     } else {
-        if (voltage >= 3.7f) {
-            // 3.7V-4.2V = 50-100%
-            level = 50 + (uint8_t)((voltage - 3.7f) * (50.0f / 0.5f));
-        } else {
-            // 3.3V-3.7V = 0-50%
-            level = (uint8_t)((voltage - 3.3f) * (50.0f / 0.4f));
+        const float voltage_levels[] = {
+            4.20f, 4.15f, 4.11f, 4.08f, 4.02f, 3.98f, 3.95f, 3.91f, 3.87f, 3.85f,
+            3.84f, 3.82f, 3.80f, 3.79f, 3.77f, 3.75f, 3.73f, 3.71f, 3.69f, 3.61f, 3.27f
+        };
+
+        const uint8_t percentage_levels[] = {
+            100, 95, 90, 85, 80, 75, 70, 65, 60, 55,
+            50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 0
+        };
+
+        const int num_levels = sizeof(voltage_levels) / sizeof(voltage_levels[0]);
+
+        int i;
+        for (i = 0; i < num_levels - 1; i++) {
+            if (voltage <= voltage_levels[i] && voltage >= voltage_levels[i+1]) {
+                // Linear interpolation formula
+                level = percentage_levels[i] +
+                    (uint8_t)((voltage - voltage_levels[i]) *
+                    (float)(percentage_levels[i+1] - percentage_levels[i]) /
+                    (voltage_levels[i+1] - voltage_levels[i]));
+                break;
+            }
+        }
+
+        if (i == num_levels - 1) {
+            if (voltage > 4.20f) {
+                level = 100;
+            } else if (voltage < 3.27f) {
+                level = 0;
+            } else {
+                level = 50;
+            }
         }
     }
 
