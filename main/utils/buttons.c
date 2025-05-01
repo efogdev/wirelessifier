@@ -32,7 +32,7 @@ void buttons_init() {
         gpio_isr_handler_add(GPIO_BUTTON_SW1 + i, button_isr_handler, (void*)(uint32_t)i);
     }
     
-    xTaskCreate(buttons_task, "buttons_task", 2400, NULL, 6, NULL);
+    xTaskCreate(buttons_task, "buttons_task", 2600, NULL, 6, NULL);
 }
 
 void buttons_subscribe_click(const button_click_callback_t callback) {
