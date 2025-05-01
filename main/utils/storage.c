@@ -8,7 +8,7 @@
 #include <esp_mac.h>
 #include "const.h"
 
-#define MAX_CACHE_SIZE 8
+#define MAX_CACHE_SIZE 16
 #define MAX_PATH_LENGTH 48
 
 typedef enum {
