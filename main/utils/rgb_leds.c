@@ -20,6 +20,8 @@
 #define STATUS_BLINK_PERIOD_MS 500
 #define WIFI_BLINK_FAST_MS 350
 #define WIFI_BLINK_SLOW_MS 2000
+#define BAT_BLINK_PERIOD_MS 15000
+#define BAT_BLINK_DURATION_MS 75
 
 static const char *TAG = "RGB_UTILS";
 static uint16_t s_current_fps = BASE_FPS;
@@ -183,23 +185,7 @@ static const led_pattern_t led_patterns[] __attribute__((section(".rodata"))) = 
         .trail_length = 2,
         .speed = 15,
         .direction_up = false
-    },
-    // BAT_WARNING
-    {
-        .colors = {NP_RGB(127, 127, 0), 0},
-        .type = ANIM_TYPE_BREATHING,
-        .trail_length = 1,
-        .speed = 1,
-        .direction_up = false
-    },
-    // BAT_LOW
-    {
-        .colors = {NP_RGB(64, 0, 0), 0},
-        .type = ANIM_TYPE_BREATHING,
-        .trail_length = 1,
-        .speed = 25,
-        .direction_up = false
-    },
+    }
 };
 
 static int s_led_pattern = LED_PATTERN_IDLE;
@@ -209,6 +195,8 @@ static TaskHandle_t s_led_task_handle = NULL;
 static uint32_t s_last_pattern_change_time = 0;
 static bool s_in_wakeup_debounce = false;
 static uint32_t s_wakeup_debounce_start_time = 0;
+static uint32_t s_last_bat_blink = 0;
+static bool s_bat_blinking = false;
 
 // Animation state
 static animation_state_t s_animation_state = {0};
@@ -374,10 +362,32 @@ IRAM_ATTR void led_update_pattern(const bool usb_connected, const bool ble_conne
     // high priority
     if (battery_state == BATTERY_CHARGING) {
         new_pattern = LED_PATTERN_CHARGING;
-    } else if (battery_state == BATTERY_WARNING) {
-        new_pattern = LED_PATTERN_BAT_WARNING;
-    } else if (battery_state == BATTERY_LOW) {
-        new_pattern = LED_PATTERN_BAT_LOW;
+    }
+
+    // Handle battery warning/low states with blinking
+    if (current_time - s_last_bat_blink >= BAT_BLINK_PERIOD_MS) {
+        s_last_bat_blink = current_time;
+        if (battery_state == BATTERY_WARNING || battery_state == BATTERY_LOW) {
+            s_bat_blinking = true;
+        }
+    }
+
+    if (s_bat_blinking) {
+        if (current_time - s_last_bat_blink >= BAT_BLINK_DURATION_MS) {
+            s_bat_blinking = false;
+        } else {
+            // Override pattern with battery warning/low indication
+            tNeopixel pixels[s_num_leds];
+            for (int i = 0; i < s_num_leds; i++) {
+                pixels[i].index = i;
+                pixels[i].rgb = color_with_brightness(
+                    battery_state == BATTERY_WARNING ? NP_RGB(127, 127, 0) : NP_RGB(127, 0, 0),
+                    g_rgb_brightness
+                );
+            }
+            neopixel_SetPixel(neopixel_ctx, pixels, s_num_leds);
+            return;
+        }
     }
 
     if (s_led_pattern == LED_PATTERN_SLEEPING && new_pattern != LED_PATTERN_SLEEPING && !s_in_wakeup_debounce) {

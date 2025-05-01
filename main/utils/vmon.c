@@ -60,17 +60,35 @@ bool is_psu_connected(void) {
 }
 
 battery_state_t get_battery_state(void) {
+    static battery_state_t prev_state = BATTERY_NORMAL;
+    battery_state_t new_state;
+
     if (is_charging()) {
-        return BATTERY_CHARGING;
+        new_state = BATTERY_CHARGING;
+    } else if (is_psu_connected()) {
+        new_state = BATTERY_NORMAL;
+    } else if (prev_state == BATTERY_NORMAL) {
+        if (bat_volts > 3.55f) {
+            new_state = BATTERY_NORMAL;
+        } else {
+            new_state = BATTERY_WARNING;
+        }
+    } else if (prev_state == BATTERY_WARNING) {
+        if (bat_volts > 3.65f) {
+            new_state = BATTERY_NORMAL;
+        } else if (bat_volts > 3.45f) {
+            new_state = BATTERY_WARNING;
+        } else {
+            new_state = BATTERY_LOW;
+        }
+    } else { 
+        if (bat_volts > 3.55f) {
+            new_state = BATTERY_WARNING;
+        } else {
+            new_state = BATTERY_LOW;
+        }
     }
-    if (is_psu_connected()) {
-        return BATTERY_NORMAL;
-    }
-    if (bat_volts > 3.6f) {
-        return BATTERY_NORMAL;
-    }
-    if (bat_volts > 3.5f) {
-        return BATTERY_WARNING;
-    }
-    return BATTERY_LOW;
+
+    prev_state = new_state;
+    return new_state;
 }
