@@ -176,9 +176,9 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
 
   const [ encoderConfig, setEncoderConfig ] = React.useState({
     mode: 'standard_actions',
-    rotateLeft: "Volume Down",
-    rotateRight: "Volume Up",
-    click: "Mute"
+    rotateLeft: "KC_AUDIO_VOL_DOWN",
+    rotateRight: "KC_AUDIO_VOL_UP",
+    click: "KC_AUDIO_MUTE"
   });
 
   React.useEffect(() => {
@@ -244,29 +244,29 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
 
     switch (mode) {
       case 'volume_control':
-        rotateLeft = "Volume Down";
-        rotateRight = "Volume Up";
-        click = "Mute";
+        rotateLeft = "KC_AUDIO_VOL_DOWN";
+        rotateRight = "KC_AUDIO_VOL_UP";
+        click = "KC_AUDIO_MUTE";
         break;
       case 'media_control':
-        rotateLeft = "Media Previous";
-        rotateRight = "Media Next";
-        click = "Media Play/Pause";
+        rotateLeft = "KC_MEDIA_PREV_TRACK";
+        rotateRight = "KC_MEDIA_NEXT_TRACK";
+        click = "KC_MEDIA_PLAY_PAUSE";
         break;
       case 'system_navigation':
-        rotateLeft = "System Back";
-        rotateRight = "System Forward";
+        rotateLeft = "KC_WWW_BACK";
+        rotateRight = "KC_WWW_FORWARD";
         click = "";
         break;
       case 'scroll':
-        rotateLeft = "Scroll Down";
-        rotateRight = "Scroll Up";
-        click = "Switch Vertical/Horizontal";
+        rotateLeft = "KC_MS_WH_DOWN";
+        rotateRight = "KC_MS_WH_UP";
+        click = "KC_MS_WH_SWITCH";
         break;
       default:
-        rotateLeft = "Volume Down";
-        rotateRight = "Volume Up";
-        click = "Mute";
+        rotateLeft = "KC_AUDIO_VOL_DOWN";
+        rotateRight = "KC_AUDIO_VOL_UP";
+        click = "KC_AUDIO_MUTE";
     }
 
     const newConfig = {
@@ -280,12 +280,23 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
   };
 
   const handleEncoderActionChange = (event, action) => {
+    const selectedOption = Object.values(actionOptions)
+      .flat()
+      .find(option => option.value === event.target.value);
+
     const newConfig = {
       ...encoderConfig,
-      [action]: event.target.value
+      [action]: selectedOption.key
     };
     setEncoderConfig(newConfig);
     onConfigChange?.({ keys: keyConfigs, encoder: newConfig });
+  };
+
+  const getDisplayValue = (keyCode) => {
+    const option = Object.values(actionOptions)
+      .flat()
+      .find(option => option.key === keyCode);
+    return option ? option.value : keyCode;
   };
 
   const renderEncoderConfig = () => {
@@ -295,7 +306,7 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
           <div className="setting-item">
             <div className="setting-title">Rotate Left</div>
             <select
-              value={encoderConfig.rotateLeft}
+              value={getDisplayValue(encoderConfig.rotateLeft)}
               onChange={(e) => handleEncoderActionChange(e, "rotateLeft")}
             >
               {Object.values(actionOptions).flat().map((option, idx) => (
@@ -306,7 +317,7 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
           <div className="setting-item">
             <div className="setting-title">Rotate Right</div>
             <select
-              value={encoderConfig.rotateRight}
+              value={getDisplayValue(encoderConfig.rotateRight)}
               onChange={(e) => handleEncoderActionChange(e, "rotateRight")}
             >
               {Object.values(actionOptions).flat().map((option, idx) => (
@@ -317,7 +328,7 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
           <div className="setting-item">
             <div className="setting-title">Click</div>
             <select
-              value={encoderConfig.click}
+              value={getDisplayValue(encoderConfig.click)}
               onChange={(e) => handleEncoderActionChange(e, "click")}
             >
               {Object.values(actionOptions).flat().map((option, idx) => (
@@ -331,13 +342,13 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
       return (
         <div className="setting-item">
           <div className="setting-title">Rotate Left:</div>
-          <div className="setting-description">{encoderConfig.rotateLeft}</div>
+          <div className="setting-description">{getDisplayValue(encoderConfig.rotateLeft)}</div>
 
           <div className="setting-title">Rotate Right:</div>
-          <div className="setting-description">{encoderConfig.rotateRight}</div>
+          <div className="setting-description">{getDisplayValue(encoderConfig.rotateRight)}</div>
 
           <div className="setting-title">Click:</div>
-          <div className="setting-description">{encoderConfig.click}</div>
+          <div className="setting-description">{getDisplayValue(encoderConfig.click)}</div>
         </div>
       );
     }
