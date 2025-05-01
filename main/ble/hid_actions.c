@@ -44,7 +44,7 @@ static struct {
     .wheel_horizontal = false
 };
 
-static void release_timer_callback(void* arg) {
+static IRAM_ATTR void release_timer_callback(void* arg) {
     release_timer_t* timer_data = (release_timer_t*)arg;
     
     switch (timer_data->type) {
@@ -66,7 +66,7 @@ static void release_timer_callback(void* arg) {
     free(timer_data);
 }
 
-static void schedule_release(const uint16_t conn_id, const uint8_t type, void* data) {
+static IRAM_ATTR void schedule_release(const uint16_t conn_id, const uint8_t type, void* data) {
     release_timer_t* timer_data = malloc(sizeof(release_timer_t));
     if (!timer_data) return;
 
@@ -87,7 +87,7 @@ static void schedule_release(const uint16_t conn_id, const uint8_t type, void* d
     esp_timer_start_once(timer_data->timer, 50000); // 50ms in microseconds
 }
 
-void execute_keyboard_action(const uint16_t conn_id, const keyboard_key_t key, const uint8_t modifiers) {
+IRAM_ATTR void execute_keyboard_action(const uint16_t conn_id, const keyboard_key_t key, const uint8_t modifiers) {
     uint8_t keyboard_cmd[8] = {0};  // 6 keys + 2 reserved
     keyboard_cmd[0] = key;
     esp_hidd_send_keyboard_value(conn_id, modifiers, keyboard_cmd);
@@ -96,22 +96,22 @@ void execute_keyboard_action(const uint16_t conn_id, const keyboard_key_t key, c
     schedule_release(conn_id, 1, &data);
 }
 
-void execute_mouse_button_action(const uint16_t conn_id, const mouse_button_t button) {
+IRAM_ATTR void execute_mouse_button_action(const uint16_t conn_id, const mouse_button_t button) {
     esp_hidd_send_mouse_value(conn_id, button, 0, 0, 0, 0);
     schedule_release(conn_id, 2, &button);
 }
 
-void execute_system_control_action(const uint16_t conn_id, const system_control_t control) {
+IRAM_ATTR void execute_system_control_action(const uint16_t conn_id, const system_control_t control) {
     esp_hidd_send_system_control_value(conn_id, control);
     schedule_release(conn_id, 3, &control);
 }
 
-void execute_consumer_control_action(const uint16_t conn_id, const consumer_control_t control) {
+IRAM_ATTR void execute_consumer_control_action(const uint16_t conn_id, const consumer_control_t control) {
     esp_hidd_send_consumer_value(conn_id, control);
     schedule_release(conn_id, 4, &control);
 }
 
-void execute_special_action(const uint16_t conn_id, const special_key_t action) {
+IRAM_ATTR void execute_special_action(const uint16_t conn_id, const special_key_t action) {
     switch (action) {
         case KC_CURSOR_BACK:
             if (state.cursor_y_axis) {
@@ -155,7 +155,7 @@ void execute_special_action(const uint16_t conn_id, const special_key_t action) 
     }
 }
 
-keyboard_key_t string_to_keyboard_key(const char* str) {
+IRAM_ATTR keyboard_key_t string_to_keyboard_key(const char* str) {
     if (strncmp(str, "KC_", 3) != 0) return 0;
     str += 3;  // Skip "KC_" prefix
 
@@ -224,7 +224,7 @@ keyboard_key_t string_to_keyboard_key(const char* str) {
     return 0;
 }
 
-mouse_button_t string_to_mouse_button(const char* str) {
+IRAM_ATTR mouse_button_t string_to_mouse_button(const char* str) {
     if (strcmp(str, "KC_MS_BTN1") == 0) return KC_MS_BTN1;
     if (strcmp(str, "KC_MS_BTN2") == 0) return KC_MS_BTN2;
     if (strcmp(str, "KC_MS_BTN3") == 0) return KC_MS_BTN3;
@@ -236,14 +236,14 @@ mouse_button_t string_to_mouse_button(const char* str) {
     return 0;
 }
 
-system_control_t string_to_system_control(const char* str) {
+IRAM_ATTR system_control_t string_to_system_control(const char* str) {
     if (strcmp(str, "KC_SYSTEM_POWER") == 0) return KC_SYSTEM_POWER;
     if (strcmp(str, "KC_SYSTEM_SLEEP") == 0) return KC_SYSTEM_SLEEP;
     if (strcmp(str, "KC_SYSTEM_WAKE") == 0) return KC_SYSTEM_WAKE;
     return 0;
 }
 
-consumer_control_t string_to_consumer_control(const char* str) {
+IRAM_ATTR consumer_control_t string_to_consumer_control(const char* str) {
     const struct {
         const char* name;
         consumer_control_t code;
@@ -282,7 +282,7 @@ consumer_control_t string_to_consumer_control(const char* str) {
     return 0;
 }
 
-special_key_t string_to_special_key(const char* str) {
+IRAM_ATTR special_key_t string_to_special_key(const char* str) {
     if (strcmp(str, "KC_CURSOR_BACK") == 0) return KC_CURSOR_BACK;
     if (strcmp(str, "KC_CURSOR_FORWARD") == 0) return KC_CURSOR_FORWARD;
     if (strcmp(str, "KC_CURSOR_SWITCH") == 0) return KC_CURSOR_SWITCH;
@@ -292,7 +292,7 @@ special_key_t string_to_special_key(const char* str) {
     return 0;
 }
 
-uint8_t string_to_modifiers(const char** modifiers, const int count) {
+IRAM_ATTR uint8_t string_to_modifiers(const char** modifiers, const int count) {
     uint8_t mod = 0;
     for (int i = 0; i < count; i++) {
         if (strcmp(modifiers[i], "Ctrl") == 0) mod |= MOD_CTRL;
@@ -303,7 +303,7 @@ uint8_t string_to_modifiers(const char** modifiers, const int count) {
     return mod;
 }
 
-static cache_entry_t* find_in_cache(const char* action_type, const char* action) {
+static IRAM_ATTR cache_entry_t* find_in_cache(const char* action_type, const char* action) {
     for (int i = 0; i < cache_count; i++) {
         if (strcmp(cache[i].action_type, action_type) == 0 && 
             strcmp(cache[i].action, action) == 0) {
@@ -313,7 +313,7 @@ static cache_entry_t* find_in_cache(const char* action_type, const char* action)
     return NULL;
 }
 
-static void add_to_cache(const char* action_type, const char* action, const uint8_t type, void* parsed) {
+static IRAM_ATTR void add_to_cache(const char* action_type, const char* action, const uint8_t type, void* parsed) {
     if (cache_count >= CACHE_SIZE) {
         memmove(&cache[0], &cache[1], sizeof(cache_entry_t) * (CACHE_SIZE - 1));
         cache_count--;
@@ -326,7 +326,7 @@ static void add_to_cache(const char* action_type, const char* action, const uint
     memcpy(&entry->parsed, parsed, sizeof(entry->parsed));
 }
 
-void execute_action_from_string(const uint16_t conn_id, const char* action_type, const char* action,
+IRAM_ATTR void execute_action_from_string(const uint16_t conn_id, const char* action_type, const char* action,
                               const char** modifiers, const int modifier_count) {
     const char* effective_type = action_type;
     if (!action_type || action_type[0] == '\0') {

@@ -33,7 +33,6 @@ const App = () => {
         power: {
             sleepTimeout: 60,
             deepSleepTimeout: 180,
-            lowPowerMode: false,
             enableSleep: true,
             deepSleep: true,
             twoSleeps: true,

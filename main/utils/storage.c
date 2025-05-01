@@ -37,7 +37,7 @@ static void cache_clear(void) {
     cache_count = 0;
 }
 
-static cache_entry_t* cache_find(const char* path) {
+static IRAM_ATTR cache_entry_t* cache_find(const char* path) {
     for(int i = 0; i < cache_count; i++) {
         if(strcmp(cache[i].path, path) == 0) {
             return &cache[i];
@@ -63,46 +63,40 @@ static const char *default_settings = "{"
         "\"macAddress\":\"00:00:00:00:00:00\""
     "},"
     "\"power\":{"
-        "\"lowPowerMode\":false,"
         "\"enableSleep\":true,"
         "\"warpSpeed\":\"slow\","
         "\"twoSleeps\":true,"
-        "\"sleepTimeout\":60,"
+        "\"sleepTimeout\":150,"
         "\"deepSleep\":true,"
         "\"fastCharge\":true,"
-        "\"deepSleepTimeout\":180,"
-        "\"output\":5.0"
+        "\"deepSleepTimeout\":600"
     "},"
     "\"led\":{"
-        "\"brightness\":25"
+        "\"brightness\":35"
     "},"
     "\"mouse\":{"
         "\"sensitivity\":100"
     "},"
     "\"connectivity\":{"
-        "\"bleTxPower\":\"p3\","
+        "\"bleTxPower\":\"p6\","
         "\"bleRecDelay\":3"
     "},"
     "\"buttons\":{"
         "\"keys\":["
             "{"
                 "\"acType\":\"keyboard_key\","
-                "\"key\":\"KC_ESCAPE\","
                 "\"action\":\"KC_ESCAPE\""
             "},"
             "{"
                 "\"acType\":\"system_control\","
-                "\"key\":\"KC_WWW_BACK\","
-                "\"action\":\"KC_WWW_BACK\""
+                "\"action\":\"KC_MS_BTN4\""
             "},"
             "{"
                 "\"acType\":\"system_control\","
-                "\"key\":\"KC_WWW_FORWARD\","
-                "\"action\":\"KC_WWW_FORWARD\""
+                "\"action\":\"KC_MS_BTN5\""
             "},"
             "{"
                 "\"acType\":\"keyboard_key\","
-                "\"key\":\"KC_ENTER\","
                 "\"action\":\"KC_ENTER\""
             "}"
         "],"
@@ -270,7 +264,7 @@ esp_err_t storage_update_settings(const char* settings_json) {
     return err;
 }
 
-static cJSON* find_json_by_path(const char* path) {
+static IRAM_ATTR cJSON* find_json_by_path(const char* path) {
     if (!path || !current_settings) return NULL;
     
     cJSON *root = cJSON_Parse(current_settings);
@@ -336,7 +330,7 @@ static cJSON* find_json_by_path(const char* path) {
     return result;
 }
 
-esp_err_t storage_get_string_setting(const char* path, char* value, const size_t max_len) {
+IRAM_ATTR esp_err_t storage_get_string_setting(const char* path, char* value, const size_t max_len) {
     if (!path || !value || max_len == 0) return ESP_ERR_INVALID_ARG;
     
     cache_entry_t* entry = cache_find(path);
@@ -365,7 +359,7 @@ esp_err_t storage_get_string_setting(const char* path, char* value, const size_t
     return ESP_ERR_INVALID_ARG;
 }
 
-esp_err_t storage_get_int_setting(const char* path, int* value) {
+IRAM_ATTR esp_err_t storage_get_int_setting(const char* path, int* value) {
     if (!path || !value) return ESP_ERR_INVALID_ARG;
     
     cache_entry_t* entry = cache_find(path);
@@ -391,7 +385,7 @@ esp_err_t storage_get_int_setting(const char* path, int* value) {
     return ESP_ERR_INVALID_ARG;
 }
 
-esp_err_t storage_get_bool_setting(const char* path, bool* value) {
+IRAM_ATTR esp_err_t storage_get_bool_setting(const char* path, bool* value) {
     if (!path || !value) return ESP_ERR_INVALID_ARG;
     
     cache_entry_t* entry = cache_find(path);
