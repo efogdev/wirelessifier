@@ -110,7 +110,7 @@ void app_main(void) {
 }
 
 static void init_variables() {
-    intrQueue = xQueueCreate(4, sizeof(int));
+    intrQueue = xQueueCreate(6, sizeof(int));
 }
 
 static void init_pm() {
@@ -305,7 +305,7 @@ static void init_gpio(void) {
 
     bool fast_charge;
     if (storage_get_bool_setting("power.fastCharge", &fast_charge) == ESP_OK && fast_charge) {
-        ESP_LOGW(TAG, "Fast charging enabled!");
+        ESP_LOGW(TAG, "Fast charging ENABLED!");
         gpio_set_level(GPIO_BAT_CE, 1);
 
         // ±5W

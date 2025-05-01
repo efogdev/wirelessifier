@@ -33,7 +33,6 @@ static uint32_t get_cycle_time_ms(const uint8_t speed) {
     return MIN_CYCLE_TIME_MS + ((MAX_CYCLE_TIME_MS - MIN_CYCLE_TIME_MS) * (100 - speed)) / 100;
 }
 
-// Color utility functions
 IRAM_ATTR static uint32_t color_with_brightness(const uint32_t color, const uint8_t brightness) {
     uint8_t r = (color >> 16) & 0xFF;
     uint8_t g = (color >> 8) & 0xFF;
@@ -313,7 +312,7 @@ void led_control_init(const int num_leds, const int gpio_pin)
         return;
     }
     
-    xTaskCreatePinnedToCore(led_control_task, "led_control", 1960, NULL, 7, &s_led_task_handle, 1);
+    xTaskCreatePinnedToCore(led_control_task, "led_control", 1960, NULL, 2, &s_led_task_handle, 1);
 }
 
 void led_control_deinit(void)
@@ -372,23 +371,6 @@ IRAM_ATTR void led_update_pattern(const bool usb_connected, const bool ble_conne
         }
     }
 
-    if (s_bat_blinking) {
-        if (current_time - s_last_bat_blink >= BAT_BLINK_DURATION_MS) {
-            s_bat_blinking = false;
-        } else {
-            // Override pattern with battery warning/low indication
-            tNeopixel pixels[s_num_leds];
-            for (int i = 0; i < s_num_leds; i++) {
-                pixels[i].index = i;
-                pixels[i].rgb = color_with_brightness(
-                    battery_state == BATTERY_WARNING ? NP_RGB(127, 127, 0) : NP_RGB(127, 0, 0),
-                    g_rgb_brightness
-                );
-            }
-            neopixel_SetPixel(neopixel_ctx, pixels, s_num_leds);
-            return;
-        }
-    }
 
     if (s_led_pattern == LED_PATTERN_SLEEPING && new_pattern != LED_PATTERN_SLEEPING && !s_in_wakeup_debounce) {
         s_in_wakeup_debounce = true;
@@ -645,6 +627,21 @@ __attribute__((section(".text"))) static void led_control_task(void *arg)
             }
         } else {
             memcpy(pixels, new_state, sizeof(tNeopixel) * s_num_leds);
+        }
+
+        if (s_bat_blinking) {
+            const uint32_t current_time = pdTICKS_TO_MS(xTaskGetTickCount());
+            if (current_time - s_last_bat_blink >= BAT_BLINK_DURATION_MS) {
+                s_bat_blinking = false;
+            } else {
+                const battery_state_t battery_state = get_battery_state();
+                for (int i = 0; i < s_num_leds; i++) {
+                    pixels[i].rgb = color_with_brightness(
+                        battery_state == BATTERY_WARNING ? NP_RGB(127, 127, 0) : NP_RGB(127, 0, 0),
+                        g_rgb_brightness
+                    );
+                }
+            }
         }
 
         neopixel_SetPixel(neopixel_ctx, pixels, s_num_leds);

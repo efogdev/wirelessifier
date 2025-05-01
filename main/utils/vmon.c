@@ -53,17 +53,17 @@ void vmon_task(void *pvParameters) {
     }
 }
 
-bool is_charging(void) {
+IRAM_ATTR bool is_charging(void) {
     // return false; // debug
     return s_psu_connected && s_charging;
 }
 
-bool is_psu_connected(void) {
+IRAM_ATTR bool is_psu_connected(void) {
     // return false; // debug
     return s_psu_connected;
 }
 
-float get_battery_level(void) {
+IRAM_ATTR float get_battery_level(void) {
     static float prev_level = 0;
     if (prev_level == 0) {
         prev_level = bat_volts;
@@ -78,14 +78,15 @@ float get_battery_level(void) {
     return prev_level;
 }
 
-battery_state_t get_battery_state(void) {
+IRAM_ATTR battery_state_t get_battery_state(void) {
     battery_state_t new_state;
+    const float level = get_battery_level();
 
     if (is_charging()) {
         new_state = BATTERY_CHARGING;
-    } else if (get_battery_level() > 3.75f || is_psu_connected()) {
+    } else if (level > 3.75f || is_psu_connected()) {
         new_state = BATTERY_NORMAL;
-    } else if (get_battery_level() > 3.65f) {
+    } else if (level > 3.65f) {
         new_state = BATTERY_WARNING;
     } else {
         new_state = BATTERY_LOW;
