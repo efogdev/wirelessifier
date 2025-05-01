@@ -165,7 +165,7 @@ static void buttons_cb(const uint8_t button) {
     sprintf(keyActionType, "buttons.keys[%d].acType", button);
 
     char keyAction[32];
-    sprintf(keyAction, "buttons.keysIRAM_ATTR[%d].action", button);
+    sprintf(keyAction, "buttons.keys[%d].action", button);
 
     char *mods[4];
     char mod_buffers[4][8];
