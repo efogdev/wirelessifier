@@ -129,7 +129,7 @@ static char* update_mac_address_in_settings(const char* settings_json) {
     
     cJSON *device_info = cJSON_GetObjectItem(root, "deviceInfo");
     if (!device_info) {
-        ESP_LOGE(STORAGE_TAG, "deviceInfo not found in settings");
+        ESP_LOGW(STORAGE_TAG, "deviceInfo not found in settings");
         char *result = strdup(settings_json);
         cJSON_Delete(root);
         return result;
@@ -296,7 +296,7 @@ static IRAM_ATTR cJSON* find_json_by_path(const char* path) {
                 if (token[0] != '\0') {
                     current = cJSON_GetObjectItem(current, token);
                     if (!current) {
-                        ESP_LOGE(STORAGE_TAG, "Object %s not found in settings", token);
+                        ESP_LOGW(STORAGE_TAG, "Object %s not found in settings", token);
                         free(path_copy);
                         cJSON_Delete(root);
                         return NULL;
@@ -305,7 +305,7 @@ static IRAM_ATTR cJSON* find_json_by_path(const char* path) {
                 
                 current = cJSON_GetArrayItem(current, index);
                 if (!current) {
-                    ESP_LOGE(STORAGE_TAG, "Array index %d not found in settings", index);
+                    ESP_LOGW(STORAGE_TAG, "Array index %d not found in settings", index);
                     free(path_copy);
                     cJSON_Delete(root);
                     return NULL;
@@ -314,7 +314,7 @@ static IRAM_ATTR cJSON* find_json_by_path(const char* path) {
         } else {
             current = cJSON_GetObjectItem(current, token);
             if (!current) {
-                ESP_LOGE(STORAGE_TAG, "Path %s not found in settings", path);
+                ESP_LOGW(STORAGE_TAG, "Path %s not found in settings", path);
                 free(path_copy);
                 cJSON_Delete(root);
                 return NULL;
