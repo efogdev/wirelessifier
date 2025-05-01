@@ -66,8 +66,10 @@ static void release_timer_callback(void* arg) {
     free(timer_data);
 }
 
-static void schedule_release(uint16_t conn_id, uint8_t type, void* data) {
+static void schedule_release(const uint16_t conn_id, const uint8_t type, void* data) {
     release_timer_t* timer_data = malloc(sizeof(release_timer_t));
+    if (!timer_data) return;
+
     timer_data->conn_id = conn_id;
     timer_data->type = type;
     memcpy(&timer_data->data, data, sizeof(timer_data->data));
@@ -78,11 +80,14 @@ static void schedule_release(uint16_t conn_id, uint8_t type, void* data) {
         .name = "release_timer"
     };
     
-    esp_timer_create(&timer_args, &timer_data->timer);
+    if (esp_timer_create(&timer_args, &timer_data->timer) != ESP_OK) {
+        free(timer_data);
+        return;
+    }
     esp_timer_start_once(timer_data->timer, 50000); // 50ms in microseconds
 }
 
-void execute_keyboard_action(const uint16_t conn_id, const keyboard_key_t key, uint8_t modifiers) {
+void execute_keyboard_action(const uint16_t conn_id, const keyboard_key_t key, const uint8_t modifiers) {
     uint8_t keyboard_cmd[8] = {0};  // 6 keys + 2 reserved
     keyboard_cmd[0] = key;
     esp_hidd_send_keyboard_value(conn_id, modifiers, keyboard_cmd);
@@ -328,7 +333,9 @@ void execute_action_from_string(const uint16_t conn_id, const char* action_type,
             }
         } else if (strncmp(action, "KC_SYSTEM_", 10) == 0) {
             effective_type = "system_control";
-        } else if (strncmp(action, "KC_", 3) == 0 && 
+        } else if (strncmp(action, "KC_CURSOR_", 10) == 0) {
+            effective_type = "special";
+        } else if (strncmp(action, "KC_", 3) == 0 &&
                   (strncmp(action + 3, "AUDIO_", 6) == 0 ||
                    strncmp(action + 3, "MEDIA_", 6) == 0 ||
                    strncmp(action + 3, "WWW_", 4) == 0 ||
@@ -386,7 +393,6 @@ void execute_action_from_string(const uint16_t conn_id, const char* action_type,
             execute_system_control_action(conn_id, control);
         }
     } else {
-        // Try special keys and consumer controls
         special_key_t special = string_to_special_key(action);
         if (special) {
             add_to_cache(effective_type, action, 5, &special);
