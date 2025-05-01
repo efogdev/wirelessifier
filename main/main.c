@@ -32,6 +32,7 @@
 #include "ulp_bat.h"
 #include "ulp/ulp_bat.h"
 #include "esp_sleep.h"
+#include "wifi_manager.h"
 
 static const char *TAG = "MAIN";
 static QueueHandle_t intrQueue = NULL;
@@ -341,6 +342,15 @@ static void rot_long_press_cb(void) {
     const uint8_t btn4 = gpio_get_level(GPIO_BUTTON_SW4);
     if (btn4 == 0) {
         storage_set_boot_with_wifi();
+    } else {
+        nvs_handle_t nvs_handle;
+        const esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
+        if (err == ESP_OK) {
+            nvs_set_u8(nvs_handle, NVS_KEY_BOOT_WITH_WIFI, 0);
+            nvs_commit(nvs_handle);
+            nvs_close(nvs_handle);
+            ESP_LOGI(TAG, "Cleared boot with WiFi flag");
+        }
     }
 
     esp_restart();
