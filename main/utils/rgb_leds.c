@@ -222,15 +222,10 @@ static void update_status_led(tNeopixel* pixels);
 static void apply_pattern(tNeopixel* pixels, const led_pattern_t* pattern);
 static void led_control_task(void *arg);
 static bool is_task_suspended = false;
-static bool is_in_flash_mode = false;
 
 // Function to check if the task should be suspended and handle suspension/resumption
 IRAM_ATTR static void check_and_update_task_suspension(void)
 {
-    if (is_in_flash_mode) {
-        return;
-    }
-
     static bool should_suspend = false;
     
     if (s_led_pattern >= 0 && s_led_pattern < sizeof(led_patterns)/sizeof(led_patterns[0])) {
@@ -338,10 +333,6 @@ void led_control_deinit(void)
 
 IRAM_ATTR void led_update_pattern(const bool usb_connected, const bool ble_connected, const bool ble_paused)
 {
-    if (is_in_flash_mode) {
-        return;
-    }
-
     int new_pattern = LED_PATTERN_IDLE;
     const uint32_t current_time = pdTICKS_TO_MS(xTaskGetTickCount());
     const battery_state_t battery_state = get_battery_state();
@@ -363,14 +354,13 @@ IRAM_ATTR void led_update_pattern(const bool usb_connected, const bool ble_conne
         new_pattern = LED_PATTERN_CHARGING;
     }
 
-    // Handle battery warning/low states with blinking
     if (current_time - s_last_bat_blink >= BAT_BLINK_PERIOD_MS) {
         s_last_bat_blink = current_time;
         if (battery_state == BATTERY_WARNING || battery_state == BATTERY_LOW) {
             s_bat_blinking = true;
+            return;
         }
     }
-
 
     if (s_led_pattern == LED_PATTERN_SLEEPING && new_pattern != LED_PATTERN_SLEEPING && !s_in_wakeup_debounce) {
         s_in_wakeup_debounce = true;
@@ -409,30 +399,22 @@ IRAM_ATTR void led_update_pattern(const bool usb_connected, const bool ble_conne
         s_use_secondary_color = false;
     }
     
-    check_and_update_task_suspension();
+    // check_and_update_task_suspension();
 }
 
 void led_update_status(const uint32_t color, const uint8_t mode)
 {
-    if (is_in_flash_mode) {
-        return;
-    }
-
     s_status_led_state.animation = WIFI_ANIM_NONE;
     s_status_led_state.color = color;
     s_status_led_state.mode = mode;
     s_status_led_state.blink_state = false;
     s_status_led_state.last_blink_time = 0;
     
-    check_and_update_task_suspension();
+    // check_and_update_task_suspension();
 }
 
 void led_update_wifi_status(bool is_apsta_mode, bool is_connected)
 {
-    if (is_in_flash_mode) {
-        return;
-    }
-
     s_wifi_apsta_mode = is_apsta_mode;
     s_wifi_connected = is_connected;
     
@@ -447,7 +429,7 @@ void led_update_wifi_status(bool is_apsta_mode, bool is_connected)
     s_status_led_state.blink_state = false;
     s_status_led_state.last_blink_time = 0;
     
-    check_and_update_task_suspension();
+    // check_and_update_task_suspension();
 }
 
 void IRAM_ATTR rgb_enter_flash_mode(void)
@@ -461,17 +443,13 @@ void IRAM_ATTR rgb_enter_flash_mode(void)
 
 __attribute__((section(".text"))) static void update_status_led(tNeopixel* pixels)
 {
-    if (is_in_flash_mode) {
-        return;
-    }
-
     pixels[0].index = 0;
     update_status_led_state(&s_status_led_state, &pixels[0]);
 }
 
 IRAM_ATTR static void apply_pattern(tNeopixel* pixels, const led_pattern_t* pattern)
 {
-    if (is_task_suspended || is_in_flash_mode) {
+    if (is_task_suspended) {
         return;
     }
 
@@ -589,23 +567,37 @@ __attribute__((section(".text"))) static void led_control_task(void *arg)
     tNeopixel new_state[s_num_leds];
     
     while (1) {
-        if (is_task_suspended) {
-            vTaskDelay(pdMS_TO_TICKS(100));
-            continue;
-        }
-
-        if (is_in_flash_mode) {
-            vTaskDelay(pdMS_TO_TICKS(100));
-            continue;
-        }
-
         for (int i = 0; i < s_num_leds; i++) {
             pixels[i].index = i;
             pixels[i].rgb = 0;
             new_state[i].index = i;
             new_state[i].rgb = 0;
         }
-        
+
+        if (s_bat_blinking) {
+            const uint32_t current_time = pdTICKS_TO_MS(xTaskGetTickCount());
+            if (current_time - s_last_bat_blink >= BAT_BLINK_DURATION_MS) {
+                s_bat_blinking = false;
+            } else {
+                const battery_state_t battery_state = get_battery_state();
+                for (int i = 0; i < s_num_leds; i++) {
+                    pixels[i].rgb = color_with_brightness(
+                        battery_state == BATTERY_WARNING ? NP_RGB(127, 127, 0) : NP_RGB(127, 0, 0),
+                        g_rgb_brightness
+                    );
+                }
+
+                neopixel_SetPixel(neopixel_ctx, pixels, s_num_leds);
+                vTaskDelay(pdMS_TO_TICKS(100));
+                continue;
+            }
+        }
+
+        if (is_task_suspended) {
+            vTaskDelay(pdMS_TO_TICKS(100));
+            continue;
+        }
+
         update_status_led(new_state);
         if (s_led_pattern >= 0 && s_led_pattern < sizeof(led_patterns)/sizeof(led_patterns[0])) {
             apply_pattern(new_state, &led_patterns[s_led_pattern]);
@@ -627,21 +619,6 @@ __attribute__((section(".text"))) static void led_control_task(void *arg)
             }
         } else {
             memcpy(pixels, new_state, sizeof(tNeopixel) * s_num_leds);
-        }
-
-        if (s_bat_blinking) {
-            const uint32_t current_time = pdTICKS_TO_MS(xTaskGetTickCount());
-            if (current_time - s_last_bat_blink >= BAT_BLINK_DURATION_MS) {
-                s_bat_blinking = false;
-            } else {
-                const battery_state_t battery_state = get_battery_state();
-                for (int i = 0; i < s_num_leds; i++) {
-                    pixels[i].rgb = color_with_brightness(
-                        battery_state == BATTERY_WARNING ? NP_RGB(127, 127, 0) : NP_RGB(127, 0, 0),
-                        g_rgb_brightness
-                    );
-                }
-            }
         }
 
         neopixel_SetPixel(neopixel_ctx, pixels, s_num_leds);
