@@ -10,8 +10,7 @@ static const char *WS_TAG = "WS";
 static httpd_handle_t server = NULL;
 
 #define MAX_CLIENTS CONFIG_LWIP_MAX_LISTENING_TCP
-#define WS_MAX_MESSAGE_LEN 512  
-#define WS_SMALL_MESSAGE_LEN 128
+#define WS_MAX_MESSAGE_LEN 1536
 
 typedef struct {
     int *fds;

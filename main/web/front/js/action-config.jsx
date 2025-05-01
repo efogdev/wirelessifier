@@ -145,7 +145,17 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
     { key: 'KC_CONTROL_PANEL', value: 'Control Panel' },
     { key: 'KC_ASSISTANT', value: 'Assistant' },
     { key: 'KC_MISSION_CONTROL', value: 'Mission Control' },
-    { key: 'KC_LAUNCHPAD', value: 'Launchpad' }
+    { key: 'KC_LAUNCHPAD', value: 'Launchpad' },
+  ];
+
+  const specialKeys = [
+    { key: 'KC_CURSOR_BACK', value: 'Cursor Back' },
+    { key: 'KC_CURSOR_FORWARD', value: 'Cursor Forward' },
+    { key: 'KC_CURSOR_SWITCH', value: 'Cursor: Switch Axis' },
+    { key: 'KC_MS_WH_DOWN', value: 'Wheel Down/Left' },
+    { key: 'KC_MS_WH_UP', value: 'Wheel Up/Right' },
+    { key: 'KC_MS_WH_SWITCH', value: 'Wheel: Switch Axis' },
+    
   ];
 
   const modifiers = [ "Ctrl", "Shift", "Alt", "Win" ];
@@ -153,7 +163,8 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
   const actionOptions = {
     keyboard_key: keyboardKeys,
     mouse_button: mouseButtons,
-    system_control: systemControls
+    system_control: systemControls,
+    special: specialKeys,
   };
 
   const encoderModes = [
@@ -253,7 +264,7 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
       case 'system_navigation':
         rotateLeft = "KC_WWW_BACK";
         rotateRight = "KC_WWW_FORWARD";
-        click = "";
+        click = "KC_WWW_HOME";
         break;
       case 'cursor_fine':
         rotateLeft = "KC_CURSOR_BACK";
@@ -340,16 +351,40 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
           </div>
         </div>
       );
+    } else if (encoderConfig.mode === 'system_navigation') {
+      return (
+        <div className="setting-group">
+          <div className="setting-item">
+            <div className="setting-title">Rotate Left</div>
+            <div className="setting-description">{getDisplayValue(encoderConfig.rotateLeft)}</div>
+          </div>
+          <div className="setting-item">
+            <div className="setting-title">Rotate Right</div>
+            <div className="setting-description">{getDisplayValue(encoderConfig.rotateRight)}</div>
+          </div>
+          <div className="setting-item">
+            <div className="setting-title">Click</div>
+            <select
+              value={encoderConfig.click}
+              onChange={(e) => handleEncoderActionChange(e, "click")}
+            >
+              {systemControls.map((option, idx) => (
+                <option key={`click-${idx}`} value={option.key}>{option.value}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      );
     } else {
       return (
         <div className="setting-item">
-          <div className="setting-title">Rotate Left:</div>
+          <div className="setting-title">Rotate Left</div>
           <div className="setting-description">{getDisplayValue(encoderConfig.rotateLeft)}</div>
 
-          <div className="setting-title">Rotate Right:</div>
+          <div className="setting-title">Rotate Right</div>
           <div className="setting-description">{getDisplayValue(encoderConfig.rotateRight)}</div>
 
-          <div className="setting-title">Click:</div>
+          <div className="setting-title">Click</div>
           <div className="setting-description">{getDisplayValue(encoderConfig.click)}</div>
         </div>
       );

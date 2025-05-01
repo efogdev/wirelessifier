@@ -49,7 +49,41 @@ const App = () => {
         },
         mouse: {
             sensitivity: 100,
-        }
+        },
+        buttons: {
+            keys: [
+                {
+                    "actionType": "",
+                    "action": "",
+                    "selectedModifiers": [],
+                    "selectedKey": ""
+                },
+                {
+                    "actionType": "",
+                    "action": "",
+                    "selectedModifiers": [],
+                    "selectedKey": ""
+                },
+                {
+                    "actionType": "",
+                    "action": "",
+                    "selectedModifiers": [],
+                    "selectedKey": ""
+                },
+                {
+                    "actionType": "",
+                    "action": "",
+                    "selectedModifiers": [],
+                    "selectedKey": ""
+                },
+            ],
+            encoder: {
+                mode: "",
+                rotateLeft: "",
+                rotateRight: "",
+                click: ""
+            },
+        },
     });
 
     const [statusMessage, setStatusMessage] = React.useState(null);
@@ -223,6 +257,12 @@ const App = () => {
     };
 
     const updateSetting = (category, key, value) => {
+        if (key === '') {
+            return setSettings(prevSettings => {
+                return { ...prevSettings, [category]: value };
+            });
+        }
+
         setSettings(prevSettings => {
             return {
                 ...prevSettings,
@@ -256,6 +296,10 @@ const App = () => {
     const toLog = React.useCallback((linearValue) => {
         return Math.round(Math.exp(minp + scale * (linearValue - min)));
     }, [minp, scale, min]);
+
+    const onConfigChange = (config) => {
+        updateSetting('buttons', '', config);
+    }
 
     const handleFirmwareUpload = () => {
         const fileInput = fileInputRef.current;
@@ -314,7 +358,7 @@ const App = () => {
     return (
         <div>
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
-                <HIDControlsConfigurator />
+                <HIDControlsConfigurator onConfigChange={onConfigChange} />
             </Modal>
 
             <h1>Device Settings</h1>
@@ -381,19 +425,6 @@ const App = () => {
                 </div>
 
                 <div className="setting-group">
-                    <h2>Device behavior</h2>
-
-
-                    <div className="setting-item">
-                        <div className="setting-title">On-device buttons</div>
-                        <div className="setting-description">
-                            Configure on-device buttons and the rotary encoder.
-                        </div>
-                        <button onClick={() => setIsModalOpen(true)}>Configure</button>
-                    </div>
-                </div>
-
-                <div className="setting-group">
                     <h2>Connectivity</h2>
 
                     <div className="setting-item">
@@ -446,6 +477,18 @@ const App = () => {
                             value={settings.connectivity.bleReconnectDelay}
                             onChange={(e) => updateSetting('connectivity', 'bleReconnectDelay', parseInt(e.target.value))}
                         />
+                    </div>
+                </div>
+
+                <div className="setting-group">
+                    <h2>Device behavior</h2>
+
+                    <div className="setting-item">
+                        <div className="setting-title">On-device buttons</div>
+                        <div className="setting-description">
+                            Configure on-device buttons and the rotary encoder.
+                        </div>
+                        <button onClick={() => setIsModalOpen(true)}>Configure</button>
                     </div>
                 </div>
 
