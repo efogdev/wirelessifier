@@ -168,9 +168,9 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
   const [ keyConfigs, setKeyConfigs ] = React.useState(
     Array(numKeys).fill().map((_, index) => ({
       actionType: 'keyboard_key',
-      action: actionOptions.keyboard_key[0].value,
+      action: actionOptions.keyboard_key[0].key,
       selectedModifiers: [],
-      selectedKey: keyboardKeys[0].value,
+      selectedKey: keyboardKeys[0].key,
     }))
   );
 
@@ -189,9 +189,9 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
             ? keyConfigs[index]
             : {
               actionType: 'keyboard_key',
-              action: actionOptions.keyboard_key[0].value,
+              action: actionOptions.keyboard_key[0].key,
               selectedModifiers: [],
-              selectedKey: keyboardKeys[0].value
+              selectedKey: keyboardKeys[0].key
             };
         })
       );
@@ -200,17 +200,14 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
 
   const handleKeyConfigChange = (index, field, value) => {
     const newConfigs = [ ...keyConfigs ];
-    newConfigs[index] = {
-      ...newConfigs[index],
-      [field]: value
-    };
+    newConfigs[index][field] = value;
 
     if (field === "actionType") {
       if (value !== 'keyboard_combo') {
-        newConfigs[index].action = actionOptions[value][0].value;
+        newConfigs[index].action = actionOptions[value][0].key;
       } else {
         newConfigs[index].selectedModifiers = [];
-        newConfigs[index].selectedKey = keyboardKeys[0].value;
+        newConfigs[index].selectedKey = keyboardKeys[0].key;
       }
     }
 
@@ -258,6 +255,11 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
         rotateRight = "KC_WWW_FORWARD";
         click = "";
         break;
+      case 'cursor_fine':
+        rotateLeft = "KC_CURSOR_BACK";
+        rotateRight = "KC_CURSOR_FORWARD";
+        click = "KC_CURSOR_SWITCH";
+        break;
       case 'scroll':
         rotateLeft = "KC_MS_WH_DOWN";
         rotateRight = "KC_MS_WH_UP";
@@ -282,7 +284,7 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
   const handleEncoderActionChange = (event, action) => {
     const selectedOption = Object.values(actionOptions)
       .flat()
-      .find(option => option.value === event.target.value);
+      .find(option => option.key === event.target.value);
 
     const newConfig = {
       ...encoderConfig,
@@ -306,33 +308,33 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
           <div className="setting-item">
             <div className="setting-title">Rotate Left</div>
             <select
-              value={getDisplayValue(encoderConfig.rotateLeft)}
+              value={encoderConfig.rotateLeft}
               onChange={(e) => handleEncoderActionChange(e, "rotateLeft")}
             >
               {Object.values(actionOptions).flat().map((option, idx) => (
-                <option key={`left-${idx}`} value={option.value}>{option.value}</option>
+                <option key={`left-${idx}`} value={option.key}>{option.value}</option>
               ))}
             </select>
           </div>
           <div className="setting-item">
             <div className="setting-title">Rotate Right</div>
             <select
-              value={getDisplayValue(encoderConfig.rotateRight)}
+              value={encoderConfig.rotateRight}
               onChange={(e) => handleEncoderActionChange(e, "rotateRight")}
             >
               {Object.values(actionOptions).flat().map((option, idx) => (
-                <option key={`right-${idx}`} value={option.value}>{option.value}</option>
+                <option key={`right-${idx}`} value={option.key}>{option.value}</option>
               ))}
             </select>
           </div>
           <div className="setting-item">
             <div className="setting-title">Click</div>
             <select
-              value={getDisplayValue(encoderConfig.click)}
+              value={encoderConfig.click}
               onChange={(e) => handleEncoderActionChange(e, "click")}
             >
               {Object.values(actionOptions).flat().map((option, idx) => (
-                <option key={`click-${idx}`} value={option.value}>{option.value}</option>
+                <option key={`click-${idx}`} value={option.key}>{option.value}</option>
               ))}
             </select>
           </div>
@@ -352,13 +354,6 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
         </div>
       );
     }
-  };
-
-  const formatKeyboardCombo = (config) => {
-    if (config.selectedModifiers.length === 0) {
-      return config.selectedKey;
-    }
-    return `${config.selectedModifiers.join('+')}+${config.selectedKey}`;
   };
 
   return (
@@ -406,7 +401,7 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
                         onChange={(e) => handleComboKeyChange(idx, e.target.value)}
                       >
                         {keyboardKeys.map((key, keyIdx) => (
-                          <option key={`combo-key-${keyIdx}`} value={key.value}>{key.value}</option>
+                          <option key={`combo-key-${keyIdx}`} value={key.key}>{key.value}</option>
                         ))}
                       </select>
                     </div>
@@ -419,7 +414,7 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
                       onChange={(e) => handleKeyConfigChange(idx, "action", e.target.value)}
                     >
                       {actionOptions[config.actionType].map((action, actionIdx) => (
-                        <option key={`action-${actionIdx}`} value={action.value}>{action.value}</option>
+                        <option key={`action-${actionIdx}`} value={action.key}>{action.value}</option>
                       ))}
                     </select>
                   </div>
