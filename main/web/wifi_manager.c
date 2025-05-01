@@ -16,6 +16,7 @@
 #include "http_server.h"
 #include "temp_sensor.h"
 #include "rgb_leds.h"
+#include "vmon.h"
 
 static const char *WIFI_TAG = "WIFI_MGR";
 
@@ -469,9 +470,10 @@ static void ws_ping_task(void *pvParameters) {
         const uint32_t free_heap = esp_get_free_heap_size();
         static float temp = 0;
         temp_sensor_get_temperature(&temp);
+        const float bat = get_battery_level();
         
-        char ping_data[64];
-        snprintf(ping_data, sizeof(ping_data), "{\"heap\":%lu,\"temp\":%.1f}", free_heap, temp);
+        char ping_data[96];
+        snprintf(ping_data, sizeof(ping_data), "{\"heap\":%lu,\"temp\":%.1f,\"bat\":%.2f}", free_heap, temp, bat);
         
         ws_broadcast_json("ping", ping_data);
         vTaskDelay(pdMS_TO_TICKS(WS_PING_INTERVAL_MS));

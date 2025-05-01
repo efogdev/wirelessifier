@@ -63,6 +63,10 @@ bool is_psu_connected(void) {
     return s_psu_connected;
 }
 
+float get_battery_level(void) {
+    return bat_volts;
+}
+
 battery_state_t get_battery_state(void) {
     static battery_state_t prev_state = BATTERY_NORMAL;
     battery_state_t new_state;

@@ -16,3 +16,4 @@ void vmon_task(void *pvParameters);
 bool is_psu_connected(void);
 bool is_charging(void);
 battery_state_t get_battery_state(void);
+float get_battery_level(void);

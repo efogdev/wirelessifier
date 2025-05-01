@@ -20,6 +20,7 @@ const App = () => {
     const [systemInfo, setSystemInfo] = React.useState({
         heap: 0,
         temp: 0,
+        bat: 0,
     });
 
     const [settings, setSettings] = React.useState({
@@ -208,7 +209,8 @@ const App = () => {
 
                             setSystemInfo({
                                 heap: pingData.heap || 0,
-                                temp: pingData.temp || 0
+                                temp: pingData.temp || 0,
+                                bat: pingData.bat || 0,
                             });
                         } catch (e) {
                             console.error('Error parsing ping data:', e);
@@ -333,23 +335,23 @@ const App = () => {
             });
     };
 
-    // if (loading || !connected) {
-    //     return (
-    //         <div id="loadingContainer">
-    //             <div className="spinner"></div>
-    //             <p>{connected ? 'Loading settings' : 'Waiting for connection…'}</p>
-    //         </div>
-    //     );
-    // }
-    //
-    // if (error) {
-    //     return (
-    //         <div className="container">
-    //             <div className="status error">{error}</div>
-    //             <button onClick={connectWebSocket}>Retry Connection</button>
-    //         </div>
-    //     );
-    // }
+    if (loading || !connected) {
+        return (
+            <div id="loadingContainer">
+                <div className="spinner"></div>
+                <p>{connected ? 'Loading settings' : 'Waiting for connection…'}</p>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="container">
+                <div className="status error">{error}</div>
+                <button onClick={connectWebSocket}>Retry Connection</button>
+            </div>
+        );
+    }
 
     return (
         <div>
@@ -408,6 +410,11 @@ const App = () => {
                         <div className="setting-item">
                             <div className="setting-title">SoC temperature</div>
                             <div>{systemInfo.temp.toFixed(0)}°C</div>
+                        </div>
+
+                        <div className="setting-item">
+                            <div className="setting-title">Battery level</div>
+                            <div>{systemInfo.bat.toFixed(2)}V</div>
                         </div>
 
                         <div className="setting-item">
@@ -487,6 +494,14 @@ const App = () => {
                             Configure on-device buttons and the rotary encoder.
                         </div>
                         <button onClick={() => setIsModalOpen(true)}>Configure</button>
+                    </div>
+
+                    <div className="setting-item">
+                        <div className="setting-title">Miscellaneous</div>
+                        <div className="setting-description">
+                            Various useful actions.
+                        </div>
+                        <button onClick={() => void(0)}>Clear data</button>
                     </div>
                 </div>
 
