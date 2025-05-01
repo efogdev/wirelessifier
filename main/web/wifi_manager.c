@@ -19,12 +19,10 @@
 
 static const char *WIFI_TAG = "WIFI_MGR";
 
-// WebSocket ping task parameters
 #define WS_PING_TASK_STACK_SIZE 2048
 #define WS_PING_TASK_PRIORITY 3
 #define WS_PING_INTERVAL_MS 250
 
-// NVS keys
 #define NVS_NAMESPACE "wifi_config"
 #define NVS_KEY_SSID "ssid"
 #define NVS_KEY_PASS "password"
@@ -34,11 +32,9 @@ static bool connecting = false;
 static bool s_web_stack_disabled = false;
 static TaskHandle_t ping_task_handle = NULL;
 
-// WiFi connection status
 static bool is_connected = false;
 static char connected_ip[16] = {0};
 
-// Connect to WiFi with stored credentials
 esp_err_t connect_wifi_with_stored_credentials(void) {
     nvs_handle_t nvs_handle;
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READONLY, &nvs_handle);
@@ -47,7 +43,6 @@ esp_err_t connect_wifi_with_stored_credentials(void) {
         return err;
     }
 
-    // Read SSID
     size_t ssid_len = 32; // Max SSID length
     char ssid[33] = {0};  // +1 for null terminator
     err = nvs_get_str(nvs_handle, NVS_KEY_SSID, ssid, &ssid_len);
@@ -57,7 +52,6 @@ esp_err_t connect_wifi_with_stored_credentials(void) {
         return err;
     }
 
-    // Read password
     size_t pass_len = 64; // Max password length
     char password[65] = {0}; // +1 for null terminator
     err = nvs_get_str(nvs_handle, NVS_KEY_PASS, password, &pass_len);
@@ -69,7 +63,6 @@ esp_err_t connect_wifi_with_stored_credentials(void) {
 
     nvs_close(nvs_handle);
 
-    // Configure WiFi
     wifi_config_t wifi_config = {0};
     strlcpy((char *)wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid));
     strlcpy((char *)wifi_config.sta.password, password, sizeof(wifi_config.sta.password));
@@ -77,14 +70,12 @@ esp_err_t connect_wifi_with_stored_credentials(void) {
     ESP_LOGI(WIFI_TAG, "Connecting to %s...", ssid);
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     
-    // Use esp_err_t to handle the return value instead of ESP_ERROR_CHECK
     const esp_err_t connect_err = esp_wifi_connect();
     if (connect_err != ESP_OK) {
         ESP_LOGE(WIFI_TAG, "Failed to connect to WiFi: %s", esp_err_to_name(connect_err));
         return connect_err;
     }
     
-    // Wait for connection or failure
     const EventBits_t bits = xEventGroupWaitBits(wifi_event_group,
         WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdFALSE, pdFALSE, portMAX_DELAY);
 
@@ -100,7 +91,6 @@ esp_err_t connect_wifi_with_stored_credentials(void) {
     }
 }
 
-// Save WiFi credentials to NVS
 esp_err_t save_wifi_credentials(const char* ssid, const char* password) {
     nvs_handle_t nvs_handle;
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
@@ -132,7 +122,6 @@ esp_err_t save_wifi_credentials(const char* ssid, const char* password) {
     return err;
 }
 
-// Clear WiFi credentials from NVS
 esp_err_t clear_wifi_credentials(void) {
     nvs_handle_t nvs_handle;
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
@@ -157,7 +146,6 @@ esp_err_t clear_wifi_credentials(void) {
     return err;
 }
 
-// Check if WiFi credentials are stored
 bool has_wifi_credentials(void) {
     if (connecting) {
         return true;
@@ -176,9 +164,7 @@ bool has_wifi_credentials(void) {
     return (err == ESP_OK && ssid_len > 0);
 }
 
-// Process WiFi scan results and send them via WebSocket
 void process_wifi_scan_results(void) {
-    // Get scan results
     uint16_t ap_count = 0;
     ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_count));
     
@@ -190,17 +176,13 @@ void process_wifi_scan_results(void) {
         return;
     }
     
-    // Allocate memory for results
     wifi_ap_record_t *ap_records = malloc(ap_count * sizeof(wifi_ap_record_t));
     if (ap_records == NULL) {
         ESP_LOGE(WIFI_TAG, "Failed to allocate memory for scan results");
         return;
     }
     
-    // Get scan results
     ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_count, ap_records));
-    
-    // Build JSON array of results
     char *json_buffer = malloc(ap_count * 128); // Allocate enough space for all APs
     if (json_buffer == NULL) {
         free(ap_records);
@@ -214,7 +196,6 @@ void process_wifi_scan_results(void) {
     for (int i = 0; i < ap_count; i++) {
         char ssid_escaped[64] = {0};
         
-        // Simple JSON escaping for SSID
         for (int j = 0, k = 0; j < strlen((const char *)ap_records[i].ssid) && k < 63; j++) {
             if (ap_records[i].ssid[j] == '"' || ap_records[i].ssid[j] == '\\') {
                 ssid_escaped[k++] = '\\';
@@ -232,22 +213,15 @@ void process_wifi_scan_results(void) {
     
     offset += sprintf(json_buffer + offset, "]");
     
-    // Send results via WebSocket
     ws_broadcast_json("wifi_scan_result", json_buffer);
-    
-    // Clean up
     free(json_buffer);
     free(ap_records);
 }
 
-// Scan for available WiFi networks
 esp_err_t scan_wifi_networks(void) {
     ESP_LOGI(WIFI_TAG, "Starting WiFi scan...");
-    
-    // Stop any ongoing scan
     esp_wifi_scan_stop();
     
-    // Configure scan
     const wifi_scan_config_t scan_config = {
         .ssid = NULL,
         .bssid = NULL,
@@ -258,7 +232,6 @@ esp_err_t scan_wifi_networks(void) {
         .scan_time.active.max = 600
     };
     
-    // Start scan asynchronously - results will be processed in the WIFI_EVENT_SCAN_DONE event handler
     const esp_err_t ret = esp_wifi_scan_start(&scan_config, false);
     if (ret != ESP_OK) {
         ESP_LOGE(WIFI_TAG, "Failed to start WiFi scan: %s", esp_err_to_name(ret));
@@ -268,7 +241,6 @@ esp_err_t scan_wifi_networks(void) {
     return ESP_OK;
 }
 
-// Connect to a specific WiFi network
 esp_err_t connect_to_wifi(const char* ssid, const char* password) {
     if (!ssid || strlen(ssid) == 0) {
         return ESP_ERR_INVALID_ARG;
@@ -284,7 +256,6 @@ esp_err_t connect_to_wifi(const char* ssid, const char* password) {
         esp_wifi_disconnect();
     }
     
-    // Configure WiFi
     wifi_config_t wifi_config = {0};
     strlcpy((char *)wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid));
     
@@ -294,11 +265,8 @@ esp_err_t connect_to_wifi(const char* ssid, const char* password) {
     }
     
     ESP_LOGI(WIFI_TAG, "Connecting to %s...", ssid);
-
-    // Set WiFi configuration and start
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     
-    // Use esp_err_t to handle the return value instead of ESP_ERROR_CHECK
     const esp_err_t connect_err = esp_wifi_connect();
     if (connect_err != ESP_OK) {
         ESP_LOGE(WIFI_TAG, "Failed to connect to WiFi: %s", esp_err_to_name(connect_err));
@@ -341,7 +309,6 @@ esp_err_t connect_to_wifi(const char* ssid, const char* password) {
     return ESP_ERR_TIMEOUT;
 }
 
-// Disable WiFi and web stack
 void disable_wifi_and_web_stack(void) {
     ESP_LOGI(WIFI_TAG, "Disabling WiFi and web stack...");
  
@@ -349,11 +316,9 @@ void disable_wifi_and_web_stack(void) {
     is_connected = false;
     s_retry_num = MAX_RETRY;
 
-    // Update LED status
     led_update_wifi_status(false, false);
     led_update_status(0, 0);
 
-    // Send final WebSocket message before cleanup
     ws_broadcast_json("web_stack_disabled", "{}");
     vTaskDelay(pdMS_TO_TICKS(250));
 
@@ -362,14 +327,12 @@ void disable_wifi_and_web_stack(void) {
         ping_task_handle = NULL;
     }
 
-    // Stop and cleanup web server components
-    stop_webserver(); 
+    stop_webserver();
     esp_wifi_disconnect();
     esp_wifi_stop();
     esp_wifi_deinit();
     esp_netif_deinit();
 
-    // Clear boot with WiFi flag in NVS
     nvs_handle_t nvs_handle;
     const esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
     if (err == ESP_OK) {
@@ -379,11 +342,9 @@ void disable_wifi_and_web_stack(void) {
         ESP_LOGI(WIFI_TAG, "Cleared boot with WiFi flag");
     }
 
-    // Final LED status update
     led_update_wifi_status(false, false);
     led_update_status(0, 0);
 
-    // Free any global buffers
     if (wifi_event_group) {
         vEventGroupDelete(wifi_event_group);
         wifi_event_group = NULL;
@@ -392,7 +353,6 @@ void disable_wifi_and_web_stack(void) {
     ESP_LOGI(WIFI_TAG, "WiFi and web stack disabled and cleaned up");
 }
 
-// Reboot the device
 void reboot_device(bool keep_wifi) {
     ESP_LOGI(WIFI_TAG, "Rebooting device, keep_wifi=%d", keep_wifi);
     ws_broadcast_json("reboot", "{}");

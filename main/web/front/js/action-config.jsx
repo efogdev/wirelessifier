@@ -25,7 +25,7 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
     ],
     system_control: [
       "Volume Up", "Volume Down", "Mute", "Media Play/Pause", "Media Next", "Media Previous",
-      "Brightness Up", "Brightness Down", "Mouse Forward", "Mouse Back"
+      "Brightness Up", "Brightness Down", "System Forward", "System Back"
     ]
   };
 
@@ -33,7 +33,7 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
     { key: 'standard_actions', value: 'Standard Actions' },
     { key: 'volume_control', value: 'Volume Control' },
     { key: 'media_control', value: 'Media Control' },
-    { key: 'mouse_navigation', value: 'Mouse Navigation' },
+    { key: 'system_navigation', value: 'System Navigation' },
     { key: 'scroll', value: 'Scroll' }
   ];
 
@@ -125,20 +125,20 @@ const HIDControlsConfigurator = ({ numKeys = 4, onConfigChange }) => {
         rotateRight = "Media Next";
         click = "Media Play/Pause";
         break;
-      case 'mouse_navigation':
-        rotateLeft = "Mouse Back";
-        rotateRight = "Mouse Forward";
-        click = "Middle Click";
+      case 'system_navigation':
+        rotateLeft = "System Back";
+        rotateRight = "System Forward";
+        click = "";
         break;
       case 'scroll':
         rotateLeft = "Scroll Down";
         rotateRight = "Scroll Up";
-        click = "Middle Click";
+        click = "Switch Vertical/Horizontal";
         break;
       default:
         rotateLeft = "Volume Down";
         rotateRight = "Volume Up";
-        click = "Media Play/Pause";
+        click = "Mute";
     }
 
     const newConfig = {
