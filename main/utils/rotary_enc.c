@@ -82,15 +82,7 @@ void rotary_enc_init() {
     ESP_ERROR_CHECK(pcnt_unit_clear_count(pcnt_unit));
     ESP_ERROR_CHECK(pcnt_unit_start(pcnt_unit));
 
-    const gpio_config_t io_conf = {
-        .intr_type = GPIO_INTR_ANYEDGE,
-        .mode = GPIO_MODE_INPUT,
-        .pin_bit_mask = (1ULL << GPIO_ROT_E),
-        .pull_up_en = GPIO_PULLUP_ENABLE,
-    };
-    gpio_config(&io_conf);
     gpio_isr_handler_add(GPIO_ROT_E, click_isr_handler, NULL);
-
     xTaskCreate(rotary_enc_task, "rotary_task", 2600, NULL, 8, NULL);
 }
 
