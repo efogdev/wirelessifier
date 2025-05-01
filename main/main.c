@@ -85,9 +85,9 @@ void app_main(void) {
     }
 
     static uint32_t sleep_counter = 0;
-    // const uint32_t sleep_threshold = (5 * 60 * 1000) / MAIN_LOOP_DELAY_MS; // 5 minutes
+    const uint32_t sleep_threshold = (5 * 60 * 1000) / MAIN_LOOP_DELAY_MS; // 5 minutes
     // const uint32_t sleep_threshold = (20 * 1000) / MAIN_LOOP_DELAY_MS; // 20 sec (debug)
-    const uint32_t sleep_threshold = (30 * 60 * 1000) / MAIN_LOOP_DELAY_MS; // 30 min (debug)
+    // const uint32_t sleep_threshold = (30 * 60 * 1000) / MAIN_LOOP_DELAY_MS; // 30 min (debug)
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(MAIN_LOOP_DELAY_MS));
         led_update_pattern(usb_hid_host_device_connected(), ble_hid_device_connected(), hid_bridge_is_ble_paused());
