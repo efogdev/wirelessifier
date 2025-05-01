@@ -25,8 +25,8 @@ const App = () => {
     const [settings, setSettings] = React.useState({
         deviceInfo: {
             name: 'TBD',
-            firmwareVersion: 'TBD',
-            hardwareVersion: 'TBD',
+            fwVersion: 'TBD',
+            hwVersion: 'TBD',
             macAddress: '00:00:00:00:00:00',
         },
         power: {
@@ -35,9 +35,9 @@ const App = () => {
             lowPowerMode: false,
             enableSleep: true,
             deepSleep: true,
-            separateSleepTimeouts: true,
+            twoSleeps: true,
             fastCharge: true,
-            highSpeedSubmode: 'slow',
+            warpSpeed: 'slow',
             output: 5,
         },
         led: {
@@ -45,7 +45,7 @@ const App = () => {
         },
         connectivity: {
             bleTxPower: 'low',
-            bleReconnectDelay: 3,
+            bleRecDelay: 3,
         },
         mouse: {
             sensitivity: 100,
@@ -53,34 +53,34 @@ const App = () => {
         buttons: {
             keys: [
                 {
-                    "actionType": "",
+                    "acType": "",
                     "action": "",
                     "selectedModifiers": [],
-                    "selectedKey": ""
+                    "key": ""
                 },
                 {
-                    "actionType": "",
+                    "acType": "",
                     "action": "",
                     "selectedModifiers": [],
-                    "selectedKey": ""
+                    "key": ""
                 },
                 {
-                    "actionType": "",
+                    "acType": "",
                     "action": "",
                     "selectedModifiers": [],
-                    "selectedKey": ""
+                    "key": ""
                 },
                 {
-                    "actionType": "",
+                    "acType": "",
                     "action": "",
                     "selectedModifiers": [],
-                    "selectedKey": ""
+                    "key": ""
                 },
             ],
             encoder: {
                 mode: "",
-                rotateLeft: "",
-                rotateRight: "",
+                left: "",
+                right: "",
                 click: ""
             },
         },
@@ -391,12 +391,12 @@ const App = () => {
                     <div className={`device-info-panel ${deviceInfoExpanded ? 'expanded' : ''}`}>
                         <div className="setting-item">
                             <div className="setting-title">Firmware version</div>
-                            <div>{settings.deviceInfo.firmwareVersion}</div>
+                            <div>{settings.deviceInfo.fwVersion}</div>
                         </div>
 
                         <div className="setting-item">
                             <div className="setting-title">Hardware revision</div>
-                            <div>{settings.deviceInfo.hardwareVersion}</div>
+                            <div>{settings.deviceInfo.hwVersion}</div>
                         </div>
 
                         <div className="setting-item">
@@ -439,8 +439,8 @@ const App = () => {
                             Some modes might work better than others with your device(s).
                         </div>
                         <select
-                            value={settings.power.highSpeedSubmode}
-                            onChange={(e) => updateSetting('power', 'highSpeedSubmode', e.target.value)}
+                            value={settings.power.warpSpeed}
+                            onChange={(e) => updateSetting('power', 'warpSpeed', e.target.value)}
                         >
                             <option value="slow">±125 rps</option>
                             <option value="fast">±175 rps</option>
@@ -476,8 +476,8 @@ const App = () => {
                             type="number"
                             min="1"
                             max="60"
-                            value={settings.connectivity.bleReconnectDelay}
-                            onChange={(e) => updateSetting('connectivity', 'bleReconnectDelay', parseInt(e.target.value))}
+                            value={settings.connectivity.bleRecDelay}
+                            onChange={(e) => updateSetting('connectivity', 'bleRecDelay', parseInt(e.target.value))}
                         />
                     </div>
                 </div>
@@ -553,8 +553,8 @@ const App = () => {
                             <label className="toggle-switch">
                                 <input
                                     type="checkbox"
-                                    checked={settings.power.separateSleepTimeouts}
-                                    onChange={(e) => updateSetting('power', 'separateSleepTimeouts', e.target.checked)}
+                                    checked={settings.power.twoSleeps}
+                                    onChange={(e) => updateSetting('power', 'twoSleeps', e.target.checked)}
                                 />
                                 <span className="slider"></span>
                             </label>
@@ -562,7 +562,7 @@ const App = () => {
 
                         <div className="setting-item">
                             <div className="setting-title">
-                                {settings.power.separateSleepTimeouts 
+                                {settings.power.twoSleeps 
                                     ? 'Light sleep timeout'
                                     : 'Sleep timeout'}
                             </div>
@@ -579,7 +579,7 @@ const App = () => {
                             />
                         </div>
 
-                        <div className={`setting-item ${settings.power.separateSleepTimeouts && settings.power.deepSleep ? 'animate-visible' : 'animate-hidden'}`}>
+                        <div className={`setting-item ${settings.power.twoSleeps && settings.power.deepSleep ? 'animate-visible' : 'animate-hidden'}`}>
                             <div className="setting-title">Deep sleep timeout</div>
                             <div className="setting-description">
                                 Time without USB events in seconds before device enters deep sleep mode.

@@ -1,5 +1,5 @@
 const HIDControlsConfigurator = ({ numKeys = 4, defaultValues, onConfigChange }) => {
-  const actionTypes = [
+  const acTypes = [
     { key: 'keyboard_key', value: 'Keyboard Key' },
     { key: 'keyboard_combo', value: 'Keyboard Combo' },
     { key: 'mouse_button', value: 'Mouse Button' },
@@ -183,12 +183,12 @@ const HIDControlsConfigurator = ({ numKeys = 4, defaultValues, onConfigChange })
     const newConfigs = [ ...keyConfigs ];
     newConfigs[index][field] = value;
 
-    if (field === "actionType") {
+    if (field === "acType") {
       if (value !== 'keyboard_combo') {
         newConfigs[index].action = actionOptions[value][0].key;
       } else {
         newConfigs[index].selectedModifiers = [];
-        newConfigs[index].selectedKey = keyboardKeys[0].key;
+        newConfigs[index].key = keyboardKeys[0].key;
       }
     }
 
@@ -212,50 +212,50 @@ const HIDControlsConfigurator = ({ numKeys = 4, defaultValues, onConfigChange })
 
   const handleComboKeyChange = (index, key) => {
     const newConfigs = [ ...keyConfigs ];
-    newConfigs[index].selectedKey = key;
+    newConfigs[index].key = key;
     setKeyConfigs(newConfigs);
     onConfigChange?.({ keys: newConfigs, encoder: encoderConfig });
   };
 
   const handleEncoderModeChange = (mode) => {
-    let rotateLeft, rotateRight, click;
+    let left, right, click;
 
     switch (mode) {
       case 'volume_control':
-        rotateLeft = "KC_AUDIO_VOL_DOWN";
-        rotateRight = "KC_AUDIO_VOL_UP";
+        left = "KC_AUDIO_VOL_DOWN";
+        right = "KC_AUDIO_VOL_UP";
         click = "KC_AUDIO_MUTE";
         break;
       case 'media_control':
-        rotateLeft = "KC_MEDIA_PREV_TRACK";
-        rotateRight = "KC_MEDIA_NEXT_TRACK";
+        left = "KC_MEDIA_PREV_TRACK";
+        right = "KC_MEDIA_NEXT_TRACK";
         click = "KC_MEDIA_PLAY_PAUSE";
         break;
       case 'system_navigation':
-        rotateLeft = "KC_WWW_BACK";
-        rotateRight = "KC_WWW_FORWARD";
+        left = "KC_WWW_BACK";
+        right = "KC_WWW_FORWARD";
         click = "KC_WWW_HOME";
         break;
       case 'cursor_fine':
-        rotateLeft = "KC_CURSOR_BACK";
-        rotateRight = "KC_CURSOR_FORWARD";
+        left = "KC_CURSOR_BACK";
+        right = "KC_CURSOR_FORWARD";
         click = "KC_CURSOR_SWITCH";
         break;
       case 'scroll':
-        rotateLeft = "KC_MS_WH_DOWN";
-        rotateRight = "KC_MS_WH_UP";
+        left = "KC_MS_WH_DOWN";
+        right = "KC_MS_WH_UP";
         click = "KC_MS_WH_SWITCH";
         break;
       default:
-        rotateLeft = "KC_AUDIO_VOL_DOWN";
-        rotateRight = "KC_AUDIO_VOL_UP";
+        left = "KC_AUDIO_VOL_DOWN";
+        right = "KC_AUDIO_VOL_UP";
         click = "KC_AUDIO_MUTE";
     }
 
     const newConfig = {
       mode,
-      rotateLeft,
-      rotateRight,
+      left,
+      right,
       click
     };
     setEncoderConfig(newConfig);
@@ -289,8 +289,8 @@ const HIDControlsConfigurator = ({ numKeys = 4, defaultValues, onConfigChange })
           <div className="setting-item">
             <div className="setting-title">Rotate Left</div>
             <select
-              value={encoderConfig.rotateLeft}
-              onChange={(e) => handleEncoderActionChange(e, "rotateLeft")}
+              value={encoderConfig.left}
+              onChange={(e) => handleEncoderActionChange(e, "left")}
             >
               {Object.values(actionOptions).flat().map((option, idx) => (
                 <option key={`left-${idx}`} value={option.key}>{option.value}</option>
@@ -300,8 +300,8 @@ const HIDControlsConfigurator = ({ numKeys = 4, defaultValues, onConfigChange })
           <div className="setting-item">
             <div className="setting-title">Rotate Right</div>
             <select
-              value={encoderConfig.rotateRight}
-              onChange={(e) => handleEncoderActionChange(e, "rotateRight")}
+              value={encoderConfig.right}
+              onChange={(e) => handleEncoderActionChange(e, "right")}
             >
               {Object.values(actionOptions).flat().map((option, idx) => (
                 <option key={`right-${idx}`} value={option.key}>{option.value}</option>
@@ -326,11 +326,11 @@ const HIDControlsConfigurator = ({ numKeys = 4, defaultValues, onConfigChange })
         <div className="setting-group">
           <div className="setting-item">
             <div className="setting-title">Rotate Left</div>
-            <div className="setting-description">{getDisplayValue(encoderConfig.rotateLeft)}</div>
+            <div className="setting-description">{getDisplayValue(encoderConfig.left)}</div>
           </div>
           <div className="setting-item">
             <div className="setting-title">Rotate Right</div>
-            <div className="setting-description">{getDisplayValue(encoderConfig.rotateRight)}</div>
+            <div className="setting-description">{getDisplayValue(encoderConfig.right)}</div>
           </div>
           <div className="setting-item">
             <div className="setting-title">Click</div>
@@ -349,10 +349,10 @@ const HIDControlsConfigurator = ({ numKeys = 4, defaultValues, onConfigChange })
       return (
         <div className="setting-item">
           <div className="setting-title">Rotate Left</div>
-          <div className="setting-description">{getDisplayValue(encoderConfig.rotateLeft)}</div>
+          <div className="setting-description">{getDisplayValue(encoderConfig.left)}</div>
 
           <div className="setting-title">Rotate Right</div>
-          <div className="setting-description">{getDisplayValue(encoderConfig.rotateRight)}</div>
+          <div className="setting-description">{getDisplayValue(encoderConfig.right)}</div>
 
           <div className="setting-title">Click</div>
           <div className="setting-description">{getDisplayValue(encoderConfig.click)}</div>
@@ -374,15 +374,15 @@ const HIDControlsConfigurator = ({ numKeys = 4, defaultValues, onConfigChange })
               <div className="setting-item">
                 <div className="setting-title">Action Type</div>
                 <select
-                  value={config.actionType}
-                  onChange={(e) => handleKeyConfigChange(idx, "actionType", e.target.value)}
+                  value={config.acType}
+                  onChange={(e) => handleKeyConfigChange(idx, "acType", e.target.value)}
                 >
-                  {actionTypes.map((type) => (
+                  {acTypes.map((type) => (
                     <option key={type.key} value={type.key}>{type.value}</option>
                   ))}
                 </select>
 
-                {config.actionType === 'keyboard_combo' ? (
+                {config.acType === 'keyboard_combo' ? (
                   <div className="setting-group">
                     <div className="setting-item">
                       <div className="setting-title">Modifiers</div>
@@ -402,7 +402,7 @@ const HIDControlsConfigurator = ({ numKeys = 4, defaultValues, onConfigChange })
                     <div className="setting-item">
                       <div className="setting-title">Key</div>
                       <select
-                        value={config.selectedKey}
+                        value={config.key}
                         onChange={(e) => handleComboKeyChange(idx, e.target.value)}
                       >
                         {keyboardKeys.map((key, keyIdx) => (
@@ -418,7 +418,7 @@ const HIDControlsConfigurator = ({ numKeys = 4, defaultValues, onConfigChange })
                       value={config.action}
                       onChange={(e) => handleKeyConfigChange(idx, "action", e.target.value)}
                     >
-                      {actionOptions[config.actionType].map((action, actionIdx) => (
+                      {actionOptions[config.acType].map((action, actionIdx) => (
                         <option key={`action-${actionIdx}`} value={action.key}>{action.value}</option>
                       ))}
                     </select>

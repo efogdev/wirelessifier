@@ -48,7 +48,7 @@ void vmon_task(void *pvParameters) {
         if (s_charging) {
             bat_volts = bat_volts - 0.2f;
         }
-        
+
         vTaskDelay(pdMS_TO_TICKS(60));
     }
 }

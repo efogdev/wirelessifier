@@ -17,6 +17,9 @@
 #include "freertos/semphr.h"
 #include "usb/usb_hid_host.h"
 #include "ble_hid_device.h"
+#include "buttons.h"
+#include "hid_actions.h"
+#include "rotary_enc.h"
 #include "web/wifi_manager.h"
 #include "utils/storage.h"
 
@@ -33,7 +36,7 @@ static uint16_t s_sensitivity = 100;
 static int s_inactivity_timeout_ms = 30 * 1000;
 static bool s_enable_sleep = true;
 
-static void inactivity_timer_callback(TimerHandle_t xTimer) {
+static void inactivity_timer_callback(const TimerHandle_t xTimer) {
     if (xSemaphoreTake(s_ble_stack_mutex, pdMS_TO_TICKS(250)) != pdTRUE) {
         ESP_LOGW(TAG, "Failed to take BLE stack mutex in inactivity timer");
         return;
@@ -93,6 +96,88 @@ static void inactivity_timer_callback(TimerHandle_t xTimer) {
 //         vTaskDelay(pdMS_TO_TICKS(1000));
 //     }
 // }
+
+static void wakeup() {
+    if (!s_ble_stack_active) {
+        if (xSemaphoreTake(s_ble_stack_mutex, pdMS_TO_TICKS(25)) != pdTRUE) {
+            ESP_LOGW(TAG, "Failed to take BLE stack mutex in process_report");
+            return;
+        }
+
+        ESP_LOGI(TAG, "Restarting BLE stack…");
+        const esp_err_t ret = ble_hid_device_init(VERBOSE);
+        if (ret != ESP_OK) {
+            s_ble_stack_active = false;
+            ESP_LOGE(TAG, "Failed to initialize BLE HID device: %s", esp_err_to_name(ret));
+            xSemaphoreGive(s_ble_stack_mutex);
+            return;
+        }
+
+        s_ble_stack_active = true;
+        xSemaphoreGive(s_ble_stack_mutex);
+
+        vTaskDelay(pdMS_TO_TICKS(50));
+        if (has_saved_device()) {
+            connect_to_saved_device(get_gatts_if());
+        }
+    }
+}
+
+static void rot_cb(const int8_t direction) {
+    if (!ble_hid_device_connected()) {
+        return;
+    }
+
+    char action[24];
+    if (direction == 1) {
+        if (storage_get_string_setting("buttons.encoder.right", action, sizeof(action)) == ESP_OK) {
+            ESP_LOGI(TAG, "Rotate right, action = %s", action);
+            execute_action_from_string(ble_conn_id(), "", action, NULL, 0);
+        }
+    } else if (direction == -1) {
+        if (storage_get_string_setting("buttons.encoder.left", action, sizeof(action)) == ESP_OK) {
+            ESP_LOGI(TAG, "Rotate left, action = %s", action);
+            execute_action_from_string(ble_conn_id(), "", action, NULL, 0);
+        }
+    }
+
+    xTimerReset(s_inactivity_timer, 0);
+    wakeup();
+}
+
+static void rot_click_cb(void) {
+    if (!ble_hid_device_connected()) {
+        return;
+    }
+
+    char action[24];
+    if (storage_get_string_setting("buttons.encoder.click", action, sizeof(action)) == ESP_OK) {
+        ESP_LOGI(TAG, "Click, action = %s", action);
+        execute_action_from_string(ble_conn_id(), "", action, NULL, 0);
+    }
+
+    xTimerReset(s_inactivity_timer, 0);
+    wakeup();
+}
+
+static void buttons_cb(const uint8_t button) {
+    char keyActionType[32];
+    sprintf(keyActionType, "buttons.keys[%d].acType", button);
+
+    char keyAction[32];
+    sprintf(keyAction, "buttons.keys[%d].action", button);
+
+    char acType[24], action[24];
+    if (storage_get_string_setting(keyActionType, acType, sizeof(acType)) == ESP_OK &&
+        storage_get_string_setting(keyAction, action, sizeof(action)) == ESP_OK) {
+        ESP_LOGI(TAG, "Click, btn #%d, action type = %s, action = %s", button, acType, action);
+
+        execute_action_from_string(ble_conn_id(), acType, action, NULL, 0);
+    }
+
+    xTimerReset(s_inactivity_timer, 0);
+    wakeup();
+}
 
 esp_err_t hid_bridge_init() {
     if (s_hid_bridge_initialized) {
@@ -166,6 +251,9 @@ esp_err_t hid_bridge_init() {
         ESP_LOGE(TAG, "Failed to start inactivity timer");
     }
 
+    rotary_enc_subscribe(rot_cb);
+    rotary_enc_subscribe_click(rot_click_cb);
+    buttons_subscribe_click(buttons_cb);
     return ESP_OK;
 }
 

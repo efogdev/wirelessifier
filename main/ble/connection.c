@@ -28,7 +28,7 @@ static struct {
  * @param addr_type Address type (public or random)
  * @return esp_err_t ESP_OK on success, error code otherwise
  */
-esp_err_t save_connected_device(esp_bd_addr_t bda, esp_ble_addr_type_t addr_type) {
+esp_err_t save_connected_device(esp_bd_addr_t bda, const esp_ble_addr_type_t addr_type) {
     nvs_handle_t nvs_handle;
     esp_err_t err;
 

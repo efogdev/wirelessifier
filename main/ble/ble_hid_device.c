@@ -80,6 +80,14 @@ static esp_ble_adv_params_t hidd_adv_params = {
     .adv_filter_policy = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
 };
 
+uint16_t ble_conn_id() {
+    if (!s_connected) {
+        return -1;
+    }
+
+    return s_conn_id;
+}
+
 static void update_tx_power(void) {
     char tx_power_str[10];
     esp_power_level_t power_level = ESP_PWR_LVL_N0;
@@ -105,7 +113,7 @@ static void update_tx_power(void) {
     esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_SCAN, power_level);
 }
 
-static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *param) {
+static void hidd_event_callback(const esp_hidd_cb_event_t event, esp_hidd_cb_param_t *param) {
     if (!is_ble_enabled() || !g_enabled)
         return;
 
@@ -229,7 +237,7 @@ esp_err_t ble_hid_device_init() {
     ESP_ERROR_CHECK(ret);
 
     char mode_str[16] = {0};
-    storage_get_string_setting("power.highSpeedSubmode", mode_str, sizeof(mode_str));
+    storage_get_string_setting("power.warpSpeed", mode_str, sizeof(mode_str));
     if (mode_str[0] == 'f') {
         s_high_speed_submode = SPEED_MODE_FAST;
     } else if (mode_str[0] == 'v') {
@@ -256,7 +264,7 @@ esp_err_t ble_hid_device_init() {
     }
 
     int reconnect_delay;
-    if (storage_get_int_setting("connectivity.bleReconnectDelay", &reconnect_delay) == ESP_OK) {
+    if (storage_get_int_setting("connectivity.bleRecDelay", &reconnect_delay) == ESP_OK) {
         s_reconnect_delay = reconnect_delay;
         ESP_LOGI(TAG, "BLE reconnect delay set to %d seconds", s_reconnect_delay);
     }

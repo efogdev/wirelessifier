@@ -4,6 +4,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
+#include "esp_timer.h"
 
 static QueueHandle_t enc_queue = NULL;
 static rotary_callback_t user_callback = NULL;
@@ -15,8 +16,8 @@ static void rotary_enc_task(void* arg);
 
 static void IRAM_ATTR enc_isr_handler(void* arg) {
     static uint8_t prev_state = 0;
+
     const uint8_t curr_state = (gpio_get_level(GPIO_ROT_A) << 1) | gpio_get_level(GPIO_ROT_B);
-    
     static const int8_t transitions[] = {
          0, -1,  1,  0,
          1,  0,  0, -1,
@@ -25,8 +26,8 @@ static void IRAM_ATTR enc_isr_handler(void* arg) {
     };
 
     const int8_t direction = transitions[(prev_state << 2) | curr_state];
-    prev_state = curr_state;
     if (direction != 0) {
+        prev_state = curr_state;
         xQueueSendFromISR(enc_queue, &direction, NULL);
     }
 }
@@ -39,11 +40,11 @@ static void IRAM_ATTR click_isr_handler(void* arg) {
 void rotary_enc_init() {
     enc_queue = xQueueCreate(4, sizeof(int8_t));
     button_state_queue = xQueueCreate(4, sizeof(uint8_t));
-    gpio_install_isr_service(0);
+
     gpio_isr_handler_add(GPIO_ROT_A, enc_isr_handler, NULL);
     gpio_isr_handler_add(GPIO_ROT_B, enc_isr_handler, NULL);
     gpio_isr_handler_add(GPIO_ROT_E, click_isr_handler, NULL);
-    xTaskCreate(rotary_enc_task, "rotary_task", 2000, NULL, 14, NULL);
+    xTaskCreate(rotary_enc_task, "rotary_task", 2600, NULL, 8, NULL);
 }
 
 void rotary_enc_subscribe(const rotary_callback_t callback) {

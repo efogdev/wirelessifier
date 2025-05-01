@@ -58,15 +58,15 @@ static cache_entry_t* cache_add(const char* path) {
 static const char *default_settings = "{"
     "\"deviceInfo\":{"
         "\"name\":\"" DEVICE_NAME "\","
-        "\"firmwareVersion\":\"" FIRMWARE_VERSION "\","
-        "\"hardwareVersion\":\"" HARDWARE_VERSION "\","
+        "\"fwVersion\":\"" FIRMWARE_VERSION "\","
+        "\"hwVersion\":\"" HARDWARE_VERSION "\","
         "\"macAddress\":\"00:00:00:00:00:00\""
     "},"
     "\"power\":{"
         "\"lowPowerMode\":false,"
         "\"enableSleep\":true,"
-        "\"highSpeedSubmode\":\"slow\","
-        "\"separateSleepTimeouts\":true,"
+        "\"warpSpeed\":\"slow\","
+        "\"twoSleeps\":true,"
         "\"sleepTimeout\":60,"
         "\"deepSleep\":true,"
         "\"fastCharge\":true,"
@@ -81,36 +81,36 @@ static const char *default_settings = "{"
     "},"
     "\"connectivity\":{"
         "\"bleTxPower\":\"p3\","
-        "\"bleReconnectDelay\":3"
+        "\"bleRecDelay\":3"
     "},"
     "\"buttons\":{"
         "\"keys\":["
             "{"
-                "\"actionType\":\"keyboard_key\","
-                "\"selectedKey\":\"KC_ESCAPE\","
+                "\"acType\":\"keyboard_key\","
+                "\"key\":\"KC_ESCAPE\","
                 "\"action\":\"KC_ESCAPE\""
             "},"
             "{"
-                "\"actionType\":\"system_control\","
-                "\"selectedKey\":\"KC_WWW_BACK\","
+                "\"acType\":\"system_control\","
+                "\"key\":\"KC_WWW_BACK\","
                 "\"action\":\"KC_WWW_BACK\""
             "},"
             "{"
-                "\"actionType\":\"system_control\","
-                "\"selectedKey\":\"KC_WWW_FORWARD\","
+                "\"acType\":\"system_control\","
+                "\"key\":\"KC_WWW_FORWARD\","
                 "\"action\":\"KC_WWW_FORWARD\""
             "},"
             "{"
-                "\"actionType\":\"keyboard_key\","
-                "\"selectedKey\":\"KC_ENTER\","
+                "\"acType\":\"keyboard_key\","
+                "\"key\":\"KC_ENTER\","
                 "\"action\":\"KC_ENTER\""
             "}"
         "],"
         "\"encoder\":{"
             "\"mode\":\"volume_control\","
             "\"click\":\"KC_AUDIO_MUTE\","
-            "\"rotateLeft\":\"KC_AUDIO_VOL_DOWN\","
-            "\"rotateRight\":\"KC_AUDIO_VOL_UP\""
+            "\"left\":\"KC_AUDIO_VOL_DOWN\","
+            "\"right\":\"KC_AUDIO_VOL_UP\""
         "}"
     "}"
 "}";
@@ -290,12 +290,41 @@ static cJSON* find_json_by_path(const char* path) {
     cJSON *current = root;
     
     while ((token = strtok_r(rest, ".", &rest))) {
-        current = cJSON_GetObjectItem(current, token);
-        if (!current) {
-            ESP_LOGE(STORAGE_TAG, "Path %s not found in settings", path);
-            free(path_copy);
-            cJSON_Delete(root);
-            return NULL;
+        char *array_index = strchr(token, '[');
+        if (array_index) {
+            *array_index = '\0';
+            array_index++;
+            char *end_bracket = strchr(array_index, ']');
+            if (end_bracket) {
+                *end_bracket = '\0';
+                int index = atoi(array_index);
+                
+                if (token[0] != '\0') {
+                    current = cJSON_GetObjectItem(current, token);
+                    if (!current) {
+                        ESP_LOGE(STORAGE_TAG, "Object %s not found in settings", token);
+                        free(path_copy);
+                        cJSON_Delete(root);
+                        return NULL;
+                    }
+                }
+                
+                current = cJSON_GetArrayItem(current, index);
+                if (!current) {
+                    ESP_LOGE(STORAGE_TAG, "Array index %d not found in settings", index);
+                    free(path_copy);
+                    cJSON_Delete(root);
+                    return NULL;
+                }
+            }
+        } else {
+            current = cJSON_GetObjectItem(current, token);
+            if (!current) {
+                ESP_LOGE(STORAGE_TAG, "Path %s not found in settings", path);
+                free(path_copy);
+                cJSON_Delete(root);
+                return NULL;
+            }
         }
     }
     

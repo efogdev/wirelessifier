@@ -24,6 +24,7 @@
 #include "driver/gpio.h"
 #include "usb/usb_hid_host.h"
 #include "ble_hid_device.h"
+#include "buttons.h"
 #include "hid_bridge.h"
 #include "utils/rgb_leds.h"
 #include "utils/storage.h"
@@ -63,6 +64,7 @@ void app_main(void) {
 
     adc_init();
     rotary_enc_init();
+    buttons_init();
     led_control_init(NUM_LEDS, GPIO_WS2812B_PIN);
     descriptor_parser_init();
 
@@ -237,14 +239,12 @@ static void init_gpio(void) {
             (1ULL<<GPIO_BUTTON_SW3) |
             (1ULL<<GPIO_BUTTON_SW4) |
             (1ULL<<GPIO_ADC_BAT) |
-            (1ULL<<GPIO_ADC_VIN) |
-            (1ULL<<GPIO_ROT_A) |
-            (1ULL<<GPIO_ROT_B)
+            (1ULL<<GPIO_ADC_VIN)
         ),
         .mode = GPIO_MODE_INPUT,
         .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE
+        .intr_type = GPIO_INTR_ANYEDGE
     };
     gpio_config(&input_nopull_conf);
 
@@ -326,6 +326,7 @@ static void init_gpio(void) {
     }
 
     gpio_set_level(GPIO_BAT_CE, 0);
+    gpio_install_isr_service(0);
 }
 
 static void rot_long_press_cb(void) {

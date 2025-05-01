@@ -6,6 +6,8 @@
 
 #define HID_KEYBOARD_IN_RPT_LEN     63
 #define HID_MOUSE_IN_RPT_LEN        7
+#define HID_SYS_CTRL_IN_RPT_LEN     2
+#define HID_CONSUMER_IN_RPT_LEN     2
 
 static uint8_t s_report_buffer[HID_KEYBOARD_IN_RPT_LEN+2] __attribute__((section(".dram1.data")));
 static bool s_enabled = true;
@@ -14,7 +16,7 @@ bool is_ble_enabled(void) {
     return s_enabled;
 }
 
-esp_err_t esp_hidd_register_callbacks(esp_hidd_event_cb_t callbacks) {
+esp_err_t esp_hidd_register_callbacks(const esp_hidd_event_cb_t callbacks) {
     esp_err_t hidd_status;
 
     if (callbacks != NULL) {
@@ -95,5 +97,21 @@ void IRAM_ATTR esp_hidd_send_mouse_value(const uint16_t conn_id, const uint8_t m
     s_report_buffer[6] = mouse_button;
 
     hid_dev_send_report(hidd_le_env.gatt_if, conn_id, HID_RPT_ID_MOUSE_IN, HID_REPORT_TYPE_INPUT, HID_MOUSE_IN_RPT_LEN,
+                        s_report_buffer);
+}
+
+void IRAM_ATTR esp_hidd_send_system_control_value(const uint16_t conn_id, const uint16_t sys_ctrl) {
+    s_report_buffer[0] = sys_ctrl & 0xFF;
+    s_report_buffer[1] = (sys_ctrl >> 8);
+
+    hid_dev_send_report(hidd_le_env.gatt_if, conn_id, HID_RPT_ID_SYS_IN, HID_REPORT_TYPE_INPUT, HID_SYS_CTRL_IN_RPT_LEN,
+                        s_report_buffer);
+}
+
+void IRAM_ATTR esp_hidd_send_consumer_value(const uint16_t conn_id, const uint16_t consumer_control) {
+    s_report_buffer[0] = consumer_control & 0xFF;
+    s_report_buffer[1] = (consumer_control >> 8);
+
+    hid_dev_send_report(hidd_le_env.gatt_if, conn_id, HID_RPT_ID_CC_IN, HID_REPORT_TYPE_INPUT, HID_CONSUMER_IN_RPT_LEN,
                         s_report_buffer);
 }

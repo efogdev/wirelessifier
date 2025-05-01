@@ -53,3 +53,9 @@ esp_err_t ble_hid_device_send_keyboard_report(const keyboard_report_t *report);
  * @return ESP_OK on success
  */
 esp_err_t ble_hid_device_send_mouse_report(const mouse_report_t *report);
+
+/**
+ * @brief Current connection ID or UINT16_MAX if not connected
+ */
+uint16_t ble_conn_id();
+
