@@ -84,9 +84,9 @@ IRAM_ATTR battery_state_t get_battery_state(void) {
 
     if (is_charging()) {
         new_state = BATTERY_CHARGING;
-    } else if (level > 3.75f || is_psu_connected()) {
+    } else if (level > 3.70f || is_psu_connected()) {
         new_state = BATTERY_NORMAL;
-    } else if (level > 3.65f) {
+    } else if (level > 3.64f) {
         new_state = BATTERY_WARNING;
     } else {
         new_state = BATTERY_LOW;
