@@ -588,7 +588,7 @@ __attribute__((section(".text"))) static void led_control_task(void *arg)
                 }
 
                 neopixel_SetPixel(neopixel_ctx, pixels, s_num_leds);
-                vTaskDelay(pdMS_TO_TICKS(100));
+                vTaskDelay(pdMS_TO_TICKS(battery_state == BATTERY_WARNING ? 100 : 200));
                 continue;
             }
         }
