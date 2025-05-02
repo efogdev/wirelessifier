@@ -224,49 +224,49 @@ static void led_control_task(void *arg);
 static bool is_task_suspended = false;
 
 // Function to check if the task should be suspended and handle suspension/resumption
-IRAM_ATTR static void check_and_update_task_suspension(void)
-{
-    static bool should_suspend = false;
-    
-    if (s_led_pattern >= 0 && s_led_pattern < sizeof(led_patterns)/sizeof(led_patterns[0])) {
-        const led_pattern_t* pattern = &led_patterns[s_led_pattern];
-        const bool only_zero_color = (pattern->colors[0] == 0);
-        const bool status_led_off = (s_status_led_state.mode == STATUS_MODE_OFF) &&
-                            (s_status_led_state.animation == WIFI_ANIM_NONE);
-        
-        should_suspend = only_zero_color && status_led_off;
-    }
-    
-    if (should_suspend && !is_task_suspended && s_led_task_handle != NULL) {
-        is_task_suspended = true;
-        ESP_LOGD(TAG, "Suspending LED task - no color and status LED off");
-        
-        if (neopixel_ctx != NULL) {
-            tNeopixel pixels[s_num_leds];
-            for (int i = 0; i < s_num_leds; i++) {
-                pixels[i].index = i;
-                pixels[i].rgb = 0;
-            }
-            neopixel_SetPixel(neopixel_ctx, pixels, s_num_leds);
-        }
-
-        vTaskDelay(pdMS_TO_TICKS(100));
-        neopixel_Deinit(neopixel_ctx);
-        vTaskDelay(pdMS_TO_TICKS(50));
-        vTaskSuspend(s_led_task_handle);
-    } else if (!should_suspend && is_task_suspended && s_led_task_handle != NULL) {
-        ESP_LOGD(TAG, "Resuming LED task - conditions changed");
-
-        neopixel_ctx = neopixel_Init(s_num_leds, s_gpio_pin);
-        if (neopixel_ctx == NULL) {
-            ESP_LOGE(TAG, "Failed to initialize NeoPixel");
-            return;
-        }
-
-        vTaskResume(s_led_task_handle);
-        is_task_suspended = false;
-    }
-}
+// IRAM_ATTR static void check_and_update_task_suspension(void)
+// {
+//     static bool should_suspend = false;
+//
+//     if (s_led_pattern >= 0 && s_led_pattern < sizeof(led_patterns)/sizeof(led_patterns[0])) {
+//         const led_pattern_t* pattern = &led_patterns[s_led_pattern];
+//         const bool only_zero_color = (pattern->colors[0] == 0);
+//         const bool status_led_off = (s_status_led_state.mode == STATUS_MODE_OFF) &&
+//                             (s_status_led_state.animation == WIFI_ANIM_NONE);
+//
+//         should_suspend = only_zero_color && status_led_off;
+//     }
+//
+//     if (should_suspend && !is_task_suspended && s_led_task_handle != NULL) {
+//         is_task_suspended = true;
+//         ESP_LOGD(TAG, "Suspending LED task - no color and status LED off");
+//
+//         if (neopixel_ctx != NULL) {
+//             tNeopixel pixels[s_num_leds];
+//             for (int i = 0; i < s_num_leds; i++) {
+//                 pixels[i].index = i;
+//                 pixels[i].rgb = 0;
+//             }
+//             neopixel_SetPixel(neopixel_ctx, pixels, s_num_leds);
+//         }
+//
+//         vTaskDelay(pdMS_TO_TICKS(100));
+//         neopixel_Deinit(neopixel_ctx);
+//         vTaskDelay(pdMS_TO_TICKS(50));
+//         vTaskSuspend(s_led_task_handle);
+//     } else if (!should_suspend && is_task_suspended && s_led_task_handle != NULL) {
+//         ESP_LOGD(TAG, "Resuming LED task - conditions changed");
+//
+//         neopixel_ctx = neopixel_Init(s_num_leds, s_gpio_pin);
+//         if (neopixel_ctx == NULL) {
+//             ESP_LOGE(TAG, "Failed to initialize NeoPixel");
+//             return;
+//         }
+//
+//         vTaskResume(s_led_task_handle);
+//         is_task_suspended = false;
+//     }
+// }
 
 uint32_t rgb_color(const uint8_t r, const uint8_t g, const uint8_t b)
 {
