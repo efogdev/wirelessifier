@@ -265,7 +265,7 @@ esp_err_t usb_hid_host_init(const usb_hid_report_callback_t report_callback) {
     const hid_host_driver_config_t hid_host_config = {
         .create_background_task = true,
         .task_priority = 16,
-        .stack_size = 2300,
+        .stack_size = 2500,
         .core_id = 1,
         .callback = hid_host_device_callback,
         .callback_arg = NULL
