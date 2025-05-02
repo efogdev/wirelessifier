@@ -11,7 +11,12 @@
 static const char *TAG = "VMON";
 static bool s_psu_connected = false;
 static bool s_charging = false;
+static bool s_never_wired = false;
 static float bat_volts = 0;
+
+void enable_no_wire_mode() {
+    s_never_wired = true;
+}
 
 void vmon_task(void *pvParameters) {
     vTaskDelay(pdMS_TO_TICKS(50));
@@ -37,7 +42,10 @@ void vmon_task(void *pvParameters) {
         if (vin_volts > 4.2f && !s_psu_connected) {
             gpio_set_level(GPIO_BAT_CE, 0);
             s_psu_connected = true;
-            gpio_set_level(GPIO_MUX_SEL, GPIO_MUX_SEL_PC);
+
+            if (!s_never_wired) {
+                gpio_set_level(GPIO_MUX_SEL, GPIO_MUX_SEL_PC);
+            }
         } else if (vin_volts < 4.2f && s_psu_connected) {
             gpio_set_level(GPIO_BAT_CE, 1);
             s_psu_connected = false;
