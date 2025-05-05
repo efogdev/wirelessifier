@@ -8,7 +8,7 @@
 #define TASK_MON 1
 #define ADC_MULTISAMPLE 24
 #define DEVICE_NAME "Wirelessifier"
-#define FIRMWARE_VERSION "0.2.2"
+#define FIRMWARE_VERSION "0.2.3"
 #define HARDWARE_VERSION "rev. 02"
 #define MAIN_LOOP_DELAY_MS 35
 
