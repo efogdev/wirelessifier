@@ -19,22 +19,38 @@
 #include "ble_hid_device.h"
 #include "buttons.h"
 #include "hid_actions.h"
+#include "rgb_leds.h"
 #include "rotary_enc.h"
+#include "ulp.h"
 #include "web/wifi_manager.h"
 #include "utils/storage.h"
 
 static const char *TAG = "HID_BRIDGE";
 static StaticTimer_t s_inactivity_timer_struct;
+static StaticTimer_t s_deep_sleep_timer_struct;
 static StaticSemaphore_t s_ble_stack_mutex_struct;
 static TimerHandle_t s_inactivity_timer = NULL;
+static TimerHandle_t s_deep_sleep_timer = NULL;
 static SemaphoreHandle_t s_ble_stack_mutex = NULL;
 static bool s_hid_bridge_initialized = false;
 static bool s_hid_bridge_running = false;
 static bool s_ble_stack_active = true;
 static uint16_t s_sensitivity = 100;
 
-static int s_inactivity_timeout_ms = 30 * 1000;
+static int s_inactivity_timeout_ms = 150 * 1000;
+static int s_deep_sleep_timeout_ms = 600 * 1000;
+static bool s_two_sleeps = true;
 static bool s_enable_sleep = true;
+static bool s_enable_deep_sleep = true;
+
+static void enter_deep_sleep() {
+    ESP_LOGI(TAG, "Going to deep sleep…");
+    hid_bridge_deinit();
+    vTaskDelay(pdMS_TO_TICKS(20));
+    led_update_pattern(true, true, false); // all black, we good
+    vTaskDelay(pdMS_TO_TICKS(5));
+    deep_sleep();
+}
 
 static void inactivity_timer_callback(const TimerHandle_t xTimer) {
     if (xSemaphoreTake(s_ble_stack_mutex, pdMS_TO_TICKS(250)) != pdTRUE) {
@@ -68,11 +84,16 @@ static void inactivity_timer_callback(const TimerHandle_t xTimer) {
     }
 
     ESP_LOGI(TAG, "No USB HID events for a while, stopping BLE stack");
+    if (!s_two_sleeps) {
+        xSemaphoreGive(s_ble_stack_mutex);
+        enter_deep_sleep();
+        return;
+    }
+
     const esp_err_t ret = ble_hid_device_deinit();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to deinitialize BLE HID device: %s", esp_err_to_name(ret));
         s_ble_stack_active = true;
-        xSemaphoreGive(s_ble_stack_mutex);
     } else {
         ESP_LOGI(TAG, "BLE stack stopped");
         s_ble_stack_active = false;
@@ -80,22 +101,28 @@ static void inactivity_timer_callback(const TimerHandle_t xTimer) {
     }
 }
 
-// ToDo test if it makes any better
-// static void sleep_task(void *pvParameters) {
-//     while (1) {
-//         if (s_ble_stack_active) {
-//             vTaskDelay(pdMS_TO_TICKS(1000));
-//             continue;
-//         }
-//
-//         // sleep for 250ms
-//         esp_sleep_enable_timer_wakeup(250 * 1000); // microseconds
-//         esp_light_sleep_start();
-//
-//         // idle for 1000ms
-//         vTaskDelay(pdMS_TO_TICKS(1000));
-//     }
-// }
+static void deep_sleep_timer_callback(const TimerHandle_t xTimer) {
+    if (xSemaphoreTake(s_ble_stack_mutex, pdMS_TO_TICKS(250)) != pdTRUE) {
+        ESP_LOGW(TAG, "Failed to take BLE stack mutex in deep sleep timer");
+        return;
+    }
+
+    if (!s_enable_deep_sleep) {
+        ESP_LOGW(TAG, "Deep sleep is disabled in settings");
+        xSemaphoreGive(s_ble_stack_mutex);
+        return;
+    }
+
+    if (is_psu_connected()) {
+        xTimerReset(xTimer, 0);
+        ESP_LOGD(TAG, "Not sleeping while connected to a power source");
+        xSemaphoreGive(s_ble_stack_mutex);
+        return;
+    }
+
+    xSemaphoreGive(s_ble_stack_mutex);
+    enter_deep_sleep();
+}
 
 static void wakeup() {
     if (!s_ble_stack_active) {
@@ -142,6 +169,7 @@ static void rot_cb(const int8_t direction) {
     }
 
     xTimerReset(s_inactivity_timer, 0);
+    xTimerReset(s_deep_sleep_timer, 0);
     wakeup();
 }
 
@@ -157,6 +185,7 @@ static void rot_click_cb(void) {
     }
 
     xTimerReset(s_inactivity_timer, 0);
+    xTimerReset(s_deep_sleep_timer, 0);
     wakeup();
 }
 
@@ -186,6 +215,7 @@ static void buttons_cb(const uint8_t button) {
     }
 
     xTimerReset(s_inactivity_timer, 0);
+    xTimerReset(s_deep_sleep_timer, 0);
     wakeup();
 }
 
@@ -197,10 +227,18 @@ esp_err_t hid_bridge_init() {
 
     int sleep_timeout;
     if (storage_get_int_setting("power.sleepTimeout", &sleep_timeout) == ESP_OK) {
-        s_inactivity_timeout_ms = sleep_timeout * 1000; // Convert to milliseconds
+        s_inactivity_timeout_ms = sleep_timeout * 1000;
         ESP_LOGI(TAG, "Sleep timeout set to %d seconds", sleep_timeout);
     } else {
         ESP_LOGW(TAG, "Failed to get sleep timeout from settings, using default");
+    }
+
+    int deep_sleep_timeout;
+    if (storage_get_int_setting("power.deepSleepTimeout", &deep_sleep_timeout) == ESP_OK) {
+        s_deep_sleep_timeout_ms = deep_sleep_timeout * 1000;
+        ESP_LOGI(TAG, "Deep sleep timeout set to %d seconds", deep_sleep_timeout);
+    } else {
+        ESP_LOGW(TAG, "Failed to get deep sleep timeout from settings, using default");
     }
 
     bool enable_sleep;
@@ -211,6 +249,15 @@ esp_err_t hid_bridge_init() {
         ESP_LOGW(TAG, "Failed to get enable sleep setting, using default (enabled)");
     }
 
+    bool enable_deep_sleep, two_sleeps;
+    if (storage_get_bool_setting("power.deepSleep", &enable_deep_sleep) == ESP_OK && storage_get_bool_setting("power.twoSleeps", &two_sleeps) == ESP_OK) {
+        s_enable_deep_sleep = enable_deep_sleep && two_sleeps;
+        s_two_sleeps = two_sleeps;
+        ESP_LOGI(TAG, "Deep sleep %s", s_enable_deep_sleep ? "enabled" : "disabled");
+    } else {
+        ESP_LOGW(TAG, "Failed to get enable deep sleep setting, using default (enabled)");
+    }
+
     s_ble_stack_mutex = xSemaphoreCreateMutexStatic(&s_ble_stack_mutex_struct);
     if (s_ble_stack_mutex == NULL) {
         ESP_LOGE(TAG, "Failed to create BLE stack mutex");
@@ -218,7 +265,6 @@ esp_err_t hid_bridge_init() {
     }
 
     s_ble_stack_active = true;
-    // xTaskCreatePinnedToCore(sleep_task, "sleep", 1500, NULL, 2, NULL, 1);
 
     s_inactivity_timer = xTimerCreateStatic("inactivity_timer", pdMS_TO_TICKS(s_inactivity_timeout_ms),
         pdFALSE, NULL, inactivity_timer_callback, &s_inactivity_timer_struct);
@@ -229,10 +275,20 @@ esp_err_t hid_bridge_init() {
         return ESP_ERR_NO_MEM;
     }
 
+    s_deep_sleep_timer = xTimerCreateStatic("deep_sleep_timer", pdMS_TO_TICKS(s_deep_sleep_timeout_ms),
+        pdFALSE, NULL, deep_sleep_timer_callback, &s_deep_sleep_timer_struct);
+    if (s_deep_sleep_timer == NULL) {
+        ESP_LOGE(TAG, "Failed to create deep sleep timer");
+        vSemaphoreDelete(s_ble_stack_mutex);
+        s_ble_stack_mutex = NULL;
+        return ESP_ERR_NO_MEM;
+    }
+
     esp_err_t ret = usb_hid_host_init(hid_bridge_process_report);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize USB HID host: %s", esp_err_to_name(ret));
         xTimerDelete(s_inactivity_timer, 0);
+        xTimerDelete(s_deep_sleep_timer, 0);
         return ret;
     }
 
@@ -241,6 +297,7 @@ esp_err_t hid_bridge_init() {
         ESP_LOGE(TAG, "Failed to initialize BLE HID device: %s", esp_err_to_name(ret));
         usb_hid_host_deinit();
         xTimerDelete(s_inactivity_timer, 0);
+        xTimerDelete(s_deep_sleep_timer, 0);
         return ret;
     }
 
@@ -259,6 +316,10 @@ esp_err_t hid_bridge_init() {
 
     if (xTimerStart(s_inactivity_timer, 0) != pdPASS) {
         ESP_LOGE(TAG, "Failed to start inactivity timer");
+    }
+
+    if (xTimerStart(s_deep_sleep_timer, 0) != pdPASS) {
+        ESP_LOGE(TAG, "Failed to start deep sleep timer");
     }
 
     rotary_enc_subscribe(rot_cb);
@@ -281,6 +342,12 @@ esp_err_t hid_bridge_deinit(void) {
         xTimerStop(s_inactivity_timer, 0);
         xTimerDelete(s_inactivity_timer, 0);
         s_inactivity_timer = NULL;
+    }
+
+    if (s_deep_sleep_timer != NULL) {
+        xTimerStop(s_deep_sleep_timer, 0);
+        xTimerDelete(s_deep_sleep_timer, 0);
+        s_deep_sleep_timer = NULL;
     }
 
     if (xSemaphoreTake(s_ble_stack_mutex, pdMS_TO_TICKS(250)) != pdTRUE) {
@@ -465,5 +532,9 @@ void IRAM_ATTR hid_bridge_process_report(const usb_hid_report_t *const report) {
 
     if (s_inactivity_timer != NULL && usb_hid_host_device_connected() && ble_hid_device_connected()) {
         xTimerReset(s_inactivity_timer, 0);
+    }
+
+    if (s_deep_sleep_timer != NULL && usb_hid_host_device_connected() && ble_hid_device_connected()) {
+        xTimerReset(s_deep_sleep_timer, 0);
     }
 }
