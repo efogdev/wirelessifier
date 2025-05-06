@@ -91,7 +91,7 @@ void app_main(void) {
     }
 
     static uint32_t sleep_counter = 0;
-    const uint32_t sleep_threshold = (5 * 60 * 1000) / MAIN_LOOP_DELAY_MS; // 5 minutes
+    const uint32_t sleep_threshold = (3 * 60 * 1000) / MAIN_LOOP_DELAY_MS; // 3 minutes
     // const uint32_t sleep_threshold = (20 * 1000) / MAIN_LOOP_DELAY_MS; // 20 sec (debug)
     // const uint32_t sleep_threshold = (30 * 60 * 1000) / MAIN_LOOP_DELAY_MS; // 30 min (debug)
     while (1) {
@@ -106,7 +106,7 @@ void app_main(void) {
                 hid_bridge_stop();
                 ble_hid_device_deinit();
                 vTaskDelay(pdMS_TO_TICKS(20));
-                ESP_LOGW(TAG, "Entering deep sleep - no devices connected for 5 minutes");
+                ESP_LOGW(TAG, "Entering deep sleep - no devices connected…");
                 deep_sleep();
             }
         } else {

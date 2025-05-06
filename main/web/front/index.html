@@ -8,7 +8,7 @@
     <style>
         @font-face {
             font-family: 'Open Sans';
-            src: url('/lib/opensans_regular.woff2') format('woff2');
+            src: url('lib/opensans-regular.woff2') format('woff2');
             font-weight: normal;
             font-style: normal;
         }
@@ -259,7 +259,6 @@
     </div>
 
     <script>
-        // DOM elements
         const loadingContainer = document.getElementById('loadingContainer');
         const mainContainer = document.getElementById('mainContainer');
         const scanBtn = document.getElementById('scanBtn');
@@ -271,17 +270,14 @@
         const actionSpinner = document.getElementById('actionSpinner');
         const statusDiv = document.getElementById('status');
         
-        // WebSocket connection
         let socket = null;
         let reconnectAttempts = 0;
-        const maxReconnectAttempts = 125;
+        const maxReconnectAttempts = 9999;
         let lastMessageTime = 0;
         let wsCheckInterval = null;
         let isConnectedToWifi = false;
         
-        // Connect to WebSocket
         function connectWebSocket() {
-            // Show loading screen
             loadingContainer.classList.remove('hidden');
             mainContainer.classList.add('hidden');
             
@@ -289,48 +285,35 @@
             const wsUrl = `${protocol}//${window.location.host}/ws`;
             
             socket = new WebSocket(wsUrl);
-            
-            socket.onopen = function() {
+            socket.onopen = () => {
                 console.log('WebSocket connected');
-                
-                // Hide loading screen
                 loadingContainer.classList.add('hidden');
                 mainContainer.classList.remove('hidden');
-
-                // If this was a reconnection, hide spinner and enable scan button
                 if (reconnectAttempts > 0) {
                     actionSpinner.classList.add('hidden');
                     scanBtn.disabled = false;
                 }
                 
                 reconnectAttempts = 0;
-
-                // Initialize last message time
                 lastMessageTime = Date.now();
-                
-                // Start checking for WebSocket inactivity
                 if (wsCheckInterval) {
                     clearInterval(wsCheckInterval);
                 }
                 wsCheckInterval = setInterval(checkWebSocketActivity, 1000);
-
                 checkSavedCredentials();
             };
             
-            socket.onclose = function() {
+            socket.onclose = () => {
                 console.log('WebSocket disconnected');
                 if (wsCheckInterval) {
                     clearInterval(wsCheckInterval);
                     wsCheckInterval = null;
                 }
                 
-                // Don't show loading screen or attempt to reconnect if already connected to WiFi
                 if (!isConnectedToWifi && reconnectAttempts < maxReconnectAttempts) {
                     reconnectAttempts++;
-                    // Show loading screen during reconnection
                     loadingContainer.classList.remove('hidden');
                     mainContainer.classList.add('hidden');
-                    // Update loading text to show reconnection status
                     const loadingText = loadingContainer.querySelector('p');
                     if (loadingText) {
                         loadingText.textContent = `Waiting for connection...`;
@@ -339,27 +322,25 @@
                 }
             };
             
-            socket.onerror = function(error) {
+            socket.onerror = error => {
                 console.error('WebSocket error:', error);
-                // Keep loading screen visible but update text
                 const loadingText = loadingContainer.querySelector('p');
                 if (loadingText) {
                     loadingText.textContent = 'Waiting for connection...';
                 }
             };
             
-            socket.onmessage = function(event) {
-                // Update last message time
+            socket.onmessage = event => {
                 lastMessageTime = Date.now();
                 handleWebSocketMessage(event.data);
             };
         }
         
-        // Handle WebSocket messages
         function handleWebSocketMessage(data) {
             try {
                 const message = JSON.parse(data);
-                
+                console.log(`WS ←`, message);
+
                 switch (message.type) {
                     case 'wifi_scan_result':
                         handleWifiScanResult(message.content);
@@ -389,7 +370,6 @@
             }
         }
         
-        // Handle saved credentials check
         function handleSavedCredentials(hasCredentials) {
             if (!hasCredentials) {
                 scanWifiNetworks();
@@ -398,12 +378,10 @@
             }
         }
         
-        // Handle WiFi scan results
         function handleWifiScanResult(networks) {
             actionSpinner.classList.add('hidden');
             scanBtn.disabled = false;
             
-            // Clear existing options except the first one
             while (networkSelect.options.length > 1) {
                 networkSelect.remove(1);
             }
@@ -412,7 +390,6 @@
                 networks.forEach(network => {
                     const option = document.createElement('option');
                     option.value = network.ssid;
-                    // Add signal quality description based on RSSI value
                     let signalQuality = "";
                     if (network.rssi >= -50) {
                         signalQuality = "excellent";
@@ -439,7 +416,6 @@
             }
         }
         
-        // Handle WiFi connection status
         function handleWifiConnectStatus(status) {
             actionSpinner.classList.add('hidden');
             
@@ -447,18 +423,15 @@
                 isConnectedToWifi = true;
                 updateStatus('Successfully connected! The device is restarting. Please connect to the selected WiFi network. You will be redirected to the new address automatically soon.', 'success');                
                 
-                // Disable inactivity watcher when connected
                 if (wsCheckInterval) {
                     clearInterval(wsCheckInterval);
                     wsCheckInterval = null;
                 }
                 
-                // Ensure loading container stays hidden
                 loadingContainer.classList.add('hidden');
                 mainContainer.classList.remove('hidden');
                 
                 setTimeout(() => {
-                    // Redirect to the new IP after a delay
                     window.location.href = `http://${status.ip}`;
                 }, 15000);
             } else if (status.attempt < 3) {
@@ -469,7 +442,6 @@
             }
         }
         
-        // Update status message
         function updateStatus(message, type) {
             if (!message) {
                 statusDiv.style.display = 'none';
@@ -481,7 +453,6 @@
             statusDiv.className = `status ${type}`;
         }
         
-        // Check for saved credentials
         function checkSavedCredentials() {
             if (!socket || socket.readyState !== WebSocket.OPEN) {
                 updateStatus('Device not connected. Please refresh the page.', 'error');
@@ -493,7 +464,6 @@
             }));
         }
         
-        // Send WiFi scan request
         function scanWifiNetworks() {
             if (!socket || socket.readyState !== WebSocket.OPEN) {
                 updateStatus('Device not connected. Please refresh the page.', 'error');
@@ -509,7 +479,6 @@
             }));
         }
         
-        // Send WiFi connect request
         function connectToWifi() {
             let ssid;
             if (manualSsidCheckbox.checked) {
@@ -545,7 +514,6 @@
             }));
         }
         
-        // Event listeners
         scanBtn.addEventListener('click', scanWifiNetworks);
         connectBtn.addEventListener('click', connectToWifi);
         manualSsidCheckbox.addEventListener('change', function() {
@@ -557,15 +525,16 @@
             } else {
                 networkSelect.classList.remove('hidden');
                 manualSsidInput.classList.add('hidden');
-                // Restore original state based on network selection
                 const hasSelectedNetwork = networkSelect.value !== "";
                 passwordInput.disabled = !hasSelectedNetwork;
                 connectBtn.disabled = !hasSelectedNetwork;
             }
         });
+
         document.getElementById('settingsBtn').addEventListener('click', function() {
             window.location.href = '/settings';
         });
+
         document.getElementById('disableWebStackBtn').addEventListener('click', function() {
             if (confirm('Are you sure you want to disable WiFi and web stack?')) {
                 if (!socket || socket.readyState !== WebSocket.OPEN) {
@@ -574,7 +543,6 @@
                 }
                 
                 updateStatus('Disabling WiFi and web stack...', 'info');
-                
                 socket.send(JSON.stringify({
                     type: 'disable_web_stack'
                 }));
@@ -588,18 +556,16 @@
                 return;
             }
             
-            updateStatus('Rebooting device...', 'info');
+            updateStatus('Rebooting device... WiFi will be disabled.', 'info');
             socket.send(JSON.stringify({
                 type: 'reboot',
-                content: { keepWifi: true },
+                content: { keepWifi: false },
             }));
         });
         
-        // Check WebSocket activity
         function checkWebSocketActivity() {
             const now = Date.now();
             if (!isConnectedToWifi && now - lastMessageTime > 5000) {
-                // Show loading screen with reconnecting message
                 loadingContainer.classList.remove('hidden');
                 mainContainer.classList.add('hidden');
                 const loadingText = loadingContainer.querySelector('p');
@@ -611,9 +577,8 @@
                 }
             }
         }
-        
-        // Initialize WebSocket connection when page loads
-        window.addEventListener('load', connectWebSocket);
+
+        document.addEventListener('DOMContentLoaded', connectWebSocket);
     </script>
 </body>
 </html>

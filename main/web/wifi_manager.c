@@ -23,7 +23,7 @@ static const char *WIFI_TAG = "WIFI_MGR";
 
 #define WS_PING_TASK_STACK_SIZE 2250
 #define WS_PING_TASK_PRIORITY 4
-#define WS_PING_INTERVAL_MS 250
+#define WS_PING_INTERVAL_MS 500
 
 #define NVS_NAMESPACE "wifi_config"
 #define NVS_KEY_SSID "ssid"
@@ -169,8 +169,8 @@ bool has_wifi_credentials(void) {
 void process_wifi_scan_results(void) {
     uint16_t ap_count = 0;
     ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_count));
-    
     ESP_LOGI(WIFI_TAG, "WiFi scan completed, found %d networks", ap_count);
+    vTaskDelay(pdMS_TO_TICKS(20));
     
     if (ap_count == 0) {
         ESP_LOGI(WIFI_TAG, "No networks found");
@@ -220,6 +220,7 @@ void process_wifi_scan_results(void) {
                          ap_records[i].authmode);
     }
 
+    sprintf(json_buffer + offset, "]");
     ws_broadcast_json("wifi_scan_result", json_buffer);
     free(json_buffer);
     free(ap_records);
@@ -235,8 +236,8 @@ esp_err_t scan_wifi_networks(void) {
         .channel = 0,
         .show_hidden = false,
         .scan_type = WIFI_SCAN_TYPE_ACTIVE,
-        .scan_time.active.min = 200,
-        .scan_time.active.max = 600
+        .scan_time.active.min = 120,
+        .scan_time.active.max = 400,
     };
     
     const esp_err_t ret = esp_wifi_scan_start(&scan_config, false);
