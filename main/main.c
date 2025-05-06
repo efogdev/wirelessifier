@@ -309,30 +309,8 @@ static void init_gpio(void) {
     ESP_ERROR_CHECK(ledc_channel_config(&ledc_channel));
 #endif
 
-    bool fast_charge;
-    if (storage_get_bool_setting("power.fastCharge", &fast_charge) == ESP_OK && fast_charge) {
-        ESP_LOGW(TAG, "Fast charging ENABLED!");
-        gpio_set_level(GPIO_BAT_CE, 1);
-
-        // ±5W
-        gpio_set_level(GPIO_BAT_ISET1, 0);
-        gpio_set_level(GPIO_BAT_ISET2, 0);
-        gpio_set_level(GPIO_BAT_ISET3, 0);
-        gpio_set_level(GPIO_BAT_ISET4, 0);
-        gpio_set_level(GPIO_BAT_ISET5, 0);
-        gpio_set_level(GPIO_BAT_ISET6, 0);
-    } else {
-        ESP_LOGW(TAG, "Fast charging disabled!");
-        gpio_set_level(GPIO_BAT_CE, 1);
-
-        // ±2W
-        gpio_set_level(GPIO_BAT_ISET1, 1);
-        gpio_set_level(GPIO_BAT_ISET2, 1);
-        gpio_set_level(GPIO_BAT_ISET3, 1);
-    }
-
-    gpio_set_level(GPIO_BAT_CE, 0);
     gpio_install_isr_service(0);
+    set_fast_charging_from_settings();
 }
 
 static void rot_long_press_cb(void) {
