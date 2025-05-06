@@ -9,6 +9,7 @@
 #include <storage.h>
 #include <cJSON.h>
 
+#include "esp_ota_ops.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
@@ -20,8 +21,8 @@
 
 static const char *WIFI_TAG = "WIFI_MGR";
 
-#define WS_PING_TASK_STACK_SIZE 2048
-#define WS_PING_TASK_PRIORITY 3
+#define WS_PING_TASK_STACK_SIZE 2250
+#define WS_PING_TASK_PRIORITY 4
 #define WS_PING_INTERVAL_MS 250
 
 #define NVS_NAMESPACE "wifi_config"
@@ -173,7 +174,7 @@ void process_wifi_scan_results(void) {
     
     if (ap_count == 0) {
         ESP_LOGI(WIFI_TAG, "No networks found");
-        ws_broadcast_json("wifi_scan_result", "[]");
+        ws_broadcast_small_json("wifi_scan_result", "[]");
         return;
     }
     
@@ -183,11 +184,17 @@ void process_wifi_scan_results(void) {
         return;
     }
     
-    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_count, ap_records));
-    char *json_buffer = malloc(ap_count * 128); // Allocate enough space for all APs
+    char *json_buffer = malloc(ap_count * 128);
     if (json_buffer == NULL) {
         free(ap_records);
         ESP_LOGE(WIFI_TAG, "Failed to allocate memory for JSON buffer");
+        return;
+    }
+    
+    if (esp_wifi_scan_get_ap_records(&ap_count, ap_records) != ESP_OK) {
+        free(ap_records);
+        free(json_buffer);
+        ESP_LOGE(WIFI_TAG, "Failed to get AP records");
         return;
     }
     
@@ -196,8 +203,9 @@ void process_wifi_scan_results(void) {
     
     for (int i = 0; i < ap_count; i++) {
         char ssid_escaped[64] = {0};
+        size_t ssid_len = strnlen((const char *)ap_records[i].ssid, sizeof(ap_records[i].ssid));
         
-        for (int j = 0, k = 0; j < strlen((const char *)ap_records[i].ssid) && k < 63; j++) {
+        for (int j = 0, k = 0; j < ssid_len && k < 63; j++) {
             if (ap_records[i].ssid[j] == '"' || ap_records[i].ssid[j] == '\\') {
                 ssid_escaped[k++] = '\\';
             }
@@ -211,9 +219,7 @@ void process_wifi_scan_results(void) {
                          ap_records[i].rssi,
                          ap_records[i].authmode);
     }
-    
-    offset += sprintf(json_buffer + offset, "]");
-    
+
     ws_broadcast_json("wifi_scan_result", json_buffer);
     free(json_buffer);
     free(ap_records);
@@ -278,34 +284,30 @@ esp_err_t connect_to_wifi(const char* ssid, const char* password) {
         WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdFALSE, pdFALSE, 40000 / portTICK_PERIOD_MS);
     
     connecting = false;
+    static char status_json[128];
 
     if (bits & WIFI_CONNECTED_BIT) {
         ESP_LOGI(WIFI_TAG, "Connected to %s", ssid);
         save_wifi_credentials(ssid, password ? password : "");
-        char status_json[128];
         snprintf(status_json, sizeof(status_json), 
                 "{\"connected\":true,\"ip\":\"%s\",\"attempt\":%d}", 
                 connected_ip, s_retry_num);
-        ws_broadcast_json("wifi_connect_status", status_json);
+        ws_broadcast_small_json("wifi_connect_status", status_json);
         storage_set_boot_with_wifi();
         vTaskDelay(pdMS_TO_TICKS(500));
         esp_restart();}
 
     if (bits & WIFI_FAIL_BIT) {
-        char status_json[64];
-        snprintf(status_json, sizeof(status_json), 
+        snprintf(status_json, sizeof(status_json),
                 "{\"connected\":false,\"attempt\":%d}",
                 s_retry_num);
-        ws_broadcast_json("wifi_connect_status", status_json);
+        ws_broadcast_small_json("wifi_connect_status", status_json);
         ESP_LOGI(WIFI_TAG, "Failed to connect to %s", ssid);
         return ESP_FAIL;
     }
 
-    char status_json[64];
-    snprintf(status_json, sizeof(status_json),
-             "{\"connected\":false,\"attempt\":%d}",
-             s_retry_num);
-    ws_broadcast_json("wifi_connect_status", status_json);
+    snprintf(status_json, sizeof(status_json), "{\"connected\":false,\"attempt\":%d}", s_retry_num);
+    ws_broadcast_small_json("wifi_connect_status", status_json);
     ESP_LOGE(WIFI_TAG, "Connection timeout");
     return ESP_ERR_TIMEOUT;
 }
@@ -320,7 +322,7 @@ void disable_wifi_and_web_stack(void) {
     led_update_wifi_status(false, false);
     led_update_status(0, 0);
 
-    ws_broadcast_json("web_stack_disabled", "{}");
+    ws_broadcast_small_json("web_stack_disabled", "{}");
     vTaskDelay(pdMS_TO_TICKS(250));
 
     if (ping_task_handle != NULL && eTaskGetState(ping_task_handle) != eDeleted) {
@@ -356,7 +358,7 @@ void disable_wifi_and_web_stack(void) {
 
 void reboot_device(bool keep_wifi) {
     ESP_LOGI(WIFI_TAG, "Rebooting device, keep_wifi=%d", keep_wifi);
-    ws_broadcast_json("reboot", "{}");
+    ws_broadcast_small_json("reboot", "{}");
     vTaskDelay(pdMS_TO_TICKS(250)); // Give time for the messages to be sent
     
     nvs_handle_t nvs_handle;
@@ -385,23 +387,23 @@ void process_wifi_ws_message(const char* message) {
         return;
     }
 
+    static char status_json[32];
     if (strcmp(type->valuestring, "wifi_check_saved") == 0) {
-        bool has_creds = has_wifi_credentials();
-        char status_json[32];
+        const bool has_creds = has_wifi_credentials();
         snprintf(status_json, sizeof(status_json), "%s", has_creds ? "true" : "false");
-        ws_broadcast_json("wifi_saved_credentials", status_json);
+        ws_broadcast_small_json("wifi_saved_credentials", status_json);
     }
     else if (strcmp(type->valuestring, "wifi_scan") == 0) {
         scan_wifi_networks();
     }
     else if (strcmp(type->valuestring, "reboot") == 0) {
-        cJSON *keepWifi = cJSON_GetObjectItem(root, "keepWifi");
-        bool keep_wifi = keepWifi && cJSON_IsTrue(keepWifi);
+        const cJSON *keepWifi = cJSON_GetObjectItem(root, "keepWifi");
+        const bool keep_wifi = keepWifi && cJSON_IsTrue(keepWifi);
         reboot_device(keep_wifi);
     }
     else if (strcmp(type->valuestring, "disable_web_stack") == 0) {
         // disable_wifi_and_web_stack();
-        ws_broadcast_json("web_stack_disabled", "{}");
+        ws_broadcast_small_json("web_stack_disabled", "{}");
         vTaskDelay(pdMS_TO_TICKS(250));
         esp_restart(); // because no memory freed when disabling web stack for some reason (ToDo)
     }
@@ -413,7 +415,7 @@ void process_wifi_ws_message(const char* message) {
         }
 
         cJSON *ssid_json = cJSON_GetObjectItem(content, "ssid");
-        cJSON *password_json = cJSON_GetObjectItem(content, "password");
+        const cJSON *password_json = cJSON_GetObjectItem(content, "password");
 
         if (!ssid_json || !ssid_json->valuestring) {
             cJSON_Delete(root);
@@ -426,6 +428,17 @@ void process_wifi_ws_message(const char* message) {
         if (strlen(ssid) > 0) {
             connect_to_wifi(ssid, password);
         }
+    }  else if (strcmp(type->valuestring, "ota_confirm") == 0) {
+        esp_ota_mark_app_valid_cancel_rollback();
+
+        nvs_handle_t nvs_handle;
+        if (nvs_open("ota", NVS_READWRITE, &nvs_handle) == ESP_OK) {
+            nvs_set_u8(nvs_handle, "fw_updated", 0);
+            nvs_commit(nvs_handle);
+            nvs_close(nvs_handle);
+        }
+
+        esp_restart();
     }
 
     cJSON_Delete(root);
@@ -472,10 +485,10 @@ static void ws_ping_task(void *pvParameters) {
         temp_sensor_get_temperature(&temp);
         const float bat = get_battery_level();
         
-        char ping_data[96];
+        static char ping_data[96];
         snprintf(ping_data, sizeof(ping_data), "{\"heap\":%lu,\"temp\":%.1f,\"bat\":%.2f}", free_heap, temp, bat);
         
-        ws_broadcast_json("ping", ping_data);
+        ws_broadcast_small_json("ping", ping_data);
         vTaskDelay(pdMS_TO_TICKS(WS_PING_INTERVAL_MS));
     }
     

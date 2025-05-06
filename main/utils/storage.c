@@ -7,8 +7,11 @@
 #include <stdlib.h>
 #include <esp_mac.h>
 #include "const.h"
+#include "esp_flash_partitions.h"
+#include "esp_ota_ops.h"
+#include "ota_server.h"
 
-#define MAX_CACHE_SIZE 8
+#define MAX_CACHE_SIZE 6
 #define MAX_PATH_LENGTH 32
 
 typedef enum {
@@ -60,7 +63,8 @@ static const char *default_settings = "{"
         "\"name\":\"" DEVICE_NAME "\","
         "\"fwVersion\":\"" FIRMWARE_VERSION "\","
         "\"hwVersion\":\"" HARDWARE_VERSION "\","
-        "\"macAddress\":\"00:00:00:00:00:00\""
+        "\"macAddress\":\"00:00:00:00:00:00\","
+        "\"newFirmware\":false"
     "},"
     "\"power\":{"
         "\"enableSleep\":true,"
@@ -118,7 +122,17 @@ static void get_mac_address_str(char *mac_str, const size_t size) {
              mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 }
 
-static char* update_mac_address_in_settings(const char* settings_json) {
+static bool is_verifying_new_fw() {
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    esp_ota_img_states_t ota_state;
+    if (esp_ota_get_state_partition(running, &ota_state) == ESP_OK) {
+        return ota_state == ESP_OTA_IMG_PENDING_VERIFY;
+    }
+
+    return false;
+}
+
+static char* update_device_info_in_settings(const char* settings_json) {
     if (!settings_json) return NULL;
     
     cJSON *root = cJSON_Parse(settings_json);
@@ -144,6 +158,21 @@ static char* update_mac_address_in_settings(const char* settings_json) {
     } else {
         cJSON_AddStringToObject(device_info, "macAddress", mac_str);
     }
+
+    cJSON *fw_version = cJSON_GetObjectItem(device_info, "fwVersion");
+    if (fw_version) {
+        cJSON_SetValuestring(fw_version, FIRMWARE_VERSION);
+    } else {
+        cJSON_AddStringToObject(device_info, "fwVersion", FIRMWARE_VERSION);
+    }
+
+    const bool is_new_fw = is_verifying_new_fw();
+    cJSON *new_fw = cJSON_GetObjectItem(device_info, "newFirmware");
+    if (new_fw) {
+        cJSON_SetBoolValue(new_fw, is_new_fw);
+    } else {
+        cJSON_AddBoolToObject(device_info, "newFirmware", is_new_fw);
+    }
     
     char *updated_settings = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
@@ -161,8 +190,7 @@ esp_err_t init_global_settings(void) {
     esp_err_t err = nvs_open(SETTINGS_NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
     if (err != ESP_OK) {
         ESP_LOGE(STORAGE_TAG, "Error opening NVS: %s", esp_err_to_name(err));
-        // Use default settings with updated MAC address
-        char *updated_settings = update_mac_address_in_settings(default_settings);
+        char *updated_settings = update_device_info_in_settings(default_settings);
         current_settings = updated_settings ? updated_settings : strdup(default_settings);
         return err;
     }
@@ -174,7 +202,7 @@ esp_err_t init_global_settings(void) {
         if (nvs_settings == NULL) {
             ESP_LOGE(STORAGE_TAG, "Failed to allocate memory for settings");
             nvs_close(nvs_handle);
-            char *updated_settings = update_mac_address_in_settings(default_settings);
+            char *updated_settings = update_device_info_in_settings(default_settings);
             current_settings = updated_settings ? updated_settings : strdup(default_settings);
             return ESP_ERR_NO_MEM;
         }
@@ -183,16 +211,24 @@ esp_err_t init_global_settings(void) {
         if (err != ESP_OK) {
             ESP_LOGE(STORAGE_TAG, "Error getting settings from NVS: %s", esp_err_to_name(err));
             free(nvs_settings);
-            char *updated_settings = update_mac_address_in_settings(default_settings);
+            char *updated_settings = update_device_info_in_settings(default_settings);
             current_settings = updated_settings ? updated_settings : strdup(default_settings);
+            if (current_settings) {
+                err = nvs_set_str(nvs_handle, SETTINGS_NVS_KEY, current_settings);
+                if (err == ESP_OK) nvs_commit(nvs_handle);
+            }
         } else {
-            char *updated_settings = update_mac_address_in_settings(nvs_settings);
+            char *updated_settings = update_device_info_in_settings(nvs_settings);
             current_settings = updated_settings ? updated_settings : strdup(nvs_settings);
+            if (current_settings) {
+                err = nvs_set_str(nvs_handle, SETTINGS_NVS_KEY, current_settings);
+                if (err == ESP_OK) nvs_commit(nvs_handle);
+            }
             free(nvs_settings);
         }
     } else {
         ESP_LOGI(STORAGE_TAG, "No settings found in NVS, using defaults");
-        char *updated_settings = update_mac_address_in_settings(default_settings);
+        char *updated_settings = update_device_info_in_settings(default_settings);
         current_settings = updated_settings ? updated_settings : strdup(default_settings);
         
         if (current_settings) {
@@ -219,7 +255,7 @@ const char* storage_get_settings(void) {
     }
     
     if (current_settings) {
-        char *updated_settings = update_mac_address_in_settings(current_settings);
+        char *updated_settings = update_device_info_in_settings(current_settings);
         if (updated_settings) {
             free(current_settings);
             current_settings = updated_settings;
@@ -232,14 +268,18 @@ const char* storage_get_settings(void) {
 esp_err_t storage_update_settings(const char* settings_json) {
     if (!settings_json) return ESP_ERR_INVALID_ARG;
     
+    char *updated_settings = update_device_info_in_settings(settings_json);
+    if (!updated_settings) return ESP_ERR_NO_MEM;
+    
     nvs_handle_t nvs_handle;
     esp_err_t err = nvs_open(SETTINGS_NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
     if (err != ESP_OK) {
         ESP_LOGE(STORAGE_TAG, "Error opening NVS: %s", esp_err_to_name(err));
+        free(updated_settings);
         return err;
     }
     
-    err = nvs_set_str(nvs_handle, SETTINGS_NVS_KEY, settings_json);
+    err = nvs_set_str(nvs_handle, SETTINGS_NVS_KEY, updated_settings);
     if (err != ESP_OK) {
         ESP_LOGE(STORAGE_TAG, "Error saving settings to NVS: %s", esp_err_to_name(err));
         nvs_close(nvs_handle);
@@ -257,8 +297,10 @@ esp_err_t storage_update_settings(const char* settings_json) {
         if (current_settings) {
             free(current_settings);
         }
-        current_settings = strdup(settings_json);
+        current_settings = updated_settings;
         cache_clear();
+    } else {
+        free(updated_settings);
     }
     
     return err;

@@ -83,7 +83,7 @@ void rotary_enc_init() {
     ESP_ERROR_CHECK(pcnt_unit_start(pcnt_unit));
 
     gpio_isr_handler_add(GPIO_ROT_E, click_isr_handler, NULL);
-    xTaskCreate(rotary_enc_task, "rotary_task", 2300, NULL, 8, NULL);
+    xTaskCreatePinnedToCore(rotary_enc_task, "rotary_task", 2300, NULL, 8, NULL, 1);
 }
 
 void rotary_enc_subscribe(const rotary_callback_t callback) {

@@ -10,13 +10,117 @@ const Modal = ({ isOpen, onClose, children }) => {
     );
 };
 
-const App = () => {
+const useWebSocket = (onMessage) => {
     const [connected, setConnected] = React.useState(false);
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState(null);
     const [lastMessageTime, setLastMessageTime] = React.useState(0);
-    const [isModalOpen, setIsModalOpen] = React.useState(false);
     
+    const socketRef = React.useRef(null);
+    const wsCheckIntervalRef = React.useRef(null);
+    const reconnectTimeoutRef = React.useRef(null);
+
+    const connect = React.useCallback(() => {
+        if (socketRef.current && socketRef.current.readyState !== WebSocket.CLOSED) {
+            return;
+        }
+
+        console.log('Connecting to WebSocket...');
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws`;
+        
+        const socket = new WebSocket(wsUrl);
+        
+        socket.onopen = () => {
+            console.log('WebSocket connected');
+            setConnected(true);
+            setLoading(false);
+            setLastMessageTime(Date.now());
+            setError(null);
+        };
+
+        socket.onclose = () => {
+            console.log('WebSocket disconnected');
+            setConnected(false);
+            setLoading(true);
+            
+            if (reconnectTimeoutRef.current) {
+                clearTimeout(reconnectTimeoutRef.current);
+            }
+            reconnectTimeoutRef.current = setTimeout(connect, 500);
+        };
+
+        socket.onerror = (err) => {
+            console.error('WebSocket error:', err);
+            setConnected(false);
+            setLoading(true);
+
+            if (reconnectTimeoutRef.current) {
+                clearTimeout(reconnectTimeoutRef.current);
+            }
+            reconnectTimeoutRef.current = setTimeout(connect, 500);
+        };
+
+        socket.onmessage = (event) => {
+            setLastMessageTime(Date.now());
+            onMessage(event.data);
+        };
+
+        socketRef.current = socket;
+    }, [onMessage]);
+
+    const checkWebSocketActivity = React.useCallback(() => {
+        const now = Date.now();
+        if (lastMessageTime > 0 && now - lastMessageTime > 2500) {
+            setConnected(false);
+            setLoading(true);
+            
+            if (socketRef.current && socketRef.current.readyState !== WebSocket.CLOSED) {
+                try {
+                    socketRef.current.close();
+                } catch (e) {
+                    console.error('Error closing socket:', e);
+                }
+            }
+            
+            if (reconnectTimeoutRef.current) {
+                clearTimeout(reconnectTimeoutRef.current);
+            }
+            reconnectTimeoutRef.current = setTimeout(connect, 500);
+        }
+    }, [lastMessageTime, connect]);
+
+    const send = React.useCallback((data) => {
+        if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+            setError('WebSocket not connected.');
+            return false;
+        }
+        socketRef.current.send(typeof data === 'string' ? data : JSON.stringify(data));
+        return true;
+    }, [ socketRef, socketRef.current ]);
+
+    React.useEffect(() => {
+        connect();
+        wsCheckIntervalRef.current = setInterval(checkWebSocketActivity, 1000);
+        
+        return () => {
+            if (socketRef.current) {
+                socketRef.current.close();
+            }
+            if (wsCheckIntervalRef.current) {
+                clearInterval(wsCheckIntervalRef.current);
+            }
+            if (reconnectTimeoutRef.current) {
+                clearTimeout(reconnectTimeoutRef.current);
+            }
+        };
+    }, []);
+
+    return { connected, loading, error, send };
+};
+
+const App = () => {
+    const [isModalOpen, setIsModalOpen] = React.useState(false);
     const [systemInfo, setSystemInfo] = React.useState({
         heap: 0,
         temp: 0,
@@ -29,6 +133,7 @@ const App = () => {
             fwVersion: 'TBD',
             hwVersion: 'TBD',
             macAddress: '00:00:00:00:00:00',
+            newFirmware: false,
         },
         power: {
             sleepTimeout: 60,
@@ -87,79 +192,20 @@ const App = () => {
     const [otaProgress, setOtaProgress] = React.useState(0);
     const [otaInProgress, setOtaInProgress] = React.useState(false);
     const [deviceInfoExpanded, setDeviceInfoExpanded] = React.useState(false);
-    const socketRef = React.useRef(null);
-    const wsCheckIntervalRef = React.useRef(null);
     const fileInputRef = React.useRef(null);
     const initialSettingsRef = React.useRef(null);
 
-    const checkWebSocketActivity = () => {
-        const now = Date.now();
-        if (lastMessageTime > 0 && now - lastMessageTime > 1500) {
-            setConnected(false);
-            setLoading(true);
-            if (socketRef.current && socketRef.current.readyState !== WebSocket.CLOSED) {
-                try {
-                    socketRef.current.close();
-                } catch (e) {
-                    console.error('Error closing socket:', e);
-                }
-            }
-            setTimeout(connectWebSocket, 1000);
-        }
-    };
+    const showStatus = React.useCallback((message, type) => {
+        setStatusMessage(message);
+        setStatusType(type);
+        window.scrollTo(0, 0);
 
-    React.useEffect(() => {
-        connectWebSocket();
-        wsCheckIntervalRef.current = setInterval(checkWebSocketActivity, 1000);
-        return () => {
-            if (socketRef.current) {
-                socketRef.current.close();
-            }
-            if (wsCheckIntervalRef.current) {
-                clearInterval(wsCheckIntervalRef.current);
-            }
-        };
-    }, []);
+        setTimeout(() => {
+            setStatusMessage(null);
+        }, 15000);
+    }, [ setStatusMessage, setStatusType ]);
 
-    const connectWebSocket = () => {
-        setLoading(true);
-        setError(null);
-
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/ws`;
-
-        const socket = new WebSocket(wsUrl);
-        socketRef.current = socket;
-
-        socket.onopen = () => {
-            console.log('WebSocket connected');
-            setConnected(true);
-            setLoading(false);
-            setLastMessageTime(Date.now());
-            requestSettings();
-        };
-
-        socket.onclose = () => {
-            console.log('WebSocket disconnected');
-            setConnected(false);
-            setLoading(true);
-            setTimeout(connectWebSocket, 1000);
-        };
-
-        socket.onerror = (error) => {
-            console.error('WebSocket error:', error);
-            setError('Failed to connect to the device. Please try again later.');
-            setLoading(false);
-        };
-
-        socket.onmessage = (event) => {
-            handleWebSocketMessage(event.data);
-        };
-    };
-
-    const handleWebSocketMessage = (data) => {
-        setLastMessageTime(Date.now());
-
+    const handleWebSocketMessage = React.useCallback((data) => {
         try {
             const message = JSON.parse(data);
 
@@ -173,10 +219,10 @@ const App = () => {
                         setOtaProgress(progress);
 
                         if (progress === 100) {
-                            showStatus('OTA update completed successfully! Device will reboot.', 'success');
+                            showStatus('Image updated. The device is rebooting, WiFi on. Please refresh this page, then verify OTA.', 'success');
                             setTimeout(() => {
                                 setOtaInProgress(false);
-                            }, 2000);
+                            }, 5000);
                         }
                     }
                     break;
@@ -222,35 +268,35 @@ const App = () => {
         } catch (error) {
             console.error('Error parsing WebSocket message:', error);
         }
-    };
+    }, [ showStatus, setSettings, settings, setSystemInfo, systemInfo ]);
 
-    const requestSettings = () => {
-        if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
-            showStatus('WebSocket not connected.', 'error');
-            return;
-        }
+    const { connected, loading, error, send } = useWebSocket(handleWebSocketMessage);
 
-        socketRef.current.send(JSON.stringify({
+    const requestSettings = React.useCallback(() => {
+        if (send({
             type: 'command',
             command: 'get_settings'
-        }));
-    };
+        })) {
+            // showStatus('Requesting settings...', 'info');
+        }
+    }, [send]);
+
+    React.useEffect(() => {
+        if (connected) {
+            requestSettings();
+        }
+    }, [connected, requestSettings]);
 
     const saveSettings = () => {
-        if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
-            showStatus('WebSocket not connected.', 'error');
-            return;
-        }
-
         const keepWifi = confirm('Do you want to keep WiFi and web stack on after reboot? Press "Ok" to keep it enabled.');
 
-        socketRef.current.send(JSON.stringify({
+        if (send({
             type: 'command',
             command: 'update_settings',
             content: { ...settings, keepWifi }
-        }));
-
-        showStatus('Saving settings…', 'info');
+        })) {
+            showStatus('Saving settings…', 'info');
+        }
     };
 
     const updateSetting = (category, key, value) => {
@@ -271,16 +317,6 @@ const App = () => {
         });
     };
 
-    const showStatus = (message, type) => {
-        setStatusMessage(message);
-        setStatusType(type);
-        window.scrollTo(0, 0);
-
-        setTimeout(() => {
-            setStatusMessage(null);
-        }, 15000);
-    };
-
     const min = 10;
     const minp = React.useMemo(() => Math.log(min), []);
     const maxp = React.useMemo(() => Math.log(100), []);
@@ -298,6 +334,17 @@ const App = () => {
         updateSetting('buttons', '', config);
     }
 
+    const handleOtaConfirm = () => {
+        if (send({ type: 'ota_confirm' })) {
+            showStatus('Done! The device is rebooting.', 'success');
+        }
+    }
+
+    const reboot = () => {
+        send({ type: 'reboot', content: { keepWifi: true } });
+        showStatus('Done! The device is rebooting.', 'success');
+    }
+
     const handleFirmwareUpload = () => {
         const fileInput = fileInputRef.current;
         if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
@@ -311,27 +358,29 @@ const App = () => {
 
         setOtaInProgress(true);
         setOtaProgress(0);
-        showStatus('Starting firmware upload…', 'info');
-        window.scrollTo(0, 0);
 
-        fetch('/upload', {
-            method: 'POST',
-            body: formData
-        })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error ${response.status}`);
+        const req = new XMLHttpRequest();
+        req.open('POST', '/upload', true);
+        
+        new Promise((resolve, reject) => {
+            req.onload = () => {
+                if (req.status >= 200 && req.status < 300) {
+                    resolve(req.responseText);
+                } else {
+                    reject(new Error(`HTTP error ${req.status}`));
                 }
-                return response.text();
-            })
-            .then(data => {
-                console.log('Upload successful:', data);
-            })
-            .catch(error => {
-                console.error('Upload failed:', error);
-                setOtaInProgress(false);
-                showStatus(`Upload failed: ${error.message}`, 'error');
-            });
+            };
+            req.onerror = () => reject(new Error('Network error'));
+            req.send(file);
+        })
+        .then(data => {
+            console.log('Upload successful:', data);
+        })
+        .catch(error => {
+            console.error('Upload failed:', error);
+            setOtaInProgress(false);
+            showStatus(`Upload failed: ${error.message}`, 'error');
+        });
     };
 
     if (loading || !connected) {
@@ -347,7 +396,7 @@ const App = () => {
         return (
             <div className="container">
                 <div className="status error">{error}</div>
-                <button onClick={connectWebSocket}>Retry Connection</button>
+                <button onClick={requestSettings}>Retry Connection</button>
             </div>
         );
     }
@@ -468,20 +517,20 @@ const App = () => {
                         </select>
                     </div>
 
-                    <div className="setting-item">
-                        <div className="setting-title">Reconnect delay</div>
-                        <div className="setting-description">
-                            Delay in seconds before attempting to reconnect after Bluetooth disconnect.
-                            Doesn't affect waking up from sleep.
-                        </div>
-                        <input
-                            type="number"
-                            min="1"
-                            max="60"
-                            value={settings.connectivity.bleRecDelay}
-                            onChange={(e) => updateSetting('connectivity', 'bleRecDelay', parseInt(e.target.value))}
-                        />
-                    </div>
+                    {/*<div className="setting-item">*/}
+                    {/*    <div className="setting-title">Reconnect delay</div>*/}
+                    {/*    <div className="setting-description">*/}
+                    {/*        Delay in seconds before attempting to reconnect after Bluetooth disconnect.*/}
+                    {/*        Doesn't affect waking up from sleep.*/}
+                    {/*    </div>*/}
+                    {/*    <input*/}
+                    {/*        type="number"*/}
+                    {/*        min="1"*/}
+                    {/*        max="60"*/}
+                    {/*        value={settings.connectivity.bleRecDelay}*/}
+                    {/*        onChange={(e) => updateSetting('connectivity', 'bleRecDelay', parseInt(e.target.value))}*/}
+                    {/*    />*/}
+                    {/*</div>*/}
                 </div>
 
                 <div className="setting-group">
@@ -495,13 +544,13 @@ const App = () => {
                         <button onClick={() => setIsModalOpen(true)}>Configure</button>
                     </div>
 
-                    <div className="setting-item">
-                        <div className="setting-title">Miscellaneous</div>
-                        <div className="setting-description">
-                            Various useful actions.
-                        </div>
-                        <button onClick={() => void(0)}>Clear data</button>
-                    </div>
+                    {/*<div className="setting-item">*/}
+                    {/*    <div className="setting-title">Miscellaneous</div>*/}
+                    {/*    <div className="setting-description">*/}
+                    {/*        Various useful actions.*/}
+                    {/*    </div>*/}
+                    {/*    <button onClick={() => void(0)}>Clear data</button>*/}
+                    {/*</div>*/}
                 </div>
 
                 <div className="setting-group">
@@ -659,12 +708,11 @@ const App = () => {
                                         className="progress-bar"
                                         style={{width: `${otaProgress}%`}}
                                     >
-                                        {otaProgress}%
+                                        <span>{otaProgress}%</span>
                                     </div>
                                 </div>
-                                <p>Uploading firmware…</p>
                             </div>
-                        ) : (
+                        ) : !settings.deviceInfo.newFirmware ? (
                             <div>
                                 <div className="file-input-container">
                                     <input
@@ -681,6 +729,18 @@ const App = () => {
                                         disabled={!connected || !fileInputRef.current?.files?.length}
                                     >
                                         Flash
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div>
+                                <div className="file-input-container">
+                                    <button onClick={handleOtaConfirm}>
+                                        Verify OTA image
+                                    </button>
+
+                                    <button onClick={reboot} className="error">
+                                        Reject update
                                     </button>
                                 </div>
                             </div>

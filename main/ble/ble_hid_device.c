@@ -402,7 +402,7 @@ esp_err_t ble_hid_device_init() {
     esp_hidd_register_callbacks(hidd_event_callback);
 
     if (VERBOSE) {
-        xTaskCreatePinnedToCore(ble_stats_task, "ble_stats", 1600, NULL, 5, &s_stats_task_handle, 1);
+        xTaskCreatePinnedToCore(ble_stats_task, "ble_stats", 1800, NULL, 5, &s_stats_task_handle, 1);
     }
 
     esp_ble_auth_req_t auth_req = ESP_LE_AUTH_REQ_SC_MITM_BOND;

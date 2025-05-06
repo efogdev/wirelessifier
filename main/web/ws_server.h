@@ -38,15 +38,9 @@ esp_err_t ws_send_frame_to_all_clients(const char *data, size_t len);
 void ws_broadcast_json(const char *type, const char *content);
 
 /**
- * @brief Queue a message for broadcast to all clients
- * 
- * @param data Message to broadcast
+ * @brief Broadcast a small JSON message to all connected clients
+ *
+ * @param type Message type identifier
+ * @param content JSON content string
  */
-void ws_queue_message(const char *data);
-
-/**
- * @brief Log a message through WebSocket
- * 
- * @param text Message to log
- */
-void ws_log(const char* text);
+void ws_broadcast_small_json(const char *type, const char *content);

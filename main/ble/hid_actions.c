@@ -32,7 +32,7 @@ typedef struct {
     esp_timer_handle_t timer;
 } release_timer_t;
 
-#define CACHE_SIZE 6
+#define CACHE_SIZE 4
 static cache_entry_t cache[CACHE_SIZE];
 static int cache_count = 0;
 

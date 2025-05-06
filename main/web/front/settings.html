@@ -24,6 +24,7 @@
             --success-bg: #dff0d8;
             --success-text: #3c763d;
             --error-bg: #f2dede;
+            --error-dark-bg: #e0c0c0;
             --error-text: #a94442;
             --info-bg: #d9edf7;
             --info-text: #31708f;
@@ -46,6 +47,7 @@
                 --success-bg: #1e3320;
                 --success-text: #4caf50;
                 --error-bg: #3c1f1f;
+                --error-dark-bg: #4b1f1f;
                 --error-text: #e57373;
                 --info-bg: #1f3b4d;
                 --info-text: #64b5f6;
@@ -207,6 +209,10 @@
             background-color: var(--primary-hover);
         }
 
+        button.error:hover {
+            background-color: var(--error-dark-bg);
+        }
+
         button:disabled {
             background-color: var(--disabled-color);
             cursor: not-allowed;
@@ -268,7 +274,6 @@
             transition: all 200ms ease-in;
         }
 
-        /* Progress bar styles */
         .progress-container {
             width: 100%;
             background-color: var(--border-color);
@@ -278,15 +283,19 @@
 
         .progress-bar {
             height: 20px;
+            padding: 6px 0;
             background-color: var(--primary-color);
             border-radius: 4px;
-            text-align: center;
+            text-align: left;
             line-height: 20px;
             color: white;
             transition: width 0.3s;
         }
 
-        /* File input styling */
+        .progress-bar span {
+            margin-left: 16px;
+        }
+
         .file-input-container {
             position: relative;
             margin: 15px 0;
@@ -320,7 +329,6 @@
             min-width: 60px;
         }
 
-        /* Header controls */
         .header-controls {
             cursor: pointer;
             display: flex;

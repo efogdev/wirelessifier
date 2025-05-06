@@ -1,5 +1,4 @@
 #include "http_server.h"
-#include "dns_server.h"
 #include "ws_server.h"
 #include "ota_server.h"
 #include "wifi_manager.h"
@@ -20,7 +19,7 @@ EventGroupHandle_t wifi_event_group;
 
 #define WIFI_SSID      "Wirelessifier"
 #define WIFI_CHANNEL   1
-#define MAX_CONN       4
+#define MAX_CONN       2
 
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT      BIT1
@@ -233,15 +232,19 @@ httpd_handle_t start_webserver(void)
     }
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 7;
-    config.stack_size = 3600;
+    config.max_uri_handlers = 10;
+    config.stack_size = 5600;
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.lru_purge_enable = true;
-    config.recv_wait_timeout = 3;
-    config.send_wait_timeout = 3;
+    config.recv_wait_timeout = 30;
+    config.send_wait_timeout = 30;
+    config.max_open_sockets = 32;
+    config.enable_so_linger = false;
+    config.backlog_conn = 24;
+    config.keep_alive_enable = true;
+    config.core_id = 1;
 
     ESP_LOGI(HTTP_TAG, "Starting server on port: '%d'", config.server_port);
-    
     if (httpd_start(&server, &config) == ESP_OK) {
         init_websocket(server);
         init_ota_server(server);
@@ -252,9 +255,9 @@ httpd_handle_t start_webserver(void)
         httpd_register_uri_handler(server, &redirect);
         start_ws_ping_task();
 
-        if (!has_wifi_credentials() || esp_wifi_get_mode(NULL) == WIFI_MODE_APSTA) {
-            start_dns_server(&dns_task_handle);
-        }
+        // if (!has_wifi_credentials() || esp_wifi_get_mode(NULL) == WIFI_MODE_APSTA) {
+        //     start_dns_server(&dns_task_handle);
+        // }
 
         return server;
     }

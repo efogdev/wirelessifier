@@ -205,7 +205,7 @@ esp_err_t usb_hid_host_init(const usb_hid_report_callback_t report_callback) {
     } else {
         task_monitor_start();
     }
-    xTaskCreatePinnedToCore(usb_stats_task, "usb_stats", 1500, NULL, 5, &g_stats_task_handle, 1);
+    xTaskCreatePinnedToCore(usb_stats_task, "usb_stats", 1650, NULL, 5, &g_stats_task_handle, 1);
 
     g_report_callback = report_callback;
     g_device_event_queue = xQueueCreate(DEVICE_EVENT_QUEUE_SIZE, sizeof(usb_device_type_event_t));
@@ -238,7 +238,7 @@ esp_err_t usb_hid_host_init(const usb_hid_report_callback_t report_callback) {
         return err;
     }
 
-    task_created = xTaskCreatePinnedToCore(usb_lib_task, "usb_events", 1600, NULL, 13, &g_usb_events_task_handle, 1);
+    task_created = xTaskCreatePinnedToCore(usb_lib_task, "usb_events", 1800, NULL, 13, &g_usb_events_task_handle, 1);
     if (task_created != pdTRUE) {
         cleanup_all_resources();
         usb_host_uninstall();

@@ -5,12 +5,15 @@
 #include "storage.h"
 #include "ble_hid_device.h"
 #include "esp_gap_ble_api.h"
+#include "esp_ota_ops.h"
+#include "nvs.h"
 
 static const char *WS_TAG = "WS";
 static httpd_handle_t server = NULL;
 
 #define MAX_CLIENTS CONFIG_LWIP_MAX_LISTENING_TCP
-#define WS_MAX_MESSAGE_LEN 1536
+#define WS_MAX_MESSAGE_LEN 1250
+#define WS_SMALL_MESSAGE_LEN 160
 
 typedef struct {
     int *fds;
@@ -52,8 +55,12 @@ esp_err_t ws_send_frame_to_all_clients(const char *data, const size_t len) {
         return ret;
     }
 
-    client_ctx->frame.payload = (uint8_t*)data;
-    client_ctx->frame.len = len;
+    httpd_ws_frame_t frame;
+    frame.fragmented = false;
+    frame.final = true;
+    frame.len = len;
+    frame.type = HTTPD_WS_TYPE_TEXT;
+    frame.payload = (uint8_t*)data;
 
     for (int i = 0; i < fds; i++) {
         if (is_failed_client(client_ctx->fds[i])) {
@@ -62,7 +69,7 @@ esp_err_t ws_send_frame_to_all_clients(const char *data, const size_t len) {
         
         const int client_info = httpd_ws_get_fd_info(server, client_ctx->fds[i]);
         if (client_info == HTTPD_WS_CLIENT_WEBSOCKET) {
-            const esp_err_t err = httpd_ws_send_frame_async(server, client_ctx->fds[i], &client_ctx->frame);
+            const esp_err_t err = httpd_ws_send_frame_async(server, client_ctx->fds[i], &frame);
             if (err != ESP_OK) {
                 ESP_LOGW(WS_TAG, "Failed to send WS frame to client %d", client_ctx->fds[i]);
                 httpd_sess_trigger_close(server, client_ctx->fds[i]);
@@ -74,16 +81,25 @@ esp_err_t ws_send_frame_to_all_clients(const char *data, const size_t len) {
     return ESP_OK;
 }
 
+static char large_buffer[WS_MAX_MESSAGE_LEN];
 void ws_broadcast_json(const char *type, const char *content) {
     if (!type || !content) return;
-    
-    static char buffer[WS_MAX_MESSAGE_LEN];
-    const int len = snprintf(buffer, sizeof(buffer), "{\"type\":\"%s\",\"content\":%s}", type, content);
-    if (len > 0 && len < sizeof(buffer)) {
-        ws_send_frame_to_all_clients(buffer, len);
+
+    const int len = snprintf(large_buffer, sizeof(large_buffer), "{\"type\":\"%s\",\"content\":%s}", type, content);
+    if (len > 0 && len < sizeof(large_buffer)) {
+        ws_send_frame_to_all_clients(large_buffer, len);
     }
 }
 
+static char small_buffer[WS_SMALL_MESSAGE_LEN];
+void ws_broadcast_small_json(const char *type, const char *content) {
+    if (!type || !content) return;
+
+    const int len = snprintf(small_buffer, sizeof(small_buffer), "{\"type\":\"%s\",\"content\":%s}", type, content);
+    if (len > 0 && len < sizeof(small_buffer)) {
+        ws_send_frame_to_all_clients(small_buffer, len);
+    }
+}
 
 extern void process_wifi_ws_message(const char* message);
 static void process_settings_ws_message(const char* message);
@@ -102,11 +118,8 @@ static void remove_failed_client(const int fd) {
 
 static esp_err_t ws_handler(httpd_req_t *req) {
     if (req->method == HTTP_GET) {
-        ESP_LOGI(WS_TAG, "Handshake done, the new connection was opened");
-
         const int sockfd = httpd_req_to_sockfd(req);
         if (sockfd != -1) {
-            ESP_LOGI(WS_TAG, "New WebSocket client connected: %d", sockfd);
             remove_failed_client(sockfd);
         }
         
@@ -123,8 +136,6 @@ static esp_err_t ws_handler(httpd_req_t *req) {
         ESP_LOGE(WS_TAG, "httpd_ws_recv_frame failed with %d", ret);
         if (ret == ESP_ERR_INVALID_STATE || ret == HTTPD_SOCK_ERR_FAIL) {
             const int sockfd = httpd_req_to_sockfd(req);
-            ESP_LOGI(WS_TAG, "Client %d appears to be disconnected, closing session", sockfd);
-            
             if (sockfd != -1) {
                 add_failed_client(sockfd);
             }
@@ -141,8 +152,6 @@ static esp_err_t ws_handler(httpd_req_t *req) {
             ESP_LOGE(WS_TAG, "httpd_ws_recv_frame failed with %d", ret);
             if (ret == ESP_ERR_INVALID_STATE || ret == HTTPD_SOCK_ERR_FAIL) {
                 const int sockfd = httpd_req_to_sockfd(req);
-                ESP_LOGI(WS_TAG, "Client %d appears to be disconnected during frame receive, closing session", sockfd);
-                
                 if (sockfd != -1) {
                     add_failed_client(sockfd);
                 }
@@ -152,7 +161,6 @@ static esp_err_t ws_handler(httpd_req_t *req) {
             return ret;
         }
         frame_buffer[ws_pkt.len] = '\0';
-        ESP_LOGI(WS_TAG, "Got packet with message: %s", frame_buffer);
         
         process_settings_ws_message((const char *)frame_buffer);
         process_wifi_ws_message((const char *)frame_buffer);
@@ -160,7 +168,6 @@ static esp_err_t ws_handler(httpd_req_t *req) {
         const esp_err_t send_ret = httpd_ws_send_frame(req, &ws_pkt);
         if (send_ret != ESP_OK) {
             ESP_LOGW(WS_TAG, "Failed to echo WS frame, error: %d. Closing connection.", send_ret);
-
             const int sockfd = httpd_req_to_sockfd(req);
             if (sockfd != -1) {
                 add_failed_client(sockfd);
@@ -186,6 +193,13 @@ static const httpd_uri_t ws = {
 };
 
 void init_websocket(const httpd_handle_t server_handle) {
+    if (client_ctx) {
+        free(client_ctx->fds);
+        free(client_ctx->failed);
+        free(client_ctx);
+        client_ctx = NULL;
+    }
+
     server = server_handle;
     client_ctx = calloc(1, sizeof(ws_client_ctx_t));
     if (!client_ctx) {
@@ -213,35 +227,6 @@ void init_websocket(const httpd_handle_t server_handle) {
     
     ESP_LOGI(WS_TAG, "Registering WebSocket handler");
     httpd_register_uri_handler(server, &ws);
-}
-
-void ws_queue_message(const char *data) {
-    if (!data || !server) return;
-    
-    size_t len = strlen(data);
-    if (len >= WS_MAX_MESSAGE_LEN) {
-        ESP_LOGW(WS_TAG, "Message too long, truncating");
-        len = WS_MAX_MESSAGE_LEN - 1;
-    }
-
-    const esp_err_t err = ws_send_frame_to_all_clients(data, len);
-    if (err != ESP_OK) {
-        ESP_LOGW(WS_TAG, "Failed to send message to clients: %s", esp_err_to_name(err));
-    }
-}
-
-void ws_log(const char* text) {
-    // NOOP
-
-    // if (!text) return;
-    // char *buffer = malloc(WS_SMALL_MESSAGE_LEN);
-    // if (!buffer) return;
-    //
-    // const int len = snprintf(buffer, WS_SMALL_MESSAGE_LEN, "{\"type\":\"log\",\"content\":\"%s\"}", text);
-    // if (len > 0 && len < sizeof(buffer)) {
-    //     ws_send_frame_to_all_clients(buffer, len);
-    // }
-    // free(buffer);
 }
 
 esp_err_t init_device_settings(void) {
@@ -294,13 +279,11 @@ static void process_settings_ws_message(const char* message) {
         
         const char *command = command_obj->valuestring;
         if (strcmp(command, "get_settings") == 0) {
-            // Send current settings
             const char* settings = storage_get_settings();
             if (settings) {
                 ws_broadcast_json("settings", settings);
             }
         } else if (strcmp(command, "update_settings") == 0) {
-            // Update settings
             cJSON *content_obj = cJSON_GetObjectItem(root, "content");
             if (!content_obj) {
                 ESP_LOGE(WS_TAG, "Missing 'content' field in update_settings command");
@@ -317,9 +300,9 @@ static void process_settings_ws_message(const char* message) {
 
             const esp_err_t err = storage_update_settings(new_settings);
             if (err == ESP_OK) {
-                ws_broadcast_json("settings_update_status", "{\"success\":true}");
+                ws_broadcast_small_json("settings_update_status", "{\"success\":true}");
             } else {
-                char error_msg[100];
+                char error_msg[64];
                 snprintf(error_msg, sizeof(error_msg), "{\"success\":false,\"error\":\"%s\"}", esp_err_to_name(err));
                 ws_broadcast_json("settings_update_status", error_msg);
             }

@@ -10,7 +10,6 @@ SRCS "main.c"
      "ble/connection.c"
      "ble/hid_device_le_prf.c"
      "ble/hid_report_data.c"
-     "web/dns_server.c"
      "web/http_server.c"
      "web/ota_server.c"
      "web/ws_server.c"
@@ -33,7 +32,7 @@ SRCS "main.c"
      "web/front/lib/gz/react.production.min.js.gz"
      "web/front/lib/gz/opensans-regular.woff2.gz"
   INCLUDE_DIRS "." "ble" "usb" "utils" "web" "web/front"
-  REQUIRES neopixel esp_http_server app_update json esp_hid bt nvs_flash usb esp_adc ulp soc driver)
+  PRIV_REQUIRES neopixel esp_http_server app_update json esp_hid bt nvs_flash usb esp_adc ulp soc driver)
 
 set(ulp_app_name ulp_bat)
 set(ulp_s_sources "ulp/bat.S")

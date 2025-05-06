@@ -137,9 +137,8 @@ static int parse_dns_request(const char *req, const size_t req_len, char *dns_re
 
 static void dns_server_task(void *pvParameters)
 {
-
-    char rx_buffer[DNS_MAX_LEN];  // Using defined max length
-    char addr_str[DNS_NAME_MAX_LEN];  // Using defined max length
+    char rx_buffer[DNS_MAX_LEN];
+    char addr_str[DNS_NAME_MAX_LEN];
 
     while (1) {
         struct sockaddr_in dest_addr;
@@ -159,6 +158,9 @@ static void dns_server_task(void *pvParameters)
         int err = bind(sock, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
         if (err < 0) {
             ESP_LOGE(DNS_TAG, "Socket unable to bind: errno %d", errno);
+            close(sock);
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            continue;
         }
 
         while (1) {
