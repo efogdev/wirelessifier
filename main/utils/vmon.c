@@ -23,7 +23,7 @@ void enable_no_wire_mode() {
 void set_fast_charging_from_settings() {
     gpio_set_level(GPIO_BAT_CE, 1);
 
-    bool fast_charge;
+    static bool fast_charge;
     if (storage_get_bool_setting("power.fastCharge", &fast_charge) == ESP_OK && fast_charge) {
         ESP_LOGW(TAG, "Fast charging ENABLED!");
 
@@ -41,6 +41,9 @@ void set_fast_charging_from_settings() {
         gpio_set_level(GPIO_BAT_ISET1, 1);
         gpio_set_level(GPIO_BAT_ISET2, 1);
         gpio_set_level(GPIO_BAT_ISET3, 1);
+        gpio_set_level(GPIO_BAT_ISET4, 0);
+        gpio_set_level(GPIO_BAT_ISET5, 0);
+        gpio_set_level(GPIO_BAT_ISET6, 0);
     }
 
     vTaskDelay(pdMS_TO_TICKS(10));
@@ -49,6 +52,9 @@ void set_fast_charging_from_settings() {
 
 void vmon_task(void *pvParameters) {
     vTaskDelay(pdMS_TO_TICKS(50));
+
+    bool disable_slow_phase;
+    storage_get_bool_setting("power.disableSlowPhase", &disable_slow_phase);
 
     uint16_t i = 0;
     while (1) {
@@ -73,7 +79,6 @@ void vmon_task(void *pvParameters) {
             s_slow_phase = false;
 
             set_fast_charging_from_settings();
-
             if (!s_never_wired) {
                 gpio_set_level(GPIO_MUX_SEL, GPIO_MUX_SEL_PC);
             }
@@ -83,12 +88,9 @@ void vmon_task(void *pvParameters) {
             gpio_set_level(GPIO_MUX_SEL, GPIO_MUX_SEL_MC);
         }
 
-        const bool charging = !gpio_get_level(GPIO_BAT_CHRG);
-        if (charging != s_charging) {
-            s_charging = charging;
-        }
+        s_charging = !gpio_get_level(GPIO_BAT_CHRG);
 
-        if (s_charging && !s_slow_phase && bat_volts >= 4.05f) {
+        if (s_charging && !s_slow_phase && bat_volts >= 4.05f && !disable_slow_phase) {
             ESP_LOGI(TAG, "Vbat_reg is now 4.05V, going into slow charging phase…");
 
             s_slow_phase = true;
@@ -102,6 +104,7 @@ void vmon_task(void *pvParameters) {
         }
 
         if (s_slow_phase && bat_volts < 4.00f) {
+            ESP_LOGW(TAG, "How tf did we get to 4V while charging in slow mode?");
             s_slow_phase = false;
             set_fast_charging_from_settings();
         }

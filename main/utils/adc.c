@@ -5,6 +5,8 @@
 #include "esp_adc/adc_oneshot.h"
 #include "esp_adc/adc_cali.h"
 #include "esp_adc/adc_cali_scheme.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 static const char *TAG = "ADC";
 
@@ -97,6 +99,7 @@ uint32_t adc_read_channel(const adc_channel_t chan)
             return 0;
         }
         adc_sum += adc_raw;
+        vTaskDelay(1);
     }
     adc_raw = adc_sum / ADC_MULTISAMPLE;
 

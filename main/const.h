@@ -6,9 +6,9 @@
 #define HW02
 #define VERBOSE 1
 #define TASK_MON 1
-#define ADC_MULTISAMPLE 24
+#define ADC_MULTISAMPLE 64
 #define DEVICE_NAME "Wirelessifier"
-#define FIRMWARE_VERSION "0.2.16"
+#define FIRMWARE_VERSION "0.2.20"
 #define HARDWARE_VERSION "rev. 02"
 #define MAIN_LOOP_DELAY_MS 35
 

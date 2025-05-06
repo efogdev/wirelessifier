@@ -142,6 +142,7 @@ const App = () => {
             deepSleep: true,
             twoSleeps: true,
             fastCharge: true,
+            disableSlowPhase: false,
             warpSpeed: 'slow',
             output: 5,
         },
@@ -567,6 +568,22 @@ const App = () => {
                                 type="checkbox"
                                 checked={settings.power.fastCharge}
                                 onChange={(e) => updateSetting('power', 'fastCharge', e.target.checked)}
+                            />
+                            <span className="slider"></span>
+                        </label>
+                    </div>
+
+                    <div className="setting-item">
+                        <div className="setting-title">Limit charge to ±80%</div>
+                        <div className="setting-description">
+                            Will terminate charging early, it helps with long-term battery
+                            health and makes charging process significantly faster.
+                        </div>
+                        <label className="toggle-switch">
+                            <input
+                                type="checkbox"
+                                checked={settings.power.disableSlowPhase}
+                                onChange={(e) => updateSetting('power', 'disableSlowPhase', e.target.checked)}
                             />
                             <span className="slider"></span>
                         </label>

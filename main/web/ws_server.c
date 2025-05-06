@@ -310,6 +310,8 @@ static void process_settings_ws_message(const char* message) {
             free(new_settings);
             if (cJSON_IsTrue(cJSON_GetObjectItem(content_obj, "keepWifi"))) {
                 storage_set_boot_with_wifi();
+            } else {
+                storage_clear_boot_with_wifi();
             }
             vTaskDelay(pdMS_TO_TICKS(250));
             esp_restart();

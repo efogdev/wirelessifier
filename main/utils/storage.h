@@ -85,3 +85,10 @@ esp_err_t storage_get_string_array_setting(const char* path, char** values, size
  * @return esp_err_t ESP_OK on success
  */
 esp_err_t storage_set_boot_with_wifi(void);
+
+/**
+ * @brief Clear the one-time boot with WiFi flag
+ *
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t storage_clear_boot_with_wifi(void);

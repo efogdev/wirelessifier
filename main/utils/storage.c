@@ -72,6 +72,7 @@ static const char *default_settings = "{"
         "\"twoSleeps\":true,"
         "\"sleepTimeout\":150,"
         "\"deepSleep\":true,"
+        "\"disableSlowPhase\":false,"
         "\"fastCharge\":true,"
         "\"deepSleepTimeout\":600"
     "},"
@@ -504,6 +505,32 @@ esp_err_t storage_get_string_array_setting(const char* path, char** values, size
     
     cJSON_Delete(array);
     return ESP_OK;
+}
+
+esp_err_t storage_clear_boot_with_wifi(void) {
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_open(WIFI_CONFIG_NAMESPACE, NVS_READWRITE, &nvs_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(STORAGE_TAG, "Error opening NVS for boot_wifi flag: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    err = nvs_set_u8(nvs_handle, BOOT_WIFI_KEY, 0);
+    if (err != ESP_OK) {
+        ESP_LOGE(STORAGE_TAG, "Error setting boot_wifi flag: %s", esp_err_to_name(err));
+        nvs_close(nvs_handle);
+        return err;
+    }
+
+    err = nvs_commit(nvs_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(STORAGE_TAG, "Error committing NVS for boot_wifi flag: %s", esp_err_to_name(err));
+    } else {
+        ESP_LOGI(STORAGE_TAG, "Successfully set boot_wifi flag");
+    }
+
+    nvs_close(nvs_handle);
+    return err;
 }
 
 esp_err_t storage_set_boot_with_wifi(void) {

@@ -310,7 +310,6 @@ static void init_gpio(void) {
 #endif
 
     gpio_install_isr_service(0);
-    set_fast_charging_from_settings();
 }
 
 static void rot_long_press_cb(void) {

@@ -123,6 +123,7 @@ static esp_err_t handle_ota_upload(httpd_req_t *req) {
         nvs_close(nvs_handle2);
     }
 
+    vTaskDelay(pdMS_TO_TICKS(500));
     esp_restart();
     return ESP_OK;
 }
