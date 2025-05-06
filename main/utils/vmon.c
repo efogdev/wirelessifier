@@ -7,15 +7,44 @@
 #include "ble_hid_device.h"
 #include "utils/adc.h"
 #include "esp_log.h"
+#include "storage.h"
 
 static const char *TAG = "VMON";
 static bool s_psu_connected = false;
 static bool s_charging = false;
 static bool s_never_wired = false;
 static float bat_volts = 0;
+static bool s_slow_phase = false;
 
 void enable_no_wire_mode() {
     s_never_wired = true;
+}
+
+void set_fast_charging_from_settings() {
+    gpio_set_level(GPIO_BAT_CE, 1);
+
+    bool fast_charge;
+    if (storage_get_bool_setting("power.fastCharge", &fast_charge) == ESP_OK && fast_charge) {
+        ESP_LOGW(TAG, "Fast charging ENABLED!");
+
+        // ±5W
+        gpio_set_level(GPIO_BAT_ISET1, 0);
+        gpio_set_level(GPIO_BAT_ISET2, 0);
+        gpio_set_level(GPIO_BAT_ISET3, 0);
+        gpio_set_level(GPIO_BAT_ISET4, 0);
+        gpio_set_level(GPIO_BAT_ISET5, 0);
+        gpio_set_level(GPIO_BAT_ISET6, 0);
+    } else {
+        ESP_LOGI(TAG, "Fast charging disabled!");
+
+        // ±2W
+        gpio_set_level(GPIO_BAT_ISET1, 1);
+        gpio_set_level(GPIO_BAT_ISET2, 1);
+        gpio_set_level(GPIO_BAT_ISET3, 1);
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(10));
+    gpio_set_level(GPIO_BAT_CE, 0);
 }
 
 void vmon_task(void *pvParameters) {
@@ -40,8 +69,10 @@ void vmon_task(void *pvParameters) {
         }
 
         if (vin_volts > 4.2f && !s_psu_connected) {
-            gpio_set_level(GPIO_BAT_CE, 0);
             s_psu_connected = true;
+            s_slow_phase = false;
+
+            set_fast_charging_from_settings();
 
             if (!s_never_wired) {
                 gpio_set_level(GPIO_MUX_SEL, GPIO_MUX_SEL_PC);
@@ -52,11 +83,29 @@ void vmon_task(void *pvParameters) {
             gpio_set_level(GPIO_MUX_SEL, GPIO_MUX_SEL_MC);
         }
 
-        s_charging = !gpio_get_level(GPIO_BAT_CHRG);
-        if (s_charging) {
-            bat_volts = bat_volts - 0.2f;
+        const bool charging = !gpio_get_level(GPIO_BAT_CHRG);
+        if (charging != s_charging) {
+            s_charging = charging;
         }
 
+        if (s_charging && !s_slow_phase && bat_volts >= 4.05f) {
+            ESP_LOGI(TAG, "Vbat_reg is now 4.05V, going into slow charging phase…");
+
+            s_slow_phase = true;
+            gpio_set_level(GPIO_BAT_CE, 1);
+            gpio_set_level(GPIO_BAT_ISET1, 1);
+            gpio_set_level(GPIO_BAT_ISET2, 1);
+            gpio_set_level(GPIO_BAT_ISET3, 1);
+            gpio_set_level(GPIO_BAT_ISET4, 1);
+            vTaskDelay(pdMS_TO_TICKS(10));
+            gpio_set_level(GPIO_BAT_CE, 0);
+        }
+
+        if (s_slow_phase && bat_volts < 4.00f) {
+            s_slow_phase = false;
+            set_fast_charging_from_settings();
+        }
+        
         vTaskDelay(pdMS_TO_TICKS(128));
     }
 }
