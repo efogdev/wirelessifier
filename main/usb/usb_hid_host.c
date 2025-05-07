@@ -606,7 +606,7 @@ static void usb_stats_task(void *arg) {
     uint16_t s_prev_rps = 0;
     while (1) {
         const uint16_t reports_per_sec = (s_current_rps - s_prev_rps) / USB_STATS_INTERVAL_SEC;
-        if (reports_per_sec > 0) {
+        if (reports_per_sec > 0 && VERBOSE) {
             ESP_LOGI(TAG, "USB: %lu rps", reports_per_sec);
         }
 

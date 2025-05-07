@@ -56,6 +56,9 @@ void vmon_task(void *pvParameters) {
     bool disable_slow_phase;
     storage_get_bool_setting("power.disableSlowPhase", &disable_slow_phase);
 
+    bool fast_charge;
+    storage_get_bool_setting("power.fastCharge", &fast_charge);
+
     uint16_t i = 0;
     while (1) {
         i++;
@@ -90,14 +93,17 @@ void vmon_task(void *pvParameters) {
 
         s_charging = !gpio_get_level(GPIO_BAT_CHRG);
 
-        if (s_charging && !s_slow_phase && bat_volts >= 4.05f && !disable_slow_phase) {
+        if (s_charging && !s_slow_phase && bat_volts >= 4.05f && (!disable_slow_phase || !fast_charge)) {
             ESP_LOGI(TAG, "Vbat_reg is now 4.05V, going into slow charging phase…");
 
+
+            // isn't really "slow", just a workaround
+            // because of charging IC specifics (Iset/Iterm)
             s_slow_phase = true;
             gpio_set_level(GPIO_BAT_CE, 1);
             gpio_set_level(GPIO_BAT_ISET1, 1);
-            gpio_set_level(GPIO_BAT_ISET2, 1);
-            gpio_set_level(GPIO_BAT_ISET3, 0);
+            gpio_set_level(GPIO_BAT_ISET2, 0);
+            gpio_set_level(GPIO_BAT_ISET3, 1);
             gpio_set_level(GPIO_BAT_ISET4, 0);
             gpio_set_level(GPIO_BAT_ISET5, 0);
             gpio_set_level(GPIO_BAT_ISET6, 0);

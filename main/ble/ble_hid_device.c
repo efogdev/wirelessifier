@@ -196,7 +196,9 @@ static void battery_timer_callback(TimerHandle_t timer) {
             false);  // false for notification, true for indication
     }
 
-    ESP_LOGI(TAG, "Battery level = %d%%", level);
+    if (VERBOSE) {
+        ESP_LOGI(TAG, "Battery level = %d%%", level);
+    }
 }
 
 static void hidd_event_callback(const esp_hidd_cb_event_t event, esp_hidd_cb_param_t *param) {
@@ -302,7 +304,10 @@ static void ble_stats_task(void *arg) {
 
         const uint32_t reports_per_sec = (s_current_rps - s_prev_rps) / BLE_STATS_INTERVAL_SEC;
         if (reports_per_sec > 0) {
-            ESP_LOGI(TAG, "BLE: %lu rps", reports_per_sec);
+            if (VERBOSE) {
+                ESP_LOGI(TAG, "BLE: %lu rps", reports_per_sec);
+            }
+
             if (esp_bt_controller_is_sleeping()) {
                 esp_bt_controller_wakeup_request();
             }
