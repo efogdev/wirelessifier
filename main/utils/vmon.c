@@ -37,10 +37,10 @@ void set_fast_charging_from_settings() {
     } else {
         ESP_LOGI(TAG, "Fast charging disabled!");
 
-        // ±2W
+        // ±2.5W
         gpio_set_level(GPIO_BAT_ISET1, 1);
         gpio_set_level(GPIO_BAT_ISET2, 1);
-        gpio_set_level(GPIO_BAT_ISET3, 1);
+        gpio_set_level(GPIO_BAT_ISET3, 0);
         gpio_set_level(GPIO_BAT_ISET4, 0);
         gpio_set_level(GPIO_BAT_ISET5, 0);
         gpio_set_level(GPIO_BAT_ISET6, 0);
@@ -97,14 +97,16 @@ void vmon_task(void *pvParameters) {
             gpio_set_level(GPIO_BAT_CE, 1);
             gpio_set_level(GPIO_BAT_ISET1, 1);
             gpio_set_level(GPIO_BAT_ISET2, 1);
-            gpio_set_level(GPIO_BAT_ISET3, 1);
-            gpio_set_level(GPIO_BAT_ISET4, 1);
+            gpio_set_level(GPIO_BAT_ISET3, 0);
+            gpio_set_level(GPIO_BAT_ISET4, 0);
+            gpio_set_level(GPIO_BAT_ISET5, 0);
+            gpio_set_level(GPIO_BAT_ISET6, 0);
             vTaskDelay(pdMS_TO_TICKS(10));
             gpio_set_level(GPIO_BAT_CE, 0);
         }
 
-        if (s_slow_phase && bat_volts < 4.00f) {
-            ESP_LOGW(TAG, "How tf did we get to 4V while charging in slow mode?");
+        if (s_slow_phase && bat_volts < 3.95f) {
+            ESP_LOGW(TAG, "How tf did we get to 3.95V while charging in slow mode?");
             s_slow_phase = false;
             set_fast_charging_from_settings();
         }

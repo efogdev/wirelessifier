@@ -317,10 +317,10 @@ static void rot_long_press_cb(void) {
     rgb_enter_flash_mode();
 
     // hold BTN1 to enter flash mode, otherwise just restart
-    const uint8_t btn1 = gpio_get_level(GPIO_BUTTON_SW1);
-    if (btn1 == 0) {
-        REG_WRITE(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
-    }
+    // const uint8_t btn1 = gpio_get_level(GPIO_BUTTON_SW1);
+    // if (btn1 == 0) {
+    //     REG_WRITE(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
+    // }
 
     // hold BTN4 to restart with WiFi
     const uint8_t btn4 = gpio_get_level(GPIO_BUTTON_SW4);

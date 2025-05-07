@@ -12,6 +12,10 @@ build:
 	idf.py build
 	cp build/esp-idf/main/ulp_bat/ulp_bat.h main/ulp
 
+.PHONY: bump
+bump:
+	sed -i -E 's/(#define FIRMWARE_VERSION "[0-9]+\.[0-9]+\.)([0-9]+)/\1'$$(( $$(grep -oP '#define FIRMWARE_VERSION "[0-9]+\.[0-9]+\.\K[0-9]+' main/const.h) + 1 ))'/g' main/const.h
+
 kill:
 	- kill `ps aux | grep idf.py | cut -d' ' -s -f6`
 

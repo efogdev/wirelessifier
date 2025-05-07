@@ -362,6 +362,18 @@ IRAM_ATTR void led_update_pattern(const bool usb_connected, const bool ble_conne
         }
     }
 
+    if (current_time - s_last_bat_blink >= BAT_BLINK_PERIOD_MS && battery_state == BATTERY_LOW) {
+        s_last_bat_blink = current_time;
+        s_bat_blinking = true;
+        return;
+    }
+
+    if (current_time - s_last_bat_blink >= BAT_BLINK_PERIOD_MS * 2 && battery_state == BATTERY_WARNING) {
+        s_last_bat_blink = current_time;
+        s_bat_blinking = true;
+        return;
+    }
+
     if (s_led_pattern == LED_PATTERN_SLEEPING && new_pattern != LED_PATTERN_SLEEPING && !s_in_wakeup_debounce) {
         s_in_wakeup_debounce = true;
         s_wakeup_debounce_start_time = current_time;
@@ -588,7 +600,7 @@ __attribute__((section(".text"))) static void led_control_task(void *arg)
                 }
 
                 neopixel_SetPixel(neopixel_ctx, pixels, s_num_leds);
-                vTaskDelay(pdMS_TO_TICKS(battery_state == BATTERY_WARNING ? 100 : 200));
+                vTaskDelay(pdMS_TO_TICKS(battery_state == BATTERY_WARNING ? BAT_BLINK_DURATION_MS : BAT_BLINK_DURATION_MS * 2));
                 continue;
             }
         }

@@ -43,11 +43,11 @@ const useWebSocket = (onMessage) => {
             console.log('WebSocket disconnected');
             setConnected(false);
             setLoading(true);
-            
+
             if (reconnectTimeoutRef.current) {
                 clearTimeout(reconnectTimeoutRef.current);
             }
-            reconnectTimeoutRef.current = setTimeout(connect, 500);
+            reconnectTimeoutRef.current = setTimeout(connect, 2500);
         };
 
         socket.onerror = (err) => {
@@ -58,7 +58,7 @@ const useWebSocket = (onMessage) => {
             if (reconnectTimeoutRef.current) {
                 clearTimeout(reconnectTimeoutRef.current);
             }
-            reconnectTimeoutRef.current = setTimeout(connect, 500);
+            reconnectTimeoutRef.current = setTimeout(connect, 2500);
         };
 
         socket.onmessage = (event) => {
@@ -573,7 +573,7 @@ const App = () => {
                         </label>
                     </div>
 
-                    <div className="setting-item">
+                    <div className={`setting-item ${settings.power.fastCharge ? 'animate-visible' : 'animate-hidden'}`}>
                         <div className="setting-title">Limit charge to ±80%</div>
                         <div className="setting-description">
                             Will terminate charging early, it helps with long-term battery
