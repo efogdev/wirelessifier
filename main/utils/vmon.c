@@ -101,7 +101,7 @@ void vmon_task(void *pvParameters) {
             // because of charging IC specifics (Iset/Iterm)
             s_slow_phase = true;
             gpio_set_level(GPIO_BAT_CE, 1);
-            gpio_set_level(GPIO_BAT_ISET1, 1);
+            gpio_set_level(GPIO_BAT_ISET1, 0);
             gpio_set_level(GPIO_BAT_ISET2, 0);
             gpio_set_level(GPIO_BAT_ISET3, 1);
             gpio_set_level(GPIO_BAT_ISET4, 0);

@@ -66,7 +66,7 @@ static void buttons_task(void* arg) {
             const uint8_t idx = event.button_index;
             
             if (event.state) { // Button pressed
-                if (!is_pressed[idx]) {
+                if (!is_pressed[idx] && (current_time - last_click_time[idx]) > 50) {
                     is_pressed[idx] = true;
                     press_start_time[idx] = current_time;
                     long_press_detected[idx] = false;
