@@ -8,13 +8,27 @@
 #include "utils/adc.h"
 #include "esp_log.h"
 #include "storage.h"
+#include "freertos/timers.h"
+
+#define SLOW_PHASE_DURATION_MAX (45 * 60 * 1000)
 
 static const char *TAG = "VMON";
+static TimerHandle_t slow_phase_timer = NULL;
 static bool s_psu_connected = false;
 static bool s_charging = false;
 static bool s_never_wired = false;
 static float bat_volts = 0;
 static bool s_slow_phase = false;
+static bool s_charging_finished = false;
+
+// ToDo remove this and impement proper termination
+static void slow_phase_timer_cb(TimerHandle_t xTimer) {
+    if (!s_charging_finished && s_slow_phase && s_psu_connected && s_charging && bat_volts >= 4.1f) {
+        ESP_LOGI(TAG, "Terminating charging…");
+        s_charging_finished = true;
+        gpio_set_level(GPIO_BAT_CE, 1);
+    }
+}
 
 void enable_no_wire_mode() {
     s_never_wired = true;
@@ -61,16 +75,16 @@ void vmon_task(void *pvParameters) {
 
     uint16_t i = 0;
     while (1) {
-        i++;
         bat_volts = (float)adc_read_channel(ADC_CHAN_BAT) * 2 / 1000;
         const float vin_volts = (float)adc_read_channel(ADC_CHAN_VIN) * 2 / 1000;
 
-        if (VERBOSE && i % 20 == 0) {
+        if (VERBOSE && ++i % 20 == 0) {
             ESP_LOGI(TAG, "BAT: %.2fV, VIN: %.2fV", bat_volts, vin_volts, ulp_last_result);
         }
 
         if (bat_volts < 3.3f && vin_volts < 4.2f) {
             ESP_LOGI(TAG, "Battery is dead. So am I…");
+
             led_update_status(STATUS_COLOR_RED, STATUS_MODE_ON);
             ble_hid_device_deinit();
             vTaskDelay(pdMS_TO_TICKS(50));
@@ -79,6 +93,7 @@ void vmon_task(void *pvParameters) {
 
         if (vin_volts > 4.2f && !s_psu_connected) {
             s_psu_connected = true;
+            s_charging_finished = false;
             s_slow_phase = false;
 
             set_fast_charging_from_settings();
@@ -86,16 +101,38 @@ void vmon_task(void *pvParameters) {
                 gpio_set_level(GPIO_MUX_SEL, GPIO_MUX_SEL_PC);
             }
         } else if (vin_volts < 4.2f && s_psu_connected) {
-            gpio_set_level(GPIO_BAT_CE, 1);
             s_psu_connected = false;
+            s_charging_finished = false;
+            s_slow_phase = false;
+
+            xTimerStop(slow_phase_timer, 0);
+            xTimerDelete(slow_phase_timer, 0);
+            slow_phase_timer = NULL;
+
+            gpio_set_level(GPIO_BAT_CE, 1);
             gpio_set_level(GPIO_MUX_SEL, GPIO_MUX_SEL_MC);
         }
 
         s_charging = !gpio_get_level(GPIO_BAT_CHRG);
+        if (s_charging_finished) {
+            continue;
+        }
 
-        if (s_charging && !s_slow_phase && bat_volts >= 4.05f && (!disable_slow_phase || !fast_charge)) {
-            ESP_LOGI(TAG, "Vbat_reg is now 4.05V, going into slow charging phase…");
+        if (s_slow_phase && s_psu_connected && !s_charging) {
+            ESP_LOGI(TAG, "Charging finished!");
 
+            s_charging_finished = true;
+            gpio_set_level(GPIO_BAT_CE, 1);
+            continue;
+        }
+
+        if (s_charging && !s_slow_phase && bat_volts >= 4.08f && (!disable_slow_phase || !fast_charge)) {
+            ESP_LOGI(TAG, "Vbat_reg is now 4.08V, going into slow charging phase…");
+
+            if (!slow_phase_timer) {
+                slow_phase_timer = xTimerCreate("slow_phase_timer", pdMS_TO_TICKS(SLOW_PHASE_DURATION_MAX), pdFALSE, NULL, slow_phase_timer_cb);
+                xTimerStart(slow_phase_timer, 0);
+            }
 
             // isn't really "slow", just a workaround
             // because of charging IC specifics (Iset/Iterm)
@@ -109,12 +146,6 @@ void vmon_task(void *pvParameters) {
             gpio_set_level(GPIO_BAT_ISET6, 0);
             vTaskDelay(pdMS_TO_TICKS(10));
             gpio_set_level(GPIO_BAT_CE, 0);
-        }
-
-        if (s_slow_phase && bat_volts < 3.95f) {
-            ESP_LOGW(TAG, "How tf did we get to 3.95V while charging in slow mode?");
-            s_slow_phase = false;
-            set_fast_charging_from_settings();
         }
         
         vTaskDelay(pdMS_TO_TICKS(128));

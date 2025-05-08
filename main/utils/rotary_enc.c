@@ -90,7 +90,7 @@ void rotary_enc_init() {
     }
 
     gpio_isr_handler_add(GPIO_ROT_E, click_isr_handler, NULL);
-    xTaskCreatePinnedToCore(rotary_enc_task, "rotary_task", 2300, NULL, 8, NULL, 1);
+    xTaskCreatePinnedToCore(rotary_enc_task, "rotary_task", VERBOSE ? 2300 : 1850, NULL, 8, NULL, 1);
 }
 
 void rotary_enc_subscribe(const rotary_callback_t callback) {

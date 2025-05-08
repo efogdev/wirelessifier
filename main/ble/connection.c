@@ -5,6 +5,7 @@
 #include <freertos/projdefs.h>
 #include <freertos/task.h>
 
+#include "ble_hid_device.h"
 #include "nvs.h"
 
 #define STORAGE_NAMESPACE "hid_dev"
@@ -153,8 +154,6 @@ esp_err_t load_saved_device_to_cache(void) {
  */
 esp_err_t connect_to_saved_device(const esp_gatt_if_t gatts_if) {
     esp_err_t err;
-    
-    // If cache is not valid, try to load from NVS
     if (!saved_device_cache.is_valid) {
         err = load_saved_device_to_cache();
         if (err != ESP_OK) {
@@ -167,13 +166,13 @@ esp_err_t connect_to_saved_device(const esp_gatt_if_t gatts_if) {
         return ESP_OK;
     }
     
-    // Log the connection attempt
     ESP_LOGI(TAG, "Connecting to saved device: %02x:%02x:%02x:%02x:%02x:%02x, type: %d",
              saved_device_cache.bda[0], saved_device_cache.bda[1], saved_device_cache.bda[2],
              saved_device_cache.bda[3], saved_device_cache.bda[4], saved_device_cache.bda[5],
              saved_device_cache.addr_type);
-    
-    // Initiate the connection using esp_ble_gatts_open
+
+    ble_hid_device_start_advertising();
+
     err = esp_ble_gatts_open(gatts_if, saved_device_cache.bda, true); // true for direct connection
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to connect to saved device, error: %s", esp_err_to_name(err));

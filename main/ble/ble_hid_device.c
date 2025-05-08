@@ -481,6 +481,7 @@ esp_err_t ble_hid_device_start_advertising(void) {
         return ret;
     }
 
+    esp_ble_gap_start_advertising(&hidd_adv_params);
     return ESP_OK;
 }
 

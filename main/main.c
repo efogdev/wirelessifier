@@ -35,6 +35,8 @@
 #include "esp_sleep.h"
 #include "wifi_manager.h"
 
+#define MAIN_LOOP_DELAY_MS 35
+
 static const char *TAG = "MAIN";
 static QueueHandle_t intrQueue = NULL;
 static bool s_web_enabled = false;
@@ -316,11 +318,12 @@ static void rot_long_press_cb(void) {
     rotary_enc_deinit();
     rgb_enter_flash_mode();
 
-    // hold BTN1 to enter flash mode, otherwise just restart
-    // const uint8_t btn1 = gpio_get_level(GPIO_BUTTON_SW1);
-    // if (btn1 == 0) {
-    //     REG_WRITE(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
-    // }
+    // hold both BTN1 and BTN2 to enter flash mode, otherwise just restart
+    const uint8_t btn1 = gpio_get_level(GPIO_BUTTON_SW1);
+    const uint8_t btn2 = gpio_get_level(GPIO_BUTTON_SW2);
+    if (btn1 == 0 && btn2 == 0) {
+        REG_WRITE(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
+    }
 
     // hold BTN4 to restart with WiFi
     const uint8_t btn4 = gpio_get_level(GPIO_BUTTON_SW4);

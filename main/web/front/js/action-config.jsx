@@ -154,10 +154,9 @@ const HIDControlsConfigurator = ({ numKeys = 4, defaultValues, onConfigChange })
     { key: 'KC_CURSOR_BACK', value: 'Cursor Back' },
     { key: 'KC_CURSOR_FORWARD', value: 'Cursor Forward' },
     { key: 'KC_CURSOR_SWITCH', value: 'Cursor: Switch Axis' },
-    { key: 'KC_MS_WH_DOWN', value: 'Wheel Down/Left' },
-    { key: 'KC_MS_WH_UP', value: 'Wheel Up/Right' },
-    { key: 'KC_MS_WH_SWITCH', value: 'Wheel: Switch Axis' },
-    
+    { key: 'KC_MS_WH_DOWN', value: 'Scroll Down/Left' },
+    { key: 'KC_MS_WH_UP', value: 'Scroll Up/Right' },
+    { key: 'KC_MS_WH_SWITCH', value: 'Scroll: Switch Axis' },
   ];
 
   const modifiers = [ "Ctrl", "Shift", "Alt", "Win" ];

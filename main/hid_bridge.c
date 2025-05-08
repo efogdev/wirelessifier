@@ -65,25 +65,37 @@ static void inactivity_timer_callback(const TimerHandle_t xTimer) {
     }
 
     if (is_wifi_connected()) {
-        ESP_LOGI(TAG, "Web stack is active, keeping BLE stack running");
+        if (VERBOSE) {
+            ESP_LOGI(TAG, "Web stack is active, keeping BLE stack running");
+        }
+
         xSemaphoreGive(s_ble_stack_mutex);
         return;
     }
 
     if (!s_enable_sleep) {
-        ESP_LOGI(TAG, "Sleep is disabled in settings, keeping BLE stack running");
+        if (VERBOSE) {
+            ESP_LOGI(TAG, "Sleep is disabled in settings, keeping BLE stack running");
+        }
+
         xSemaphoreGive(s_ble_stack_mutex);
         return;
     }
 
     if (is_psu_connected()) {
+        if (VERBOSE) {
+            ESP_LOGD(TAG, "Not sleeping while connected to a power source");
+        }
+
         xTimerReset(xTimer, 0);
-        ESP_LOGD(TAG, "Not sleeping while connected to a power source");
         xSemaphoreGive(s_ble_stack_mutex);
         return;
     }
 
-    ESP_LOGI(TAG, "No USB HID events for a while, stopping BLE stack");
+    if (VERBOSE) {
+        ESP_LOGI(TAG, "No USB HID events for a while, stopping BLE stack");
+    }
+
     if (!s_two_sleeps) {
         xSemaphoreGive(s_ble_stack_mutex);
         enter_deep_sleep();
@@ -95,7 +107,10 @@ static void inactivity_timer_callback(const TimerHandle_t xTimer) {
         ESP_LOGE(TAG, "Failed to deinitialize BLE HID device: %s", esp_err_to_name(ret));
         s_ble_stack_active = true;
     } else {
-        ESP_LOGI(TAG, "BLE stack stopped");
+        if (VERBOSE) {
+            ESP_LOGI(TAG, "BLE stack stopped");
+        }
+
         s_ble_stack_active = false;
         xSemaphoreGive(s_ble_stack_mutex);
     }
@@ -158,12 +173,18 @@ static void rot_cb(const int8_t direction) {
     char action[24];
     if (direction == 1) {
         if (storage_get_string_setting("buttons.encoder.right", action, sizeof(action)) == ESP_OK) {
-            ESP_LOGI(TAG, "Rotate right, action = %s", action);
+            if (VERBOSE) {
+                ESP_LOGI(TAG, "Rotate right, action = %s", action);
+            }
+
             execute_action_from_string(ble_conn_id(), "", action, NULL, 0);
         }
     } else if (direction == -1) {
         if (storage_get_string_setting("buttons.encoder.left", action, sizeof(action)) == ESP_OK) {
-            ESP_LOGI(TAG, "Rotate left, action = %s", action);
+            if (VERBOSE) {
+                ESP_LOGI(TAG, "Rotate left, action = %s", action);
+            }
+
             execute_action_from_string(ble_conn_id(), "", action, NULL, 0);
         }
     }
@@ -180,7 +201,10 @@ static void rot_click_cb(void) {
 
     char action[24];
     if (storage_get_string_setting("buttons.encoder.click", action, sizeof(action)) == ESP_OK) {
-        ESP_LOGI(TAG, "Click, action = %s", action);
+        if (VERBOSE) {
+            ESP_LOGI(TAG, "Click, action = %s", action);
+        }
+
         execute_action_from_string(ble_conn_id(), "", action, NULL, 0);
     }
 
@@ -203,14 +227,19 @@ static void execute_button_action(const uint8_t button, bool isLongPress) {
     }
     char modsPath[32];
     size_t mods_count = 4;
-    sprintf(modsPath, "buttons.%s[%d].mods", isLongPress ? "longPress" : "keys", button);
-    storage_get_string_array_setting(modsPath, mods, &mods_count, 8);
 
     char acType[24], action[24];
     if (storage_get_string_setting(keyActionType, acType, sizeof(acType)) == ESP_OK &&
         storage_get_string_setting(keyAction, action, sizeof(action)) == ESP_OK) {
-        ESP_LOGI(TAG, "%s, btn #%d, action type = %s, action = %s", 
-                 isLongPress ? "Long press" : "Click", button, acType, action);
+
+        if (VERBOSE) {
+            ESP_LOGI(TAG, "%s, btn #%d, action type = %s, action = %s", isLongPress ? "Long press" : "Click", button, acType, action);
+        }
+
+        if (strcmp(acType, "keyboard_combo") == 0) {
+            sprintf(modsPath, "buttons.%s[%d].mods", isLongPress ? "longPress" : "keys", button);
+            storage_get_string_array_setting(modsPath, mods, &mods_count, 8);
+        }
 
         execute_action_from_string(ble_conn_id(), acType, action, (const char**)mods, mods_count);
     }
@@ -247,7 +276,10 @@ esp_err_t hid_bridge_init() {
     int sleep_timeout;
     if (storage_get_int_setting("power.sleepTimeout", &sleep_timeout) == ESP_OK) {
         s_inactivity_timeout_ms = sleep_timeout * 1000;
-        ESP_LOGI(TAG, "Sleep timeout set to %d seconds", sleep_timeout);
+
+        if (VERBOSE) {
+            ESP_LOGI(TAG, "Sleep timeout set to %d seconds", sleep_timeout);
+        }
     } else {
         ESP_LOGW(TAG, "Failed to get sleep timeout from settings, using default");
     }
@@ -255,7 +287,10 @@ esp_err_t hid_bridge_init() {
     int deep_sleep_timeout;
     if (storage_get_int_setting("power.deepSleepTimeout", &deep_sleep_timeout) == ESP_OK) {
         s_deep_sleep_timeout_ms = deep_sleep_timeout * 1000;
-        ESP_LOGI(TAG, "Deep sleep timeout set to %d seconds", deep_sleep_timeout);
+
+        if (VERBOSE) {
+            ESP_LOGI(TAG, "Deep sleep timeout set to %d seconds", deep_sleep_timeout);
+        }
     } else {
         ESP_LOGW(TAG, "Failed to get deep sleep timeout from settings, using default");
     }
@@ -263,7 +298,10 @@ esp_err_t hid_bridge_init() {
     bool enable_sleep;
     if (storage_get_bool_setting("power.enableSleep", &enable_sleep) == ESP_OK) {
         s_enable_sleep = enable_sleep;
-        ESP_LOGI(TAG, "Sleep %s", enable_sleep ? "enabled" : "disabled");
+
+        if (VERBOSE) {
+            ESP_LOGI(TAG, "Sleep %s", enable_sleep ? "enabled" : "disabled");
+        }
     } else {
         ESP_LOGW(TAG, "Failed to get enable sleep setting, using default (enabled)");
     }
@@ -272,7 +310,10 @@ esp_err_t hid_bridge_init() {
     if (storage_get_bool_setting("power.deepSleep", &enable_deep_sleep) == ESP_OK && storage_get_bool_setting("power.twoSleeps", &two_sleeps) == ESP_OK) {
         s_enable_deep_sleep = enable_deep_sleep && two_sleeps;
         s_two_sleeps = two_sleeps;
-        ESP_LOGI(TAG, "Deep sleep %s", s_enable_deep_sleep ? "enabled" : "disabled");
+
+        if (VERBOSE) {
+            ESP_LOGI(TAG, "Deep sleep %s", s_enable_deep_sleep ? "enabled" : "disabled");
+        }
     } else {
         ESP_LOGW(TAG, "Failed to get enable deep sleep setting, using default (enabled)");
     }
@@ -323,11 +364,13 @@ esp_err_t hid_bridge_init() {
     int mouse_sens;
     if (storage_get_int_setting("mouse.sensitivity", &mouse_sens) == ESP_OK) {
         s_sensitivity = mouse_sens;
-        ESP_LOGI(TAG, "Sleep timeout set to %d seconds", sleep_timeout);
     }
 
     s_hid_bridge_initialized = true;
-    ESP_LOGI(TAG, "HID bridge initialized");
+
+    if (VERBOSE) {
+        ESP_LOGI(TAG, "HID bridge initialized");
+    }
 
     if (has_saved_device()) {
         connect_to_saved_device(get_gatts_if());
@@ -399,9 +442,12 @@ esp_err_t hid_bridge_deinit(void) {
     }
 
     s_hid_bridge_initialized = false;
-    ESP_LOGI(TAG, "HID bridge deinitialized");
-    xSemaphoreGive(s_ble_stack_mutex);
 
+    if (VERBOSE) {
+        ESP_LOGI(TAG, "HID bridge deinitialized");
+    }
+
+    xSemaphoreGive(s_ble_stack_mutex);
     return ESP_OK;
 }
 
@@ -416,8 +462,11 @@ esp_err_t hid_bridge_start(void) {
         return ESP_OK;
     }
 
+    if (VERBOSE) {
+        ESP_LOGI(TAG, "HID bridge started");
+    }
+
     s_hid_bridge_running = true;
-    ESP_LOGI(TAG, "HID bridge started");
     return ESP_OK;
 }
 
@@ -432,8 +481,11 @@ esp_err_t hid_bridge_stop(void) {
         return ESP_OK;
     }
 
+    if (VERBOSE) {
+        ESP_LOGI(TAG, "HID bridge stopped");
+    }
+
     s_hid_bridge_running = false;
-    ESP_LOGI(TAG, "HID bridge stopped");
     return ESP_OK;
 }
 
@@ -514,7 +566,9 @@ void IRAM_ATTR hid_bridge_process_report(const usb_hid_report_t *const report) {
         }
 
         if (!s_ble_stack_active) {
-            ESP_LOGI(TAG, "USB HID event received, restarting BLE stack");
+            if (VERBOSE) {
+                ESP_LOGI(TAG, "USB HID event received, restarting BLE stack");
+            }
 
             const esp_err_t ret = ble_hid_device_init(VERBOSE);
             if (ret != ESP_OK) {

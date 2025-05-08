@@ -70,11 +70,11 @@ static const char *default_settings = "{"
         "\"enableSleep\":true,"
         "\"warpSpeed\":\"slow\","
         "\"twoSleeps\":true,"
-        "\"sleepTimeout\":150,"
+        "\"sleepTimeout\":300,"
         "\"deepSleep\":true,"
         "\"disableSlowPhase\":false,"
         "\"fastCharge\":true,"
-        "\"deepSleepTimeout\":600"
+        "\"deepSleepTimeout\":900"
     "},"
     "\"led\":{"
         "\"brightness\":35"
@@ -112,11 +112,11 @@ static const char *default_settings = "{"
                 "\"action\":\"KC_ESCAPE\""
             "},"
             "{"
-                "\"acType\":\"system_control\","
+                "\"acType\":\"mouse_button\","
                 "\"action\":\"KC_MS_BTN4\""
             "},"
             "{"
-                "\"acType\":\"system_control\","
+                "\"acType\":\"mouse_button\","
                 "\"action\":\"KC_MS_BTN5\""
             "},"
             "{"
@@ -163,7 +163,10 @@ static char* update_device_info_in_settings(const char* settings_json) {
     
     cJSON *device_info = cJSON_GetObjectItem(root, "deviceInfo");
     if (!device_info) {
-        ESP_LOGW(STORAGE_TAG, "deviceInfo not found in settings");
+        if (VERBOSE) {
+            ESP_LOGW(STORAGE_TAG, "deviceInfo not found in settings");
+        }
+
         char *result = strdup(settings_json);
         cJSON_Delete(root);
         return result;
@@ -263,9 +266,12 @@ esp_err_t init_global_settings(void) {
             }
         }
     }
-    
+
+    if (VERBOSE) {
+        ESP_LOGI(STORAGE_TAG, "Current settings: %s", current_settings);
+    }
+
     nvs_close(nvs_handle);
-    ESP_LOGI(STORAGE_TAG, "Current settings: %s", current_settings);
     return ESP_OK;
 }
 
@@ -358,7 +364,10 @@ static cJSON* find_json_by_path(const char* path) {
                 if (token[0] != '\0') {
                     current = cJSON_GetObjectItem(current, token);
                     if (!current) {
-                        ESP_LOGW(STORAGE_TAG, "Object %s not found in settings", token);
+                        if (VERBOSE) {
+                            ESP_LOGW(STORAGE_TAG, "Object %s not found in settings", token);
+                        }
+
                         free(path_copy);
                         cJSON_Delete(root);
                         return NULL;
@@ -367,7 +376,10 @@ static cJSON* find_json_by_path(const char* path) {
                 
                 current = cJSON_GetArrayItem(current, index);
                 if (!current) {
-                    ESP_LOGW(STORAGE_TAG, "Array index %d not found in settings", index);
+                    if (VERBOSE) {
+                        ESP_LOGW(STORAGE_TAG, "Array index %d not found in settings", index);
+                    }
+
                     free(path_copy);
                     cJSON_Delete(root);
                     return NULL;
@@ -376,7 +388,10 @@ static cJSON* find_json_by_path(const char* path) {
         } else {
             current = cJSON_GetObjectItem(current, token);
             if (!current) {
-                ESP_LOGW(STORAGE_TAG, "Path %s not found in settings", path);
+                if (VERBOSE) {
+                    ESP_LOGW(STORAGE_TAG, "Path %s not found in settings", path);
+                }
+
                 free(path_copy);
                 cJSON_Delete(root);
                 return NULL;
