@@ -24,7 +24,10 @@ static bool s_charging_finished = false;
 // ToDo remove this and impement proper termination
 static void slow_phase_timer_cb(TimerHandle_t xTimer) {
     if (!s_charging_finished && s_slow_phase && s_psu_connected && s_charging && bat_volts >= 4.1f) {
-        ESP_LOGI(TAG, "Terminating charging…");
+        if (VERBOSE) {
+            ESP_LOGI(TAG, "Terminating charging…");
+        }
+
         s_charging_finished = true;
         gpio_set_level(GPIO_BAT_CE, 1);
     }
@@ -49,7 +52,9 @@ void set_fast_charging_from_settings() {
         gpio_set_level(GPIO_BAT_ISET5, 0);
         gpio_set_level(GPIO_BAT_ISET6, 0);
     } else {
-        ESP_LOGI(TAG, "Fast charging disabled!");
+        if (VERBOSE) {
+            ESP_LOGI(TAG, "Fast charging disabled!");
+        }
 
         // ±2.5W
         gpio_set_level(GPIO_BAT_ISET1, 1);
@@ -83,7 +88,9 @@ void vmon_task(void *pvParameters) {
         }
 
         if (bat_volts < 3.3f && vin_volts < 4.2f) {
-            ESP_LOGI(TAG, "Battery is dead. So am I…");
+            if (VERBOSE) {
+                ESP_LOGI(TAG, "Battery is dead. So am I…");
+            }
 
             led_update_status(STATUS_COLOR_RED, STATUS_MODE_ON);
             ble_hid_device_deinit();
@@ -119,7 +126,9 @@ void vmon_task(void *pvParameters) {
         }
 
         if (s_slow_phase && s_psu_connected && !s_charging) {
-            ESP_LOGI(TAG, "Charging finished!");
+            if (VERBOSE) {
+                ESP_LOGI(TAG, "Charging finished!");
+            }
 
             s_charging_finished = true;
             gpio_set_level(GPIO_BAT_CE, 1);
@@ -127,7 +136,9 @@ void vmon_task(void *pvParameters) {
         }
 
         if (s_charging && !s_slow_phase && bat_volts >= 4.08f && (!disable_slow_phase || !fast_charge)) {
-            ESP_LOGI(TAG, "Vbat_reg is now 4.08V, going into slow charging phase…");
+            if (VERBOSE) {
+                ESP_LOGI(TAG, "Vbat_reg is now 4.08V, going into slow charging phase…");
+            }
 
             if (!slow_phase_timer) {
                 slow_phase_timer = xTimerCreate("slow_phase_timer", pdMS_TO_TICKS(SLOW_PHASE_DURATION_MAX), pdFALSE, NULL, slow_phase_timer_cb);

@@ -6,6 +6,7 @@
 #include <freertos/task.h>
 
 #include "ble_hid_device.h"
+#include "const.h"
 #include "nvs.h"
 
 #define STORAGE_NAMESPACE "hid_dev"
@@ -33,19 +34,16 @@ esp_err_t save_connected_device(esp_bd_addr_t bda, const esp_ble_addr_type_t add
     nvs_handle_t nvs_handle;
     esp_err_t err;
 
-    // Update in-memory cache first
     memcpy(saved_device_cache.bda, bda, ESP_BD_ADDR_LEN);
     saved_device_cache.addr_type = addr_type;
     saved_device_cache.is_valid = true;
 
-    // Open NVS
     err = nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &nvs_handle);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Error opening NVS handle: %s", esp_err_to_name(err));
         return err;
     }
 
-    // Save the device address
     err = nvs_set_blob(nvs_handle, ADDR_KEY, bda, ESP_BD_ADDR_LEN);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Error saving device address: %s", esp_err_to_name(err));
@@ -53,7 +51,6 @@ esp_err_t save_connected_device(esp_bd_addr_t bda, const esp_ble_addr_type_t add
         return err;
     }
 
-    // Save the address type
     err = nvs_set_u8(nvs_handle, ADDR_TYPE_KEY, (uint8_t)addr_type);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Error saving address type: %s", esp_err_to_name(err));
@@ -61,7 +58,6 @@ esp_err_t save_connected_device(esp_bd_addr_t bda, const esp_ble_addr_type_t add
         return err;
     }
 
-    // Commit changes
     err = nvs_commit(nvs_handle);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Error committing NVS: %s", esp_err_to_name(err));
@@ -69,12 +65,12 @@ esp_err_t save_connected_device(esp_bd_addr_t bda, const esp_ble_addr_type_t add
         return err;
     }
 
-    // Close NVS
+    if (VERBOSE) {
+        ESP_LOGI(TAG, "Saved device: %02x:%02x:%02x:%02x:%02x:%02x, type: %d",
+                 bda[0], bda[1], bda[2], bda[3], bda[4], bda[5], addr_type);
+    }
+
     nvs_close(nvs_handle);
-
-    ESP_LOGI(TAG, "Saved device: %02x:%02x:%02x:%02x:%02x:%02x, type: %d",
-             bda[0], bda[1], bda[2], bda[3], bda[4], bda[5], addr_type);
-
     return ESP_OK;
 }
 
@@ -84,7 +80,6 @@ esp_err_t save_connected_device(esp_bd_addr_t bda, const esp_ble_addr_type_t add
  * @return esp_err_t ESP_OK if data loaded successfully, error code otherwise
  */
 esp_err_t load_saved_device_to_cache(void) {
-    // If cache is already valid, no need to load from NVS
     if (saved_device_cache.is_valid) {
         return ESP_OK;
     }
@@ -94,14 +89,12 @@ esp_err_t load_saved_device_to_cache(void) {
     size_t addr_size = ESP_BD_ADDR_LEN;
     uint8_t addr_type_val;
 
-    // Open NVS
     err = nvs_open(STORAGE_NAMESPACE, NVS_READONLY, &nvs_handle);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Error opening NVS handle: %s", esp_err_to_name(err));
         return err;
     }
 
-    // Read the device address
     err = nvs_get_blob(nvs_handle, ADDR_KEY, saved_device_cache.bda, &addr_size);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Error reading device address: %s", esp_err_to_name(err));
@@ -109,7 +102,6 @@ esp_err_t load_saved_device_to_cache(void) {
         return err;
     }
 
-    // Read the address type
     err = nvs_get_u8(nvs_handle, ADDR_TYPE_KEY, &addr_type_val);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Error reading address type: %s", esp_err_to_name(err));
@@ -117,13 +109,9 @@ esp_err_t load_saved_device_to_cache(void) {
         return err;
     }
 
-    // Close NVS
     nvs_close(nvs_handle);
-
-    // Update cache
     saved_device_cache.addr_type = (esp_ble_addr_type_t)addr_type_val;
 
-    // Check if we have a valid address (not all zeros)
     bool valid_addr = false;
     for (int i = 0; i < ESP_BD_ADDR_LEN; i++) {
         if (saved_device_cache.bda[i] != 0) {
@@ -135,10 +123,13 @@ esp_err_t load_saved_device_to_cache(void) {
     saved_device_cache.is_valid = valid_addr;
 
     if (valid_addr) {
-        ESP_LOGI(TAG, "Loaded device to cache: %02x:%02x:%02x:%02x:%02x:%02x, type: %d",
-                 saved_device_cache.bda[0], saved_device_cache.bda[1], saved_device_cache.bda[2],
-                 saved_device_cache.bda[3], saved_device_cache.bda[4], saved_device_cache.bda[5],
-                 saved_device_cache.addr_type);
+        if (VERBOSE) {
+            ESP_LOGI(TAG, "Loaded device to cache: %02x:%02x:%02x:%02x:%02x:%02x, type: %d",
+                     saved_device_cache.bda[0], saved_device_cache.bda[1], saved_device_cache.bda[2],
+                     saved_device_cache.bda[3], saved_device_cache.bda[4], saved_device_cache.bda[5],
+                     saved_device_cache.addr_type);
+        }
+
         return ESP_OK;
     } else {
         ESP_LOGW(TAG, "No valid device found in storage");
@@ -165,11 +156,13 @@ esp_err_t connect_to_saved_device(const esp_gatt_if_t gatts_if) {
     if (!saved_device_cache.is_valid) {
         return ESP_OK;
     }
-    
-    ESP_LOGI(TAG, "Connecting to saved device: %02x:%02x:%02x:%02x:%02x:%02x, type: %d",
-             saved_device_cache.bda[0], saved_device_cache.bda[1], saved_device_cache.bda[2],
-             saved_device_cache.bda[3], saved_device_cache.bda[4], saved_device_cache.bda[5],
-             saved_device_cache.addr_type);
+
+    if (VERBOSE) {
+        ESP_LOGI(TAG, "Connecting to saved device: %02x:%02x:%02x:%02x:%02x:%02x, type: %d",
+                 saved_device_cache.bda[0], saved_device_cache.bda[1], saved_device_cache.bda[2],
+                 saved_device_cache.bda[3], saved_device_cache.bda[4], saved_device_cache.bda[5],
+                 saved_device_cache.addr_type);
+    }
 
     ble_hid_device_start_advertising();
 
@@ -207,7 +200,6 @@ bool has_saved_device(void) {
  * @return esp_err_t ESP_OK if data retrieved successfully, error code otherwise
  */
 esp_err_t get_saved_device(esp_bd_addr_t bda, esp_ble_addr_type_t *addr_type) {
-    // If cache is not valid, try to load from NVS
     if (!saved_device_cache.is_valid) {
         const esp_err_t err = load_saved_device_to_cache();
         if (err != ESP_OK) {
@@ -219,7 +211,6 @@ esp_err_t get_saved_device(esp_bd_addr_t bda, esp_ble_addr_type_t *addr_type) {
         return ESP_ERR_NOT_FOUND;
     }
 
-    // Copy data to output parameters
     if (bda != NULL) {
         memcpy(bda, saved_device_cache.bda, ESP_BD_ADDR_LEN);
     }
@@ -240,19 +231,16 @@ esp_err_t clear_saved_device(void) {
     nvs_handle_t nvs_handle;
     esp_err_t err;
 
-    // Clear in-memory cache
     memset(saved_device_cache.bda, 0, ESP_BD_ADDR_LEN);
     saved_device_cache.addr_type = BLE_ADDR_TYPE_PUBLIC;
     saved_device_cache.is_valid = false;
 
-    // Open NVS
     err = nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &nvs_handle);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Error opening NVS handle: %s", esp_err_to_name(err));
         return err;
     }
 
-    // Erase the keys
     err = nvs_erase_key(nvs_handle, ADDR_KEY);
     if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
         ESP_LOGE(TAG, "Error erasing device address: %s", esp_err_to_name(err));
@@ -267,7 +255,6 @@ esp_err_t clear_saved_device(void) {
         return err;
     }
 
-    // Commit changes
     err = nvs_commit(nvs_handle);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Error committing NVS: %s", esp_err_to_name(err));
@@ -275,10 +262,10 @@ esp_err_t clear_saved_device(void) {
         return err;
     }
 
-    // Close NVS
+    if (VERBOSE) {
+        ESP_LOGI(TAG, "Cleared saved device data");
+    }
+
     nvs_close(nvs_handle);
-
-    ESP_LOGI(TAG, "Cleared saved device data");
-
     return ESP_OK;
 }

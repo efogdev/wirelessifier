@@ -14,7 +14,7 @@ static void buttons_task(void* arg);
 
 void buttons_init() {
     storage_get_int_setting("buttons.longPressMs", &s_long_press_threshold);
-    xTaskCreatePinnedToCore(buttons_task, "buttons_task", VERBOSE ? 2600 : 2250, NULL, 8, NULL, 1);
+    xTaskCreatePinnedToCore(buttons_task, "buttons_task", VERBOSE ? 2600 : 2350, NULL, 8, NULL, 1);
 }
 
 void buttons_subscribe_click(const button_click_callback_t callback) {

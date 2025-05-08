@@ -1,4 +1,6 @@
 #include "temp_sensor.h"
+
+#include "const.h"
 #include "esp_log.h"
 
 static const char *TAG = "TempSensor";
@@ -24,8 +26,11 @@ esp_err_t temp_sensor_init(void)
         return ret;
     }
 
+    if (VERBOSE) {
+        ESP_LOGI(TAG, "Temperature sensor initialized");
+    }
+
     is_initialized = true;
-    ESP_LOGI(TAG, "Temperature sensor initialized");
     return ESP_OK;
 }
 
@@ -70,6 +75,10 @@ esp_err_t temp_sensor_deinit(void)
 
     temp_sensor = NULL;
     is_initialized = false;
-    ESP_LOGI(TAG, "Temperature sensor deinitialized");
+
+    if (VERBOSE) {
+        ESP_LOGI(TAG, "Temperature sensor deinitialized");
+    }
+
     return ESP_OK;
 }

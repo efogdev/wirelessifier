@@ -6,6 +6,8 @@
 #include <esp_wifi.h>
 #include <esp_event.h>
 #include <esp_netif.h>
+
+#include "const.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "nvs_flash.h"
@@ -144,7 +146,9 @@ static void event_handler(void*, const esp_event_base_t event_base, const int32_
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         if (has_wifi_credentials()) esp_wifi_connect();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        ESP_LOGI(HTTP_TAG, "WIFI_EVENT_STA_DISCONNECTED");
+        if (VERBOSE) {
+            ESP_LOGI(HTTP_TAG, "WIFI_EVENT_STA_DISCONNECTED");
+        }
         
         wifi_mode_t mode;
         esp_wifi_get_mode(&mode);
@@ -153,10 +157,16 @@ static void event_handler(void*, const esp_event_base_t event_base, const int32_
             s_retry_num++;
             
             if (s_retry_num < MAX_RETRY) {
-                ESP_LOGI(HTTP_TAG, "Retry to connect to the AP, attempt %d/%d", s_retry_num, MAX_RETRY);
+                if (VERBOSE) {
+                    ESP_LOGI(HTTP_TAG, "Retry to connect to the AP, attempt %d/%d", s_retry_num, MAX_RETRY);
+                }
+
                 esp_wifi_connect();
             } else {
-                ESP_LOGI(HTTP_TAG, "Failed to connect after %d attempts", MAX_RETRY);
+                if (VERBOSE) {
+                    ESP_LOGI(HTTP_TAG, "Failed to connect after %d attempts", MAX_RETRY);
+                }
+
                 xEventGroupSetBits(wifi_event_group, WIFI_FAIL_BIT);
             }
 
@@ -165,13 +175,19 @@ static void event_handler(void*, const esp_event_base_t event_base, const int32_
         
         xEventGroupClearBits(wifi_event_group, WIFI_CONNECTED_BIT);
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_SCAN_DONE) {
-        ESP_LOGI(HTTP_TAG, "WIFI_EVENT_SCAN_DONE");
+        if (VERBOSE) {
+            ESP_LOGI(HTTP_TAG, "WIFI_EVENT_SCAN_DONE");
+        }
+
         process_wifi_scan_results();
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         const ip_event_got_ip_t* event = event_data;
         char ip_str[16];
         snprintf(ip_str, sizeof(ip_str), IPSTR, IP2STR(&event->ip_info.ip));
-        ESP_LOGI(HTTP_TAG, "Got IP: %s", ip_str);
+
+        if (VERBOSE) {
+            ESP_LOGI(HTTP_TAG, "Got IP: %s", ip_str);
+        }
 
         s_retry_num = 0;
         xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
@@ -206,12 +222,20 @@ void init_wifi_apsta(void)
     bool is_apsta_mode = false;
     if (has_wifi_credentials()) {
         ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-        ESP_LOGI(HTTP_TAG, "WiFi initialized in STA mode.");
+
+        if (VERBOSE) {
+            ESP_LOGI(HTTP_TAG, "WiFi initialized in STA mode.");
+        }
+
         is_apsta_mode = false;
     } else {
         ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
         ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
-        ESP_LOGI(HTTP_TAG, "WiFi initialized in APSTA mode.");
+
+        if (VERBOSE) {
+            ESP_LOGI(HTTP_TAG, "WiFi initialized in APSTA mode.");
+        }
+
         is_apsta_mode = true;
     }
 
@@ -225,7 +249,10 @@ httpd_handle_t start_webserver(void)
         return server;
 
     if (server != NULL) {
-        ESP_LOGI(HTTP_TAG, "Server already running");
+        if (VERBOSE) {
+            ESP_LOGI(HTTP_TAG, "Server already running");
+        }
+
         return server;
     }
 
@@ -242,7 +269,10 @@ httpd_handle_t start_webserver(void)
     config.keep_alive_enable = true;
     config.core_id = 1;
 
-    ESP_LOGI(HTTP_TAG, "Starting server on port: '%d'", config.server_port);
+    if (VERBOSE) {
+        ESP_LOGI(HTTP_TAG, "Starting server on port: '%d'", config.server_port);
+    }
+
     if (httpd_start(&server, &config) == ESP_OK) {
         init_websocket(server);
         init_ota_server(server);
@@ -260,7 +290,10 @@ httpd_handle_t start_webserver(void)
         return server;
     }
 
-    ESP_LOGI(HTTP_TAG, "Error starting server!");
+    if (VERBOSE) {
+        ESP_LOGW(HTTP_TAG, "Error starting server!");
+    }
+
     return NULL;
 }
 
@@ -284,7 +317,9 @@ void stop_webserver(void)
 
 static void web_services_task(void *pvParameters)
 {
-    ESP_LOGI(HTTP_TAG, "Initializing web services in task");
+    if (VERBOSE) {
+        ESP_LOGI(HTTP_TAG, "Initializing web services in task");
+    }
     
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -295,7 +330,9 @@ static void web_services_task(void *pvParameters)
     
     init_wifi_apsta();
     if (has_wifi_credentials()) {
-        ESP_LOGI(HTTP_TAG, "Found stored WiFi credentials, attempting to connect");
+        if (VERBOSE) {
+            ESP_LOGI(HTTP_TAG, "Found stored WiFi credentials, attempting to connect");
+        }
 
         const EventBits_t bits = xEventGroupWaitBits(wifi_event_group,
             WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdFALSE, pdFALSE, 10000 / portTICK_PERIOD_MS);
@@ -307,7 +344,11 @@ static void web_services_task(void *pvParameters)
                 nvs_set_u8(nvs_handle, NVS_KEY_BOOT_WITH_WIFI, 1);
                 nvs_commit(nvs_handle);
                 nvs_close(nvs_handle);
-                ESP_LOGI(HTTP_TAG, "Set boot with WiFi flag");
+
+                if (VERBOSE) {
+                    ESP_LOGI(HTTP_TAG, "Set boot with WiFi flag");
+                }
+
                 vTaskDelay(pdMS_TO_TICKS(100));
                 esp_restart();
             }
@@ -331,7 +372,10 @@ void init_web_services(void)
     if (!is_wifi_enabled())
         return;
 
-    ESP_LOGI(HTTP_TAG, "Starting web services task");
+    if (VERBOSE) {
+        ESP_LOGI(HTTP_TAG, "Starting web services task");
+    }
+
     wifi_event_group = xEventGroupCreate();
     xTaskCreatePinnedToCore(web_services_task, "web_services", 2800, NULL, 8, &web_services_task_handle, 1);
 }

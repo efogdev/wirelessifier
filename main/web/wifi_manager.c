@@ -9,6 +9,7 @@
 #include <storage.h>
 #include <cJSON.h>
 
+#include "const.h"
 #include "esp_gap_ble_api.h"
 #include "esp_ota_ops.h"
 #include "freertos/FreeRTOS.h"
@@ -69,8 +70,11 @@ esp_err_t connect_wifi_with_stored_credentials(void) {
     wifi_config_t wifi_config = {0};
     strlcpy((char *)wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid));
     strlcpy((char *)wifi_config.sta.password, password, sizeof(wifi_config.sta.password));
-    
-    ESP_LOGI(WIFI_TAG, "Connecting to %s...", ssid);
+
+    if (VERBOSE) {
+        ESP_LOGI(WIFI_TAG, "Connecting to %s...", ssid);
+    }
+
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     
     const esp_err_t connect_err = esp_wifi_connect();
@@ -83,10 +87,16 @@ esp_err_t connect_wifi_with_stored_credentials(void) {
         WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdFALSE, pdFALSE, portMAX_DELAY);
 
     if (bits & WIFI_CONNECTED_BIT) {
-        ESP_LOGI(WIFI_TAG, "Connected to %s", ssid);
+        if (VERBOSE) {
+            ESP_LOGI(WIFI_TAG, "Connected to %s", ssid);
+        }
+
         return ESP_OK;
     } else if (bits & WIFI_FAIL_BIT) {
-        ESP_LOGI(WIFI_TAG, "Failed to connect to %s", ssid);
+        if (VERBOSE) {
+            ESP_LOGI(WIFI_TAG, "Failed to connect to %s", ssid);
+        }
+
         return ESP_FAIL;
     } else {
         ESP_LOGE(WIFI_TAG, "Unexpected event");
@@ -170,11 +180,18 @@ bool has_wifi_credentials(void) {
 void process_wifi_scan_results(void) {
     uint16_t ap_count = 0;
     ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_count));
-    ESP_LOGI(WIFI_TAG, "WiFi scan completed, found %d networks", ap_count);
+
+    if (VERBOSE) {
+        ESP_LOGI(WIFI_TAG, "WiFi scan completed, found %d networks", ap_count);
+    }
+
     vTaskDelay(pdMS_TO_TICKS(20));
     
     if (ap_count == 0) {
-        ESP_LOGI(WIFI_TAG, "No networks found");
+        if (VERBOSE) {
+            ESP_LOGI(WIFI_TAG, "No networks found");
+        }
+
         ws_broadcast_small_json("wifi_scan_result", "[]");
         return;
     }
@@ -228,7 +245,10 @@ void process_wifi_scan_results(void) {
 }
 
 esp_err_t scan_wifi_networks(void) {
-    ESP_LOGI(WIFI_TAG, "Starting WiFi scan...");
+    if (VERBOSE) {
+        ESP_LOGI(WIFI_TAG, "Starting WiFi scan...");
+    }
+
     esp_wifi_scan_stop();
     
     const wifi_scan_config_t scan_config = {
@@ -272,8 +292,11 @@ esp_err_t connect_to_wifi(const char* ssid, const char* password) {
         wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
         strlcpy((char *)wifi_config.sta.password, password, sizeof(wifi_config.sta.password));
     }
-    
-    ESP_LOGI(WIFI_TAG, "Connecting to %s...", ssid);
+
+    if (VERBOSE) {
+        ESP_LOGI(WIFI_TAG, "Connecting to %s...", ssid);
+    }
+
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     
     const esp_err_t connect_err = esp_wifi_connect();
@@ -289,7 +312,10 @@ esp_err_t connect_to_wifi(const char* ssid, const char* password) {
     static char status_json[128];
 
     if (bits & WIFI_CONNECTED_BIT) {
-        ESP_LOGI(WIFI_TAG, "Connected to %s", ssid);
+        if (VERBOSE) {
+            ESP_LOGI(WIFI_TAG, "Connected to %s", ssid);
+        }
+
         save_wifi_credentials(ssid, password ? password : "");
         snprintf(status_json, sizeof(status_json), 
                 "{\"connected\":true,\"ip\":\"%s\",\"attempt\":%d}", 
@@ -304,7 +330,11 @@ esp_err_t connect_to_wifi(const char* ssid, const char* password) {
                 "{\"connected\":false,\"attempt\":%d}",
                 s_retry_num);
         ws_broadcast_small_json("wifi_connect_status", status_json);
-        ESP_LOGI(WIFI_TAG, "Failed to connect to %s", ssid);
+
+        if (VERBOSE) {
+            ESP_LOGI(WIFI_TAG, "Failed to connect to %s", ssid);
+        }
+
         return ESP_FAIL;
     }
 
@@ -315,7 +345,9 @@ esp_err_t connect_to_wifi(const char* ssid, const char* password) {
 }
 
 void disable_wifi_and_web_stack(void) {
-    ESP_LOGI(WIFI_TAG, "Disabling WiFi and web stack...");
+    if (VERBOSE) {
+        ESP_LOGI(WIFI_TAG, "Disabling WiFi and web stack...");
+    }
  
     s_web_stack_disabled = true;
     is_connected = false;
@@ -344,7 +376,10 @@ void disable_wifi_and_web_stack(void) {
         nvs_set_u8(nvs_handle, NVS_KEY_BOOT_WITH_WIFI, 0);
         nvs_commit(nvs_handle);
         nvs_close(nvs_handle);
-        ESP_LOGI(WIFI_TAG, "Cleared boot with WiFi flag");
+
+        if (VERBOSE) {
+            ESP_LOGI(WIFI_TAG, "Cleared boot with WiFi flag");
+        }
     }
 
     led_update_wifi_status(false, false);
@@ -355,11 +390,16 @@ void disable_wifi_and_web_stack(void) {
         wifi_event_group = NULL;
     }
 
-    ESP_LOGI(WIFI_TAG, "WiFi and web stack disabled and cleaned up");
+    if (VERBOSE) {
+        ESP_LOGI(WIFI_TAG, "WiFi and web stack disabled and cleaned up");
+    }
 }
 
 void reboot_device(bool keep_wifi) {
-    ESP_LOGI(WIFI_TAG, "Rebooting device, keep_wifi=%d", keep_wifi);
+    if (VERBOSE) {
+        ESP_LOGI(WIFI_TAG, "Rebooting device, keep_wifi=%d", keep_wifi);
+    }
+
     ws_broadcast_small_json("reboot", "{}");
     vTaskDelay(pdMS_TO_TICKS(250)); // Give time for the messages to be sent
     
@@ -369,7 +409,10 @@ void reboot_device(bool keep_wifi) {
         nvs_set_u8(nvs_handle, NVS_KEY_BOOT_WITH_WIFI, keep_wifi ? 1 : 0);
         nvs_commit(nvs_handle);
         nvs_close(nvs_handle);
-        ESP_LOGI(WIFI_TAG, "%s boot with WiFi flag", keep_wifi ? "Set" : "Cleared");
+
+        if (VERBOSE) {
+            ESP_LOGI(WIFI_TAG, "%s boot with WiFi flag", keep_wifi ? "Set" : "Cleared");
+        }
     }
     
     vTaskDelay(pdMS_TO_TICKS(20));
@@ -509,7 +552,9 @@ bool is_wifi_enabled(void) {
 }
 
 static void ws_ping_task(void *pvParameters) {
-    ESP_LOGI(WIFI_TAG, "WebSocket ping task started");
+    if (VERBOSE) {
+        ESP_LOGI(WIFI_TAG, "WebSocket ping task started");
+    }
     
     while (1) {
         if (s_web_stack_disabled) {
@@ -540,7 +585,9 @@ void start_ws_ping_task(void) {
         if (result != pdPASS) {
             ESP_LOGE(WIFI_TAG, "Failed to create WebSocket ping task");
         } else {
-            ESP_LOGI(WIFI_TAG, "WebSocket ping task created");
+            if (VERBOSE) {
+                ESP_LOGI(WIFI_TAG, "WebSocket ping task created");
+            }
         }
     } else {
         ESP_LOGW(WIFI_TAG, "WebSocket ping task already running");

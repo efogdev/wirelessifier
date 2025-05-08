@@ -50,7 +50,9 @@ static void init_web_stack(void);
 static void rot_long_press_cb(void);
 
 void app_main(void) {
-    ESP_LOGI(TAG, "Starting USB HID to BLE HID bridge");
+    if (VERBOSE) {
+        ESP_LOGI(TAG, "Starting USB HID to BLE HID bridge");
+    }
 
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -156,14 +158,21 @@ static void run_hid_bridge() {
 static void init_web_stack(void) {
     if (gpio_get_level(GPIO_BUTTON_SW4) == 0) {
         vTaskDelay(pdMS_TO_TICKS(20));
-        ESP_LOGI(TAG, "Initializing web services because SW4 held on boot");
+
+        if (VERBOSE) {
+            ESP_LOGI(TAG, "Initializing web services because SW4 held on boot");
+        }
+
         s_web_enabled = true;
     } else {
         nvs_handle_t nvs_handle;
         uint8_t boot_with_wifi = 0;
         if (nvs_open("wifi_config", NVS_READWRITE, &nvs_handle) == ESP_OK) {
             if (nvs_get_u8(nvs_handle, "boot_wifi", &boot_with_wifi) == ESP_OK && boot_with_wifi == 1) {
-                ESP_LOGI(TAG, "Initializing web services because of one-time boot flag");
+                if (VERBOSE) {
+                    ESP_LOGI(TAG, "Initializing web services because of one-time boot flag");
+                }
+
                 s_web_enabled = true;
                 
                 nvs_set_u8(nvs_handle, "boot_wifi", 0);
@@ -342,7 +351,10 @@ static void rot_long_press_cb(void) {
             nvs_set_u8(nvs_handle, NVS_KEY_BOOT_WITH_WIFI, 0);
             nvs_commit(nvs_handle);
             nvs_close(nvs_handle);
-            ESP_LOGI(TAG, "Cleared boot with WiFi flag");
+
+            if (VERBOSE) {
+                ESP_LOGI(TAG, "Cleared boot with WiFi flag");
+            }
         }
     }
 

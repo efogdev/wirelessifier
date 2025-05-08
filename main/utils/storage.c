@@ -250,7 +250,10 @@ esp_err_t init_global_settings(void) {
             free(nvs_settings);
         }
     } else {
-        ESP_LOGI(STORAGE_TAG, "No settings found in NVS, using defaults");
+        if (VERBOSE) {
+            ESP_LOGI(STORAGE_TAG, "No settings found in NVS, using defaults");
+        }
+
         char *updated_settings = update_device_info_in_settings(default_settings);
         current_settings = updated_settings ? updated_settings : strdup(default_settings);
         
@@ -560,7 +563,9 @@ esp_err_t storage_clear_boot_with_wifi(void) {
     if (err != ESP_OK) {
         ESP_LOGE(STORAGE_TAG, "Error committing NVS for boot_wifi flag: %s", esp_err_to_name(err));
     } else {
-        ESP_LOGI(STORAGE_TAG, "Successfully set boot_wifi flag");
+        if (VERBOSE) {
+            ESP_LOGI(STORAGE_TAG, "Successfully set boot_wifi flag");
+        }
     }
 
     nvs_close(nvs_handle);
@@ -586,7 +591,9 @@ esp_err_t storage_set_boot_with_wifi(void) {
     if (err != ESP_OK) {
         ESP_LOGE(STORAGE_TAG, "Error committing NVS for boot_wifi flag: %s", esp_err_to_name(err));
     } else {
-        ESP_LOGI(STORAGE_TAG, "Successfully set boot_wifi flag");
+        if (VERBOSE) {
+            ESP_LOGI(STORAGE_TAG, "Successfully set boot_wifi flag");
+        }
     }
     
     nvs_close(nvs_handle);

@@ -4,6 +4,7 @@
 #include <cJSON.h>
 #include "storage.h"
 #include "ble_hid_device.h"
+#include "const.h"
 #include "esp_gap_ble_api.h"
 #include "esp_ota_ops.h"
 #include "nvs.h"
@@ -224,8 +225,11 @@ void init_websocket(const httpd_handle_t server_handle) {
     client_ctx->frame.final = true;
     client_ctx->frame.fragmented = false;
     client_ctx->frame.type = HTTPD_WS_TYPE_TEXT;
-    
-    ESP_LOGI(WS_TAG, "Registering WebSocket handler");
+
+    if (VERBOSE) {
+        ESP_LOGI(WS_TAG, "Registering WebSocket handler");
+    }
+
     httpd_register_uri_handler(server, &ws);
 }
 

@@ -146,6 +146,5 @@ static const httpd_uri_t ota_upload = {
 };
 
 void init_ota_server(const httpd_handle_t server) {
-    ESP_LOGI(OTA_TAG, "Registering OTA upload handler");
     httpd_register_uri_handler(server, &ota_upload);
 }

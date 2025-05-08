@@ -22,7 +22,10 @@ static bool adc_calibration_init(const adc_unit_t unit, const adc_channel_t chan
     esp_err_t ret = ESP_FAIL;
     bool calibrated = false;
 
-    ESP_LOGI(TAG, "Calibration scheme version is %s", "Curve Fitting");
+    if (VERBOSE) {
+        ESP_LOGI(TAG, "Calibration scheme version is %s", "Curve Fitting");
+    }
+
     const adc_cali_curve_fitting_config_t cali_config = {
         .unit_id = unit,
         .chan = channel,
@@ -36,7 +39,9 @@ static bool adc_calibration_init(const adc_unit_t unit, const adc_channel_t chan
 
     *out_handle = handle;
     if (ret == ESP_OK) {
-        ESP_LOGI(TAG, "Calibration Success");
+        if (VERBOSE) {
+            ESP_LOGI(TAG, "Calibration Success");
+        }
     } else if (ret == ESP_ERR_NOT_SUPPORTED || !calibrated) {
         ESP_LOGW(TAG, "eFuse not burnt, skip software calibration");
     } else {

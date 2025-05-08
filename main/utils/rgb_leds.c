@@ -9,6 +9,7 @@
 #include <math.h>
 #include <vmon.h>
 
+#include "const.h"
 #include "esp_wifi.h"
 #include "storage.h"
 
@@ -279,7 +280,10 @@ void led_control_init(const int num_leds, const int gpio_pin)
     if (storage_get_int_setting("led.brightness", &brightness) == ESP_OK) {
         if (brightness >= 0 && brightness <= 100) {
             g_rgb_brightness = brightness;
-            ESP_LOGI(TAG, "LED brightness set to %d%%", brightness);
+
+            if (VERBOSE) {
+                ESP_LOGI(TAG, "LED brightness set to %d%%", brightness);
+            }
         } else {
             ESP_LOGW(TAG, "Invalid brightness value %d, using default", brightness);
         }

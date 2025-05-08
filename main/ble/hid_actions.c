@@ -4,6 +4,8 @@
 #include "esp_timer.h"
 #include <string.h>
 
+#include "const.h"
+
 static const char *TAG = "HID_ACTIONS";
 
 typedef struct {
@@ -129,7 +131,11 @@ void execute_special_action(const uint16_t conn_id, const special_key_t action) 
             break;
         case KC_CURSOR_SWITCH:
             state.cursor_y_axis = !state.cursor_y_axis;
-            ESP_LOGI(TAG, "Cursor axis switched to %s", state.cursor_y_axis ? "Y" : "X");
+
+            if (VERBOSE) {
+                ESP_LOGI(TAG, "Cursor axis switched to %s", state.cursor_y_axis ? "Y" : "X");
+            }
+
             break;
         case KC_MS_WH_DOWN:
             if (state.wheel_horizontal) {
@@ -147,7 +153,11 @@ void execute_special_action(const uint16_t conn_id, const special_key_t action) 
             break;
         case KC_MS_WH_SWITCH:
             state.wheel_horizontal = !state.wheel_horizontal;
-            ESP_LOGI(TAG, "Wheel axis switched to %s", state.wheel_horizontal ? "horizontal" : "vertical");
+
+            if (VERBOSE) {
+                ESP_LOGI(TAG, "Wheel axis switched to %s", state.wheel_horizontal ? "horizontal" : "vertical");
+            }
+
             break;
         default:
             ESP_LOGW(TAG, "Unknown special action: %d", action);

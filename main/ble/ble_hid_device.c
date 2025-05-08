@@ -96,7 +96,10 @@ static void update_tx_power(void) {
     char tx_power_str[10];
     esp_power_level_t power_level = ESP_PWR_LVL_N0;
     if (storage_get_string_setting("connectivity.bleTxPower", tx_power_str, sizeof(tx_power_str)) == ESP_OK) {
-        ESP_LOGI(TAG, "BLE TX power setting: %s", tx_power_str);
+        if (VERBOSE) {
+            ESP_LOGI(TAG, "BLE TX power setting: %s", tx_power_str);
+        }
+
         if (strcmp(tx_power_str, "n6") == 0) {
             power_level = ESP_PWR_LVL_N6;
         } else if (strcmp(tx_power_str, "n3") == 0) {
@@ -218,7 +221,10 @@ static void hidd_event_callback(const esp_hidd_cb_event_t event, esp_hidd_cb_par
             break;
         }
         case ESP_HIDD_EVENT_BLE_CONNECT: {
-            ESP_LOGI(TAG, "ESP_HIDD_EVENT_BLE_CONNECT");
+            if (VERBOSE) {
+                ESP_LOGI(TAG, "ESP_HIDD_EVENT_BLE_CONNECT");
+            }
+
             update_tx_power();
             save_connected_device(param->connect.remote_bda, s_connected_device_addr_type);
             s_conn_id = param->connect.conn_id;
@@ -234,7 +240,10 @@ static void hidd_event_callback(const esp_hidd_cb_event_t event, esp_hidd_cb_par
         }
         case ESP_HIDD_EVENT_BLE_DISCONNECT: {
             s_connected = false;
-            ESP_LOGI(TAG, "ESP_HIDD_EVENT_BLE_DISCONNECT");
+
+            if (VERBOSE) {
+                ESP_LOGI(TAG, "ESP_HIDD_EVENT_BLE_DISCONNECT");
+            }
 
             // Stop battery updates when disconnected
             if (s_battery_timer != NULL) {
@@ -246,8 +255,11 @@ static void hidd_event_callback(const esp_hidd_cb_event_t event, esp_hidd_cb_par
             break;
         }
         case ESP_HIDD_EVENT_BLE_LED_REPORT_WRITE_EVT: {
-            ESP_LOGI(TAG, "ESP_HIDD_EVENT_BLE_LED_REPORT_WRITE_EVT");
-            ESP_LOG_BUFFER_HEX(TAG, param->led_write.data, param->led_write.length);
+            if (VERBOSE) {
+                ESP_LOGI(TAG, "ESP_HIDD_EVENT_BLE_LED_REPORT_WRITE_EVT");
+                ESP_LOG_BUFFER_HEX(TAG, param->led_write.data, param->led_write.length);
+            }
+
             break;
         }
         default:
@@ -273,15 +285,21 @@ static void gap_event_handler(const esp_gap_ble_cb_event_t event, esp_ble_gap_cb
             s_connected_device_addr_type = param->ble_security.auth_cmpl.addr_type;
             update_tx_power();
 
-            ESP_LOGI(TAG, "remote BD_ADDR: %08x%04x",\
-                     (bd_addr[0] << 24) + (bd_addr[1] << 16) + (bd_addr[2] << 8) + bd_addr[3],
-                     (bd_addr[4] << 8) + bd_addr[5]);
-            ESP_LOGI(TAG, "address type = %d", param->ble_security.auth_cmpl.addr_type);
-            ESP_LOGI(TAG, "pair status = %s", param->ble_security.auth_cmpl.success ? "success" : "fail");
+            if (VERBOSE) {
+                ESP_LOGI(TAG, "remote BD_ADDR: %08x%04x",\
+                         (bd_addr[0] << 24) + (bd_addr[1] << 16) + (bd_addr[2] << 8) + bd_addr[3],
+                         (bd_addr[4] << 8) + bd_addr[5]);
+                ESP_LOGI(TAG, "address type = %d", param->ble_security.auth_cmpl.addr_type);
+                ESP_LOGI(TAG, "pair status = %s", param->ble_security.auth_cmpl.success ? "success" : "fail");
+            }
+
             if (!param->ble_security.auth_cmpl.success) {
                 ESP_LOGE(TAG, "fail reason = 0x%x", param->ble_security.auth_cmpl.fail_reason);
                 if (param->ble_security.auth_cmpl.fail_reason == 0x66) {
-                    ESP_LOGI(TAG, "Unbonding device due to error 0x66");
+                    if (VERBOSE) {
+                        ESP_LOGI(TAG, "Unbonding device due to error 0x66");
+                    }
+
                     esp_ble_remove_bond_device(bd_addr);
                 }
             } else {
@@ -369,7 +387,10 @@ esp_err_t ble_hid_device_init() {
     int reconnect_delay;
     if (storage_get_int_setting("connectivity.bleRecDelay", &reconnect_delay) == ESP_OK) {
         s_reconnect_delay = reconnect_delay;
-        ESP_LOGI(TAG, "BLE reconnect delay set to %d seconds", s_reconnect_delay);
+
+        if (VERBOSE) {
+            ESP_LOGI(TAG, "BLE reconnect delay set to %d seconds", s_reconnect_delay);
+        }
     }
 
     ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
@@ -473,7 +494,10 @@ esp_err_t ble_hid_device_start_advertising(void) {
         strcpy(device_name, DEVICE_NAME);
     }
 
-    ESP_LOGI(TAG, "Advertising with device name: %s", device_name);
+    if (VERBOSE) {
+        ESP_LOGI(TAG, "Advertising with device name: %s", device_name);
+    }
+
     esp_ble_gap_set_device_name(device_name);
     const esp_err_t ret = esp_ble_gap_config_adv_data(&hidd_adv_data);
     if (ret) {
@@ -500,7 +524,10 @@ static bool check_high_speed_device() {
         if (delay < HIGH_SPEED_DEVICE_THRESHOLD_MS) {
             s_fast_events_count++;
             if (s_fast_events_count >= HIGH_SPEED_DEVICE_THRESHOLD_EVENTS) {
-                ESP_LOGI(TAG, "High speed device detected");
+                if (VERBOSE) {
+                    ESP_LOGI(TAG, "High speed device detected");
+                }
+
                 s_is_high_speed = true;
             }
         } else {

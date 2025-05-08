@@ -45,7 +45,10 @@ static bool s_enable_deep_sleep = true;
 static bool s_never_sleep = false;
 
 static void enter_deep_sleep() {
-    ESP_LOGI(TAG, "Going to deep sleep…");
+    if (VERBOSE) {
+        ESP_LOGI(TAG, "Going to deep sleep…");
+    }
+
     hid_bridge_deinit();
     vTaskDelay(pdMS_TO_TICKS(20));
     led_update_pattern(true, true, false); // all black, we good
@@ -160,7 +163,10 @@ static void wakeup() {
             return;
         }
 
-        ESP_LOGI(TAG, "Restarting BLE stack…");
+        if (VERBOSE) {
+            ESP_LOGI(TAG, "Restarting BLE stack…");
+        }
+
         const esp_err_t ret = ble_hid_device_init(VERBOSE);
         if (ret != ESP_OK) {
             s_ble_stack_active = false;
