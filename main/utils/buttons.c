@@ -3,36 +3,18 @@
 #include "driver/gpio.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "freertos/queue.h"
 #include "esp_timer.h"
+#include "storage.h"
 
-static QueueHandle_t button_state_queue = NULL;
 static button_click_callback_t user_click_callback = NULL;
 static button_long_press_callback_t user_long_press_callback = NULL;
-
-typedef struct {
-    uint8_t button_index;
-    uint8_t state;
-} button_event_t;
+static int s_long_press_threshold = 1500;
 
 static void buttons_task(void* arg);
 
-static void IRAM_ATTR button_isr_handler(void* arg) {
-    const uint8_t button_index = (uint32_t) arg;
-    const button_event_t event = {
-        .button_index = button_index,
-        .state = gpio_get_level(GPIO_BUTTON_SW1 + button_index)
-    };
-    xQueueSendFromISR(button_state_queue, &event, NULL);
-}
-
 void buttons_init() {
-    button_state_queue = xQueueCreate(8, sizeof(button_event_t));
-    for (uint8_t i = 0; i < 4; i++) {
-        gpio_isr_handler_add(GPIO_BUTTON_SW1 + i, button_isr_handler, (void*)(uint32_t)i);
-    }
-    
-    xTaskCreatePinnedToCore(buttons_task, "buttons_task", 2600, NULL, 6, NULL, 1);
+    storage_get_int_setting("buttons.longPressMs", &s_long_press_threshold);
+    xTaskCreatePinnedToCore(buttons_task, "buttons_task", 2600, NULL, 8, NULL, 1);
 }
 
 void buttons_subscribe_click(const button_click_callback_t callback) {
@@ -44,49 +26,49 @@ void buttons_subscribe_long_press(const button_long_press_callback_t callback) {
 }
 
 void buttons_deinit() {
-    for (uint8_t i = 0; i < 4; i++) {
-        gpio_isr_handler_remove(GPIO_BUTTON_SW1 + i);
-    }
-    vQueueDelete(button_state_queue);
     user_click_callback = NULL;
     user_long_press_callback = NULL;
 }
 
 static void buttons_task(void* arg) {
-    button_event_t event;
-    uint32_t last_click_time[4] = {0};
     uint32_t press_start_time[4] = {0};
+    uint32_t last_state_time[4] = {0};
     bool is_pressed[4] = {false};
     bool long_press_detected[4] = {false};
-    
-    while (1) {
-        const uint32_t current_time = xTaskGetTickCount() * portTICK_PERIOD_MS;
+    bool last_state[4] = {true};  
 
-        if (xQueueReceive(button_state_queue, &event, 0)) {
-            const uint8_t idx = event.button_index;
+    while (1) {
+        const uint32_t current_time = pdTICKS_TO_MS(xTaskGetTickCount());
+        for (uint8_t i = 0; i < 4; i++) {
+            const bool current_state = gpio_get_level(GPIO_BUTTON_SW1 + i);
             
-            if (event.state) { // Button pressed
-                if (!is_pressed[idx] && (current_time - last_click_time[idx]) > 50) {
-                    is_pressed[idx] = true;
-                    press_start_time[idx] = current_time;
-                    long_press_detected[idx] = false;
-                }
-            } else { // Button released
-                if (is_pressed[idx]) {
-                    is_pressed[idx] = false;
-                    if (!long_press_detected[idx] && user_click_callback && 
-                        (current_time - last_click_time[idx]) > 50) { // Debounce
-                        user_click_callback(idx);
-                        last_click_time[idx] = current_time;
+            if (current_time - last_state_time[i] >= 20) {
+                if (current_state != last_state[i]) {
+                    last_state_time[i] = current_time;
+                    last_state[i] = current_state;
+
+                    if (!current_state) { // Button pressed (active low)
+                        if (!is_pressed[i]) {
+                            is_pressed[i] = true;
+                            press_start_time[i] = current_time;
+                            long_press_detected[i] = false;
+                        }
+                    } else { // Button released
+                        if (is_pressed[i]) {
+                            if (!long_press_detected[i] && user_click_callback &&
+                                (current_time - press_start_time[i]) < s_long_press_threshold) {
+                                user_click_callback(i);
+                            }
+                            is_pressed[i] = false;
+                            long_press_detected[i] = false;
+                            press_start_time[i] = 0;
+                        }
                     }
                 }
             }
-        }
 
-        // Check for long press on all buttons
-        for (uint8_t i = 0; i < 4; i++) {
             if (is_pressed[i] && !long_press_detected[i] && 
-                (current_time - press_start_time[i]) >= 3000) {
+                (current_time - press_start_time[i]) >= s_long_press_threshold) {
                 long_press_detected[i] = true;
                 if (user_long_press_callback) {
                     user_long_press_callback(i);
@@ -94,6 +76,6 @@ static void buttons_task(void* arg) {
             }
         }
 
-        vTaskDelay(pdMS_TO_TICKS(5));
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }

@@ -9,6 +9,7 @@
 #include <storage.h>
 #include <cJSON.h>
 
+#include "esp_gap_ble_api.h"
 #include "esp_ota_ops.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -375,6 +376,18 @@ void reboot_device(bool keep_wifi) {
     esp_restart();
 }
 
+void remove_all_bonded_devices(void)
+{
+    int dev_num = esp_ble_get_bond_device_num();
+    esp_ble_bond_dev_t *dev_list = (esp_ble_bond_dev_t *)malloc(sizeof(esp_ble_bond_dev_t) * dev_num);
+    esp_ble_get_bond_device_list(&dev_num, dev_list);
+    for (int i = 0; i < dev_num; i++) {
+        esp_ble_remove_bond_device(dev_list[i].bd_addr);
+    }
+
+    free(dev_list);
+}
+
 void process_wifi_ws_message(const char* message) {
     cJSON *root = cJSON_Parse(message);
     if (!root) {
@@ -401,6 +414,29 @@ void process_wifi_ws_message(const char* message) {
         const cJSON *keepWifi = cJSON_GetObjectItem(root, "keepWifi");
         const bool keep_wifi = keepWifi && cJSON_IsTrue(keepWifi);
         reboot_device(keep_wifi);
+    }
+    else if (strcmp(type->valuestring, "clear") == 0) {
+        remove_all_bonded_devices();
+
+        esp_partition_iterator_t it = esp_partition_find(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, "nvs");
+        if (it) {
+            const esp_partition_t* nvs_partition = esp_partition_get(it);
+            esp_partition_erase_range(nvs_partition, 0, nvs_partition->size);
+            esp_partition_iterator_release(it);
+        }
+        it = esp_partition_find(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, "phy_init");
+        if (it) {
+            const esp_partition_t* phy_partition = esp_partition_get(it);
+            esp_partition_erase_range(phy_partition, 0, phy_partition->size);
+            esp_partition_iterator_release(it);
+        }
+        it = esp_partition_find(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, "phy");
+        if (it) {
+            const esp_partition_t* phy_partition = esp_partition_get(it);
+            esp_partition_erase_range(phy_partition, 0, phy_partition->size);
+            esp_partition_iterator_release(it);
+        }
+        reboot_device(false);
     }
     else if (strcmp(type->valuestring, "disable_web_stack") == 0) {
         // disable_wifi_and_web_stack();

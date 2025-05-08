@@ -7,6 +7,7 @@
 #include "esp_timer.h"
 #include "driver/pulse_cnt.h"
 #include "esp_log.h"
+#include "storage.h"
 
 #define PCNT_HIGH_LIMIT 8
 #define PCNT_LOW_LIMIT  (-8)
@@ -17,6 +18,7 @@ static rotary_callback_t user_callback = NULL;
 static rotary_click_callback_t user_click_callback = NULL;
 static rotary_long_press_callback_t user_long_press_callback = NULL;
 static pcnt_unit_handle_t pcnt_unit = NULL;
+static int s_long_press_threshold = 1500;
 
 static void rotary_enc_task(void* arg);
 
@@ -81,6 +83,11 @@ void rotary_enc_init() {
     ESP_ERROR_CHECK(pcnt_unit_enable(pcnt_unit));
     ESP_ERROR_CHECK(pcnt_unit_clear_count(pcnt_unit));
     ESP_ERROR_CHECK(pcnt_unit_start(pcnt_unit));
+
+    storage_get_int_setting("buttons.longPressMs", &s_long_press_threshold);
+    if (s_long_press_threshold < 750) {
+        s_long_press_threshold = 750;
+    }
 
     gpio_isr_handler_add(GPIO_ROT_E, click_isr_handler, NULL);
     xTaskCreatePinnedToCore(rotary_enc_task, "rotary_task", 2300, NULL, 8, NULL, 1);
@@ -151,7 +158,7 @@ static void rotary_enc_task(void* arg) {
 
         // Check for long press only while button is held
         if (is_pressed && !long_press_detected && 
-            (current_time - press_start_time) >= 2000) {
+            (current_time - press_start_time) >= s_long_press_threshold) {
             long_press_detected = true;
             if (user_long_press_callback) {
                 user_long_press_callback();

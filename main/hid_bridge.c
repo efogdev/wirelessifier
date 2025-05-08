@@ -189,12 +189,12 @@ static void rot_click_cb(void) {
     wakeup();
 }
 
-static void buttons_cb(const uint8_t button) {
+static void execute_button_action(const uint8_t button, bool isLongPress) {
     char keyActionType[32];
-    sprintf(keyActionType, "buttons.keys[%d].acType", button);
+    sprintf(keyActionType, "buttons.%s[%d].acType", isLongPress ? "longPress" : "keys", button);
 
     char keyAction[32];
-    sprintf(keyAction, "buttons.keys[%d].action", button);
+    sprintf(keyAction, "buttons.%s[%d].action", isLongPress ? "longPress" : "keys", button);
 
     char *mods[4];
     char mod_buffers[4][8];
@@ -203,17 +203,36 @@ static void buttons_cb(const uint8_t button) {
     }
     char modsPath[32];
     size_t mods_count = 4;
-    sprintf(modsPath, "buttons.keys[%d].mods", button);
+    sprintf(modsPath, "buttons.%s[%d].mods", isLongPress ? "longPress" : "keys", button);
     storage_get_string_array_setting(modsPath, mods, &mods_count, 8);
 
     char acType[24], action[24];
     if (storage_get_string_setting(keyActionType, acType, sizeof(acType)) == ESP_OK &&
         storage_get_string_setting(keyAction, action, sizeof(action)) == ESP_OK) {
-        ESP_LOGI(TAG, "Click, btn #%d, action type = %s, action = %s", button, acType, action);
+        ESP_LOGI(TAG, "%s, btn #%d, action type = %s, action = %s", 
+                 isLongPress ? "Long press" : "Click", button, acType, action);
 
         execute_action_from_string(ble_conn_id(), acType, action, (const char**)mods, mods_count);
     }
+}
 
+static void buttons_cb(const uint8_t button) {
+    if (!ble_hid_device_connected()) {
+        return;
+    }
+
+    execute_button_action(button, false);
+    xTimerReset(s_inactivity_timer, 0);
+    xTimerReset(s_deep_sleep_timer, 0);
+    wakeup();
+}
+
+static void buttons_long_press_cb(const uint8_t button) {
+    if (!ble_hid_device_connected()) {
+        return;
+    }
+
+    execute_button_action(button, true);
     xTimerReset(s_inactivity_timer, 0);
     xTimerReset(s_deep_sleep_timer, 0);
     wakeup();
@@ -325,6 +344,7 @@ esp_err_t hid_bridge_init() {
     rotary_enc_subscribe(rot_cb);
     rotary_enc_subscribe_click(rot_click_cb);
     buttons_subscribe_click(buttons_cb);
+    buttons_subscribe_long_press(buttons_long_press_cb);
     return ESP_OK;
 }
 

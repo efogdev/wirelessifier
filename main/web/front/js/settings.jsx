@@ -155,7 +155,30 @@ const App = () => {
             sensitivity: 100,
         },
         buttons: {
+            longPressMs: 1500,
             keys: [
+                {
+                    "acType": "keyboard_key",
+                    "action": "KC_A",
+                    "mods": []
+                },
+                {
+                    "acType": "keyboard_key",
+                    "action": "KC_A",
+                    "mods": []
+                },
+                {
+                    "acType": "keyboard_key",
+                    "action": "KC_A",
+                    "mods": []
+                },
+                {
+                    "acType": "keyboard_key",
+                    "action": "KC_A",
+                    "mods": []
+                },
+            ],
+            longPress: [
                 {
                     "acType": "keyboard_key",
                     "action": "KC_A",
@@ -342,6 +365,13 @@ const App = () => {
     const reboot = () => {
         send({ type: 'reboot', content: { keepWifi: true } });
         showStatus('Done! The device is rebooting.', 'success');
+    }
+
+    const clearData = () => {
+        if (confirm('Are you sure you want to restore default configuration?')) {
+            send({ type: 'clear', content: { keepWifi: true } });
+            showStatus('Done! The device is rebooting.', 'success');
+        }
     }
 
     const handleFirmwareUpload = () => {
@@ -543,13 +573,13 @@ const App = () => {
                         <button onClick={() => setIsModalOpen(true)}>Configure</button>
                     </div>
 
-                    {/*<div className="setting-item">*/}
-                    {/*    <div className="setting-title">Miscellaneous</div>*/}
-                    {/*    <div className="setting-description">*/}
-                    {/*        Various useful actions.*/}
-                    {/*    </div>*/}
-                    {/*    <button onClick={() => void(0)}>Clear data</button>*/}
-                    {/*</div>*/}
+                    <div className="setting-item">
+                        <div className="setting-title">Clear data</div>
+                        <div className="setting-description">
+                            Restore factory default configuration, remove saved devices.
+                        </div>
+                        <button className="error" onClick={() => clearData()}>Clear</button>
+                    </div>
                 </div>
 
                 <div className="setting-group">
@@ -689,6 +719,20 @@ const App = () => {
                             />
                             <span className="range-value">{settings.mouse.sensitivity}%</span>
                         </div>
+                    </div>
+
+                    <div className="setting-item">
+                        <div className="setting-title">Long press threshold</div>
+                        <div className="setting-description">
+                            Time in milliseconds to trigger long press action.
+                        </div>
+                        <input
+                            type="number"
+                            min="100"
+                            max="5000"
+                            value={settings.buttons.longPressMs}
+                            onChange={(e) => updateSetting('buttons', 'longPressMs', parseInt(e.target.value))}
+                        />
                     </div>
 
                     <div className="setting-item">

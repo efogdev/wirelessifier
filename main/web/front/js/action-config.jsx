@@ -180,10 +180,11 @@ const HIDControlsConfigurator = ({ numKeys = 4, defaultValues, onConfigChange })
   ];
 
   const [ keyConfigs, setKeyConfigs ] = React.useState(defaultValues.keys);
+  const [ longPressConfigs, setLongPressConfigs ] = React.useState(defaultValues.longPress);
   const [ encoderConfig, setEncoderConfig ] = React.useState(defaultValues.encoder);
 
-  const handleKeyConfigChange = (index, field, value) => {
-    const newConfigs = [ ...keyConfigs ];
+  const handleKeyConfigChange = (index, field, value, isLongPress = false) => {
+    const newConfigs = isLongPress ? [ ...longPressConfigs ] : [ ...keyConfigs ];
     newConfigs[index][field] = value;
 
     if (field === "acType") {
@@ -195,12 +196,17 @@ const HIDControlsConfigurator = ({ numKeys = 4, defaultValues, onConfigChange })
       }
     }
 
-    setKeyConfigs(newConfigs);
-    onConfigChange?.({ keys: newConfigs, encoder: encoderConfig });
+    if (isLongPress) {
+      setLongPressConfigs(newConfigs);
+      onConfigChange?.({ keys: keyConfigs, longPress: newConfigs, encoder: encoderConfig });
+    } else {
+      setKeyConfigs(newConfigs);
+      onConfigChange?.({ keys: newConfigs, longPress: longPressConfigs, encoder: encoderConfig });
+    }
   };
 
-  const handleModifierToggle = (index, modifier) => {
-    const newConfigs = [ ...keyConfigs ];
+  const handleModifierToggle = (index, modifier, isLongPress = false) => {
+    const newConfigs = isLongPress ? [ ...longPressConfigs ] : [ ...keyConfigs ];
     const currentModifiers = [ ...newConfigs[index].mods ];
 
     if (currentModifiers.includes(modifier)) {
@@ -209,15 +215,26 @@ const HIDControlsConfigurator = ({ numKeys = 4, defaultValues, onConfigChange })
       newConfigs[index].mods = [ ...currentModifiers, modifier ];
     }
 
-    setKeyConfigs(newConfigs);
-    onConfigChange?.({ keys: newConfigs, encoder: encoderConfig });
+    if (isLongPress) {
+      setLongPressConfigs(newConfigs);
+      onConfigChange?.({ keys: keyConfigs, longPress: newConfigs, encoder: encoderConfig });
+    } else {
+      setKeyConfigs(newConfigs);
+      onConfigChange?.({ keys: newConfigs, longPress: longPressConfigs, encoder: encoderConfig });
+    }
   };
 
-  const handleComboKeyChange = (index, key) => {
-    const newConfigs = [ ...keyConfigs ];
+  const handleComboKeyChange = (index, key, isLongPress = false) => {
+    const newConfigs = isLongPress ? [ ...longPressConfigs ] : [ ...keyConfigs ];
     newConfigs[index].action = key;
-    setKeyConfigs(newConfigs);
-    onConfigChange?.({ keys: newConfigs, encoder: encoderConfig });
+    
+    if (isLongPress) {
+      setLongPressConfigs(newConfigs);
+      onConfigChange?.({ keys: keyConfigs, longPress: newConfigs, encoder: encoderConfig });
+    } else {
+      setKeyConfigs(newConfigs);
+      onConfigChange?.({ keys: newConfigs, longPress: longPressConfigs, encoder: encoderConfig });
+    }
   };
 
   const handleEncoderModeChange = (mode) => {
@@ -375,7 +392,7 @@ const HIDControlsConfigurator = ({ numKeys = 4, defaultValues, onConfigChange })
               <div className="setting-title secondary">Button #{idx + 1}</div>
 
               <div className="setting-item">
-                <div className="setting-title">Action Type</div>
+                <div className="setting-title">Click</div>
                 <select
                   value={config.acType}
                   onChange={(e) => handleKeyConfigChange(idx, "acType", e.target.value)}
@@ -416,12 +433,69 @@ const HIDControlsConfigurator = ({ numKeys = 4, defaultValues, onConfigChange })
                   </div>
                 ) : (
                   <div className="setting-item">
-                    <div className="setting-title">Action</div>
+                    <div className="setting-title">Key</div>
                     <select
                       value={config.action}
                       onChange={(e) => handleKeyConfigChange(idx, "action", e.target.value)}
                     >
                       {actionOptions[config.acType].map((action, actionIdx) => (
+                        <option key={`action-${actionIdx}`} value={action.key}>{action.value}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              <div className="separator" />
+
+              <div className="setting-item">
+                <div className="setting-title">Long Press</div>
+                <select
+                  value={longPressConfigs[idx].acType}
+                  onChange={(e) => handleKeyConfigChange(idx, "acType", e.target.value, true)}
+                >
+                  {acTypes.map((type) => (
+                    <option key={type.key} value={type.key}>{type.value}</option>
+                  ))}
+                </select>
+
+                {longPressConfigs[idx].acType === 'keyboard_combo' ? (
+                  <div className="setting-group">
+                    <div className="setting-item">
+                      <div className="setting-title">Modifiers</div>
+                      <div>
+                        {modifiers.map((modifier, modIdx) => (
+                          <button
+                            key={`mod-${modIdx}`}
+                            className={longPressConfigs[idx].mods.includes(modifier) ? "" : "success"}
+                            onClick={() => handleModifierToggle(idx, modifier, true)}
+                            type="button"
+                          >
+                            {modifier}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="setting-item">
+                      <div className="setting-title">Key</div>
+                      <select
+                        value={longPressConfigs[idx].action}
+                        onChange={(e) => handleKeyConfigChange(idx, "action", e.target.value, true)}
+                      >
+                        {keyboardKeys.map((key, keyIdx) => (
+                          <option key={`combo-key-${keyIdx}`} value={key.key}>{key.value}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="setting-item">
+                    <div className="setting-title">Key</div>
+                    <select
+                      value={longPressConfigs[idx].action}
+                      onChange={(e) => handleKeyConfigChange(idx, "action", e.target.value, true)}
+                    >
+                      {actionOptions[longPressConfigs[idx].acType].map((action, actionIdx) => (
                         <option key={`action-${actionIdx}`} value={action.key}>{action.value}</option>
                       ))}
                     </select>

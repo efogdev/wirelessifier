@@ -4,11 +4,11 @@
 
 // #define HW01
 #define HW02
-#define VERBOSE 1
+#define VERBOSE 0
 #define TASK_MON 0
 #define ADC_MULTISAMPLE 64
 #define DEVICE_NAME "Wirelessifier"
-#define FIRMWARE_VERSION "0.2.35"
+#define FIRMWARE_VERSION "0.2.55"
 #define MAIN_LOOP_DELAY_MS 35
 
 #ifdef HW01
