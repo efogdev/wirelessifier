@@ -1,4 +1,5 @@
 #include "ws_server.h"
+#include "http_server.h"
 #include <esp_log.h>
 #include "freertos/FreeRTOS.h"
 #include <cJSON.h>
@@ -123,7 +124,7 @@ static esp_err_t ws_handler(httpd_req_t *req) {
         if (sockfd != -1) {
             remove_failed_client(sockfd);
         }
-        
+        update_web_access_timestamp();
         return ESP_OK;
     }
 
@@ -163,6 +164,7 @@ static esp_err_t ws_handler(httpd_req_t *req) {
         }
         frame_buffer[ws_pkt.len] = '\0';
         
+        update_web_access_timestamp();
         process_settings_ws_message((const char *)frame_buffer);
         process_wifi_ws_message((const char *)frame_buffer);
 
@@ -252,7 +254,8 @@ esp_err_t init_device_settings(void) {
 
 static void process_settings_ws_message(const char* message) {
     if (!message) return;
-    
+    update_web_access_timestamp();
+
     cJSON *root = cJSON_Parse(message);
     if (!root) {
         ESP_LOGE(WS_TAG, "Error parsing JSON message");

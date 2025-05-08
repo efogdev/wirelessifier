@@ -3,10 +3,8 @@
 #include <esp_http_server.h>
 #include "freertos/event_groups.h"
 
-// Expose event group for WiFi events
 extern EventGroupHandle_t wifi_event_group;
 
-// Event bits
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT      BIT1
 
@@ -42,3 +40,11 @@ void stop_webserver(void);
  * The task remains running to keep the web server alive.
  */
 void init_web_services(void);
+
+/**
+ * @brief Update the last access timestamp
+ * 
+ * Updates the timestamp used to track the last HTTP or WebSocket access.
+ * This is used by the inactivity timer to determine when to shut down services.
+ */
+void update_web_access_timestamp(void);

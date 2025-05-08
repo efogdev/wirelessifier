@@ -80,6 +80,7 @@ void app_main(void) {
     if (!btn2) {
         // if SW2 held on boot, never sleep
         enable_no_sleep_mode();
+        ESP_LOGW(TAG, "No sleep mode activated.");
     }
 
     const esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();

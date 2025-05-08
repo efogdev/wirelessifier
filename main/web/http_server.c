@@ -17,6 +17,7 @@ static const char *HTTP_TAG = "HTTP";
 static httpd_handle_t server = NULL;
 static TaskHandle_t dns_task_handle = NULL;
 static TaskHandle_t web_services_task_handle = NULL;
+static TaskHandle_t inactivity_timer_handle = NULL;
 EventGroupHandle_t wifi_event_group;
 
 #define WIFI_SSID      "Wirelessifier"
@@ -25,9 +26,36 @@ EventGroupHandle_t wifi_event_group;
 
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT      BIT1
+#define INACTIVITY_TIMEOUT_MS (10 * 60 * 1000)
+
+static int64_t last_access_timestamp = 0;
+
+static void update_last_access(void) {
+    last_access_timestamp = esp_timer_get_time() / 1000; 
+}
+
+static void inactivity_timer_task(void *pvParameters) {
+    while (1) {
+        const int64_t current_time = esp_timer_get_time() / 1000;
+        if ((current_time - last_access_timestamp) > INACTIVITY_TIMEOUT_MS) {
+            if (VERBOSE) {
+                ESP_LOGI(HTTP_TAG, "Web server hadn't been accessed, shutting down web stack and WiFi…");
+            }
+
+            stop_webserver();
+            esp_wifi_stop();
+            esp_wifi_deinit();
+            vTaskDelete(NULL);
+            break;
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(30 * 1000)); 
+    }
+}
 
 static esp_err_t root_get_handler(httpd_req_t *req)
 {
+    update_last_access();
     extern const char web_front_index_html_gz_start[] asm("_binary_index_min_html_gz_start");
     extern const char web_front_index_html_gz_end[] asm("_binary_index_min_html_gz_end");
     const size_t index_html_size = (web_front_index_html_gz_end - web_front_index_html_gz_start);
@@ -40,6 +68,7 @@ static esp_err_t root_get_handler(httpd_req_t *req)
 
 static esp_err_t settings_get_handler(httpd_req_t *req)
 {
+    update_last_access();
     extern const char web_front_settings_html_gz_start[] asm("_binary_settings_min_html_gz_start");
     extern const char web_front_settings_html_gz_end[] asm("_binary_settings_min_html_gz_end");
     const size_t settings_html_size = (web_front_settings_html_gz_end - web_front_settings_html_gz_start);
@@ -52,6 +81,7 @@ static esp_err_t settings_get_handler(httpd_req_t *req)
 
 static esp_err_t lib_get_handler(httpd_req_t *req)
 {
+    update_last_access();
     httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
     const char *req_uri = req->uri;
     
@@ -104,6 +134,7 @@ static esp_err_t lib_get_handler(httpd_req_t *req)
 
 static esp_err_t not_found_handler(httpd_req_t *req)
 {
+    update_last_access();
     httpd_resp_set_status(req, "404 Not Found");
     httpd_resp_send(req, NULL, 0);
     return ESP_OK;
@@ -287,6 +318,9 @@ httpd_handle_t start_webserver(void)
         //     start_dns_server(&dns_task_handle);
         // }
 
+        update_last_access();
+        xTaskCreatePinnedToCore(inactivity_timer_task, "inactivity_timer", 2048, NULL, 1, &inactivity_timer_handle, 1);
+
         return server;
     }
 
@@ -312,6 +346,11 @@ void stop_webserver(void)
     if (dns_task_handle) {
         vTaskDelete(dns_task_handle);
         dns_task_handle = NULL;
+    }
+
+    if (inactivity_timer_handle) {
+        vTaskDelete(inactivity_timer_handle);
+        inactivity_timer_handle = NULL;
     }
 }
 
@@ -378,4 +417,8 @@ void init_web_services(void)
 
     wifi_event_group = xEventGroupCreate();
     xTaskCreatePinnedToCore(web_services_task, "web_services", 2800, NULL, 8, &web_services_task_handle, 1);
+}
+
+void update_web_access_timestamp(void) {
+    update_last_access();
 }
