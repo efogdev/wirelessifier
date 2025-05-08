@@ -42,6 +42,7 @@ static int s_deep_sleep_timeout_ms = 600 * 1000;
 static bool s_two_sleeps = true;
 static bool s_enable_sleep = true;
 static bool s_enable_deep_sleep = true;
+static bool s_never_sleep = false;
 
 static void enter_deep_sleep() {
     ESP_LOGI(TAG, "Going to deep sleep…");
@@ -50,6 +51,10 @@ static void enter_deep_sleep() {
     led_update_pattern(true, true, false); // all black, we good
     vTaskDelay(pdMS_TO_TICKS(5));
     deep_sleep();
+}
+
+void enable_no_sleep_mode() {
+    s_never_sleep = true;
 }
 
 static void inactivity_timer_callback(const TimerHandle_t xTimer) {
@@ -67,6 +72,15 @@ static void inactivity_timer_callback(const TimerHandle_t xTimer) {
     if (is_wifi_connected()) {
         if (VERBOSE) {
             ESP_LOGI(TAG, "Web stack is active, keeping BLE stack running");
+        }
+
+        xSemaphoreGive(s_ble_stack_mutex);
+        return;
+    }
+
+    if (s_never_sleep) {
+        if (VERBOSE) {
+            ESP_LOGI(TAG, "Not sleeping because of boot flag");
         }
 
         xSemaphoreGive(s_ble_stack_mutex);

@@ -74,6 +74,12 @@ void app_main(void) {
     rotary_enc_subscribe_long_press(rot_long_press_cb);
     xTaskCreatePinnedToCore(vmon_task, "vmon", 2048, NULL, 5, NULL, 1);
 
+    const uint8_t btn2 = gpio_get_level(GPIO_BUTTON_SW2);
+    if (!btn2) {
+        // if SW2 held on boot, never sleep
+        enable_no_sleep_mode();
+    }
+
     const esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
     if (cause != ESP_SLEEP_WAKEUP_UNDEFINED) {
         ESP_LOGW(TAG, "Woke up, reason=0x%02X, last reading: 0x%04X (%d)", cause, ulp_last_result, ulp_last_result);
@@ -83,8 +89,8 @@ void app_main(void) {
 
         ulp_last_result = 0;
     } else {
-        const uint8_t btn2 = gpio_get_level(GPIO_BUTTON_SW3);
-        if (!btn2) {
+        const uint8_t btn3 = gpio_get_level(GPIO_BUTTON_SW3);
+        if (!btn3) {
             // if SW3 held on boot, never switch to wired HID until restart
             enable_no_wire_mode();
         }

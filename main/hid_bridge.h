@@ -345,6 +345,8 @@ void hid_bridge_process_report(const usb_hid_report_t *report);
  */
 bool hid_bridge_is_ble_paused(void);
 
+void enable_no_sleep_mode(void);
+
 #ifdef __cplusplus
 }
 #endif
