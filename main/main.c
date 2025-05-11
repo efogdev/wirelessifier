@@ -30,8 +30,8 @@
 #include "utils/storage.h"
 #include "utils/rotary_enc.h"
 #include "web/http_server.h"
-#include "ulp_bat.h"
-#include "ulp/ulp_bat.h"
+// #include "ulp_bat.h"
+// #include "ulp/ulp_bat.h"
 #include "esp_sleep.h"
 #include "wifi_manager.h"
 
@@ -67,6 +67,8 @@ void app_main(void) {
     init_gpio();
 
     adc_init();
+    xTaskCreatePinnedToCore(vmon_task, "vmon", 2048, NULL, 5, NULL, 1);
+
     rotary_enc_init();
     buttons_init();
     led_control_init(NUM_LEDS, GPIO_WS2812B_PIN);
@@ -74,28 +76,26 @@ void app_main(void) {
     run_hid_bridge();
 
     rotary_enc_subscribe_long_press(rot_long_press_cb);
-    xTaskCreatePinnedToCore(vmon_task, "vmon", 2048, NULL, 5, NULL, 1);
 
     const uint8_t btn2 = gpio_get_level(GPIO_BUTTON_SW2);
     if (!btn2) {
         // if SW2 held on boot, never sleep
         enable_no_sleep_mode();
-        ESP_LOGW(TAG, "No sleep mode activated.");
+        ESP_LOGW(TAG, "No sleep mode activated until next reboot.");
     }
 
     const esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
     if (cause != ESP_SLEEP_WAKEUP_UNDEFINED) {
-        ESP_LOGW(TAG, "Woke up, reason=0x%02X, last reading: 0x%04X (%d)", cause, ulp_last_result, ulp_last_result);
+        ESP_LOGW(TAG, "Woke up, reason=0x%02X", cause);
         if (cause == ESP_SLEEP_WAKEUP_EXT1) {
             log_bits(esp_sleep_get_ext1_wakeup_status(), 4);
         }
-
-        ulp_last_result = 0;
     } else {
         const uint8_t btn3 = gpio_get_level(GPIO_BUTTON_SW3);
         if (!btn3) {
             // if SW3 held on boot, never switch to wired HID until restart
             enable_no_wire_mode();
+            ESP_LOGW(TAG, "No wire mode activated, USB only for charging util next reboot.");
         }
 
         init_web_stack();
@@ -268,7 +268,7 @@ static void init_gpio(void) {
         .mode = GPIO_MODE_INPUT,
         .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_ANYEDGE
+        .intr_type = GPIO_INTR_DISABLE
     };
     gpio_config(&input_nopull_conf);
 
@@ -277,7 +277,7 @@ static void init_gpio(void) {
         .mode = GPIO_MODE_INPUT,
         .pull_up_en = GPIO_PULLUP_ENABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_ANYEDGE
+        .intr_type = GPIO_INTR_DISABLE
     };
     gpio_config(&rot_conf);
 
@@ -334,15 +334,16 @@ static void rot_long_press_cb(void) {
     rotary_enc_deinit();
     rgb_enter_flash_mode();
 
-    // hold both BTN1 and BTN2 to enter flash mode, otherwise just restart
+    // hold all 4 buttons to enter flash mode, otherwise just restart
     const uint8_t btn1 = gpio_get_level(GPIO_BUTTON_SW1);
     const uint8_t btn2 = gpio_get_level(GPIO_BUTTON_SW2);
-    if (btn1 == 0 && btn2 == 0) {
+    const uint8_t btn3 = gpio_get_level(GPIO_BUTTON_SW3);
+    const uint8_t btn4 = gpio_get_level(GPIO_BUTTON_SW4);
+    if (btn1 == 0 && btn2 == 0 && btn3 == 0 && btn4 == 0) {
         REG_WRITE(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
     }
 
-    // hold BTN4 to restart with WiFi
-    const uint8_t btn4 = gpio_get_level(GPIO_BUTTON_SW4);
+    // hold BTN4 to restart with WiFi;
     if (btn4 == 0) {
         storage_set_boot_with_wifi();
     } else {

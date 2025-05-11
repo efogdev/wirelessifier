@@ -123,18 +123,17 @@ static esp_err_t handle_ota_upload(httpd_req_t *req) {
         nvs_close(nvs_handle2);
     }
 
-    vTaskDelay(pdMS_TO_TICKS(500));
+    // ToDo remove?
+    vTaskDelay(pdMS_TO_TICKS(5000));
     esp_restart();
     return ESP_OK;
 }
 
 static esp_err_t ota_upload_handler(httpd_req_t *req) {
     const esp_err_t err = handle_ota_upload(req);
-    if (err != ESP_OK) {
-        char response[BUFFSIZE];
-        sprintf(response, "OTA update failed: %s", esp_err_to_name(err));
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, response);
-    }
+    char response[BUFFSIZE];
+    sprintf(response, "OTA update failed: %s", esp_err_to_name(err));
+    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, response);
     return err;
 }
 

@@ -121,16 +121,8 @@ static void update_tx_power(void) {
 }
 
 static void battery_timer_callback(TimerHandle_t timer) {
-    if (!s_connected) {
-        return;
-    }
-
+    const float voltage = get_battery_level();
     uint8_t level = 0;
-    float voltage = get_battery_level();
-    const bool chg = is_charging();
-    if (chg) {
-        voltage += .2f;
-    }
 
     // LiPo battery discharge curve using piecewise linear interpolation
     // Based on the provided voltage-percentage table
@@ -175,10 +167,19 @@ static void battery_timer_callback(TimerHandle_t timer) {
     }
 
     battery_lev = level;
+
+    if (VERBOSE) {
+        ESP_LOGI(TAG, "Battery level = %d%%", level);
+    }
+
     esp_ble_gatts_set_attr_value(
         hidd_le_env.hidd_inst.att_tbl[BAS_IDX_BATT_LVL_VAL],
         sizeof(uint8_t),
         &battery_lev);
+
+    if (!s_connected) {
+        return;
+    }
 
     // Check if notifications are enabled for this characteristic
     uint16_t length = 0;
@@ -197,10 +198,6 @@ static void battery_timer_callback(TimerHandle_t timer) {
             sizeof(uint8_t),
             &battery_lev,
             false);  // false for notification, true for indication
-    }
-
-    if (VERBOSE) {
-        ESP_LOGI(TAG, "Battery level = %d%%", level);
     }
 }
 
@@ -350,6 +347,8 @@ static TickType_t acc_window = pdMS_TO_TICKS(8);
 
 esp_err_t ble_hid_device_init() {
     g_enabled = true;
+    battery_timer_callback(NULL);
+
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());

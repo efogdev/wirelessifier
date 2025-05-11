@@ -18,4 +18,3 @@ bool is_charging(void);
 void enable_no_wire_mode();
 battery_state_t get_battery_state(void);
 float get_battery_level(void);
-void set_fast_charging_from_settings();

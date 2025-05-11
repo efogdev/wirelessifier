@@ -2,7 +2,7 @@
 #include <adc.h>
 #include <const.h>
 #include "ulp_adc.h"
-#include "ulp_bat.h"
+// #include "ulp_bat.h"
 #include "ulp/ulp_bat.h"
 #include <esp_err.h>
 #include <esp_sleep.h>

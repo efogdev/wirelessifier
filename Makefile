@@ -10,7 +10,7 @@ build:
 	cd main/web/front && bun run build
 	cd main/web/front/lib && mkdir -p gz && ls | grep -v / | xargs -I {} sh -c 'cat {} | gzip > gz/{}.gz'
 	idf.py build
-	cp build/esp-idf/main/ulp_bat/ulp_bat.h main/ulp
+	@cp build/esp-idf/main/ulp_bat/ulp_bat.h main/ulp
 
 .PHONY: bump
 bump:

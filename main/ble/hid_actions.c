@@ -3,10 +3,9 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include <string.h>
-
 #include "const.h"
 
-static const char *TAG = "HID_ACTIONS";
+#define CACHE_SIZE 12
 
 typedef struct {
     char action_type[20];
@@ -34,7 +33,7 @@ typedef struct {
     esp_timer_handle_t timer;
 } release_timer_t;
 
-#define CACHE_SIZE 10
+static const char *TAG = "HID_ACTIONS";
 static cache_entry_t cache[CACHE_SIZE];
 static int cache_count = 0;
 
@@ -63,7 +62,7 @@ static void release_timer_callback(void* arg) {
             esp_hidd_send_consumer_value(timer_data->conn_id, 0);
             break;
     }
-    
+
     esp_timer_delete(timer_data->timer);
     free(timer_data);
 }
@@ -86,7 +85,7 @@ static void schedule_release(const uint16_t conn_id, const uint8_t type, const v
         free(timer_data);
         return;
     }
-    esp_timer_start_once(timer_data->timer, 50000); // 50ms in microseconds
+    esp_timer_start_once(timer_data->timer, 7000); // 50ms in microseconds
 }
 
 void execute_keyboard_action(const uint16_t conn_id, const keyboard_key_t key, const uint8_t modifiers) {
@@ -155,7 +154,7 @@ void execute_special_action(const uint16_t conn_id, const special_key_t action) 
             state.wheel_horizontal = !state.wheel_horizontal;
 
             if (VERBOSE) {
-                ESP_LOGI(TAG, "Wheel axis switched to %s", state.wheel_horizontal ? "horizontal" : "vertical");
+                ESP_LOGI(TAG, "Scrolling axis switched to %s", state.wheel_horizontal ? "horizontal" : "vertical");
             }
 
             break;

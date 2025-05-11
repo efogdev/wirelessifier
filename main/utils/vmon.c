@@ -11,9 +11,18 @@
 #include "freertos/timers.h"
 
 #define SLOW_PHASE_DURATION_MAX (45 * 60 * 1000)
+#define SLOW_PHASE_ENTRY_DELAY (2 * 1000)
+
+#define VIN_THRESHOLD          4.2f    // Voltage threshold for PSU connection
+#define BAT_SLOW_PHASE_THRESH  4.16f   // Battery voltage threshold for slow charging phase
+#define BAT_DEAD_THRESH        3.3f    // Dead battery threshold
+#define BAT_NORMAL_THRESH      3.72f   // Normal battery state threshold
+#define BAT_WARNING_THRESH     3.64f   // Warning battery state threshold
+#define ADC_CORRECTION_COEF    1.025f  // ADC correction coefficient
 
 static const char *TAG = "VMON";
 static TimerHandle_t slow_phase_timer = NULL;
+static TimerHandle_t slow_phase_entry_timer = NULL;
 static bool s_psu_connected = false;
 static bool s_charging = false;
 static bool s_never_wired = false;
@@ -23,13 +32,36 @@ static bool s_charging_finished = false;
 
 // ToDo remove this and impement proper termination
 static void slow_phase_timer_cb(TimerHandle_t xTimer) {
-    if (!s_charging_finished && s_slow_phase && s_psu_connected && s_charging && bat_volts >= 4.1f) {
-        if (VERBOSE) {
-            ESP_LOGI(TAG, "Terminating charging…");
-        }
-
+    if (!s_charging_finished && s_slow_phase && s_psu_connected && s_charging && bat_volts >= BAT_SLOW_PHASE_THRESH) {
+        ESP_LOGW(TAG, "Timeout reached, terminating charging…");
         s_charging_finished = true;
         gpio_set_level(GPIO_BAT_CE, 1);
+    }
+}
+
+static void slow_phase_entry_timer_cb(TimerHandle_t xTimer) {
+    if (s_charging && !s_slow_phase && bat_volts >= BAT_SLOW_PHASE_THRESH) {
+        if (VERBOSE) {
+            ESP_LOGI(TAG, "Vbat ≥ %.2fV, going into slow charging phase…", BAT_SLOW_PHASE_THRESH);
+        }
+
+        if (!slow_phase_timer) {
+            slow_phase_timer = xTimerCreate("slow_phase_timer", pdMS_TO_TICKS(SLOW_PHASE_DURATION_MAX), pdFALSE, NULL, slow_phase_timer_cb);
+            xTimerStart(slow_phase_timer, 0);
+        }
+
+        // isn't really "slow", just a workaround
+        // because of charging IC specifics (Iterm = Iset/10)
+        s_slow_phase = true;
+        gpio_set_level(GPIO_BAT_CE, 1);
+        gpio_set_level(GPIO_BAT_ISET1, 1);
+        gpio_set_level(GPIO_BAT_ISET2, 0);
+        gpio_set_level(GPIO_BAT_ISET3, 0);
+        gpio_set_level(GPIO_BAT_ISET4, 1);
+        gpio_set_level(GPIO_BAT_ISET5, 0);
+        gpio_set_level(GPIO_BAT_ISET6, 0);
+        vTaskDelay(pdMS_TO_TICKS(10));
+        gpio_set_level(GPIO_BAT_CE, 0);
     }
 }
 
@@ -37,7 +69,7 @@ void enable_no_wire_mode() {
     s_never_wired = true;
 }
 
-void set_fast_charging_from_settings() {
+static void start_charging() {
     gpio_set_level(GPIO_BAT_CE, 1);
 
     static bool fast_charge;
@@ -80,14 +112,16 @@ void vmon_task(void *pvParameters) {
 
     uint16_t i = 0;
     while (1) {
-        bat_volts = (float)adc_read_channel(ADC_CHAN_BAT) * 2 / 1000;
-        const float vin_volts = (float)adc_read_channel(ADC_CHAN_VIN) * 2 / 1000;
+        // I'm still unsure why ADC readings are incorrect and a magic coef is required
+        // but the offset seems pretty stable across different PCBs and batteries
+        bat_volts = ((float)adc_read_channel(ADC_CHAN_BAT) * 2) / 1000 * ADC_CORRECTION_COEF;
+        const float vin_volts = ((float)adc_read_channel(ADC_CHAN_VIN) * 2) / 1000 * ADC_CORRECTION_COEF;
 
-        if (VERBOSE && ++i % 20 == 0) {
-            ESP_LOGI(TAG, "BAT: %.2fV, VIN: %.2fV", bat_volts, vin_volts, ulp_last_result);
+        if (VERBOSE && ++i % 10 == 0) {
+            ESP_LOGI(TAG, "BAT: %.3fV, Vin: %.3fV", bat_volts, vin_volts);
         }
 
-        if (bat_volts < 3.3f && vin_volts < 4.2f) {
+        if (bat_volts < BAT_DEAD_THRESH && vin_volts < VIN_THRESHOLD) {
             if (VERBOSE) {
                 ESP_LOGI(TAG, "Battery is dead. So am I…");
             }
@@ -98,23 +132,33 @@ void vmon_task(void *pvParameters) {
             deep_sleep();
         }
 
-        if (vin_volts > 4.2f && !s_psu_connected) {
+        if (vin_volts > VIN_THRESHOLD && !s_psu_connected) {
             s_psu_connected = true;
             s_charging_finished = false;
             s_slow_phase = false;
 
-            set_fast_charging_from_settings();
+            start_charging();
             if (!s_never_wired) {
                 gpio_set_level(GPIO_MUX_SEL, GPIO_MUX_SEL_PC);
+            } else {
+                gpio_set_level(GPIO_MUX_SEL, GPIO_MUX_SEL_MC);
             }
-        } else if (vin_volts < 4.2f && s_psu_connected) {
+        } else if (vin_volts < VIN_THRESHOLD && s_psu_connected) {
             s_psu_connected = false;
             s_charging_finished = false;
             s_slow_phase = false;
 
-            xTimerStop(slow_phase_timer, 0);
-            xTimerDelete(slow_phase_timer, 0);
-            slow_phase_timer = NULL;
+            if (slow_phase_timer) {
+                xTimerStop(slow_phase_timer, 0);
+                xTimerDelete(slow_phase_timer, 0);
+                slow_phase_timer = NULL;
+            }
+
+            if (slow_phase_entry_timer) {
+                xTimerStop(slow_phase_entry_timer, 0);
+                xTimerDelete(slow_phase_entry_timer, 0);
+                slow_phase_entry_timer = NULL;
+            }
 
             gpio_set_level(GPIO_BAT_CE, 1);
             gpio_set_level(GPIO_MUX_SEL, GPIO_MUX_SEL_MC);
@@ -135,31 +179,18 @@ void vmon_task(void *pvParameters) {
             continue;
         }
 
-        if (s_charging && !s_slow_phase && bat_volts >= 4.08f && (!disable_slow_phase || !fast_charge)) {
-            if (VERBOSE) {
-                ESP_LOGI(TAG, "Vbat_reg is now 4.08V, going into slow charging phase…");
+        if (s_charging && !s_slow_phase && bat_volts >= BAT_SLOW_PHASE_THRESH && (!disable_slow_phase || !fast_charge)) {
+            if (!slow_phase_entry_timer) {
+                slow_phase_entry_timer = xTimerCreate("slow_phase_entry_timer", pdMS_TO_TICKS(SLOW_PHASE_ENTRY_DELAY), pdFALSE, NULL, slow_phase_entry_timer_cb);
+                xTimerStart(slow_phase_entry_timer, 0);
             }
-
-            if (!slow_phase_timer) {
-                slow_phase_timer = xTimerCreate("slow_phase_timer", pdMS_TO_TICKS(SLOW_PHASE_DURATION_MAX), pdFALSE, NULL, slow_phase_timer_cb);
-                xTimerStart(slow_phase_timer, 0);
-            }
-
-            // isn't really "slow", just a workaround
-            // because of charging IC specifics (Iset/Iterm)
-            s_slow_phase = true;
-            gpio_set_level(GPIO_BAT_CE, 1);
-            gpio_set_level(GPIO_BAT_ISET1, 0);
-            gpio_set_level(GPIO_BAT_ISET2, 0);
-            gpio_set_level(GPIO_BAT_ISET3, 1);
-            gpio_set_level(GPIO_BAT_ISET4, 0);
-            gpio_set_level(GPIO_BAT_ISET5, 0);
-            gpio_set_level(GPIO_BAT_ISET6, 0);
-            vTaskDelay(pdMS_TO_TICKS(10));
-            gpio_set_level(GPIO_BAT_CE, 0);
+        } else if (bat_volts < BAT_SLOW_PHASE_THRESH && slow_phase_entry_timer) {
+            xTimerStop(slow_phase_entry_timer, 0);
+            xTimerDelete(slow_phase_entry_timer, 0);
+            slow_phase_entry_timer = NULL;
         }
         
-        vTaskDelay(pdMS_TO_TICKS(128));
+        vTaskDelay(pdMS_TO_TICKS(i == 1 ? 1 : 128));
     }
 }
 
@@ -194,9 +225,9 @@ IRAM_ATTR battery_state_t get_battery_state(void) {
 
     if (is_charging()) {
         new_state = BATTERY_CHARGING;
-    } else if (level > 3.70f || is_psu_connected()) {
+    } else if (level > BAT_NORMAL_THRESH || is_psu_connected()) {
         new_state = BATTERY_NORMAL;
-    } else if (level > 3.64f) {
+    } else if (level > BAT_WARNING_THRESH) {
         new_state = BATTERY_WARNING;
     } else {
         new_state = BATTERY_LOW;

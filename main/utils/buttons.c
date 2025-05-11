@@ -76,6 +76,8 @@ static void buttons_task(void* arg) {
             }
         }
 
+        // polling, not interrupts
+        // because of bad PCB design (no hardware debounce)
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }

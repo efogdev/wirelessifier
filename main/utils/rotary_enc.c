@@ -156,8 +156,7 @@ static void rotary_enc_task(void* arg) {
             }
         }
 
-        // Check for long press only while button is held
-        if (is_pressed && !long_press_detected && 
+        if (is_pressed && !long_press_detected &&
             (current_time - press_start_time) >= s_long_press_threshold) {
             long_press_detected = true;
             if (user_long_press_callback) {

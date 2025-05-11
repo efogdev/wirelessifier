@@ -11,7 +11,7 @@
 #include "esp_ota_ops.h"
 #include "ota_server.h"
 
-#define MAX_CACHE_SIZE 6
+#define MAX_CACHE_SIZE 16
 #define MAX_PATH_LENGTH 32
 
 typedef enum {
@@ -91,19 +91,19 @@ static const char *default_settings = "{"
         "\"keys\":["
             "{"
                 "\"acType\":\"keyboard_key\","
-                "\"action\":\"KC_PAGE_UP\""
-            "},"
-            "{"
-                "\"acType\":\"keyboard_key\","
                 "\"action\":\"KC_HOME\""
             "},"
             "{"
                 "\"acType\":\"keyboard_key\","
-                "\"action\":\"KC_END\""
+                "\"action\":\"KC_PAGE_UP\""
             "},"
             "{"
                 "\"acType\":\"keyboard_key\","
                 "\"action\":\"KC_PAGE_DOWN\""
+            "},"
+            "{"
+                "\"acType\":\"keyboard_key\","
+                "\"action\":\"KC_END\""
             "}"
         "],"
         "\"longPress\":["

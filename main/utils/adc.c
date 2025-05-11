@@ -22,16 +22,13 @@ static bool adc_calibration_init(const adc_unit_t unit, const adc_channel_t chan
     esp_err_t ret = ESP_FAIL;
     bool calibrated = false;
 
-    if (VERBOSE) {
-        ESP_LOGI(TAG, "Calibration scheme version is %s", "Curve Fitting");
-    }
-
     const adc_cali_curve_fitting_config_t cali_config = {
         .unit_id = unit,
         .chan = channel,
         .atten = atten,
-        .bitwidth = ADC_BITWIDTH_DEFAULT,
+        .bitwidth = ADC_BITWIDTH_12,
     };
+
     ret = adc_cali_create_scheme_curve_fitting(&cali_config, &handle);
     if (ret == ESP_OK) {
         calibrated = true;
@@ -40,7 +37,7 @@ static bool adc_calibration_init(const adc_unit_t unit, const adc_channel_t chan
     *out_handle = handle;
     if (ret == ESP_OK) {
         if (VERBOSE) {
-            ESP_LOGI(TAG, "Calibration Success");
+            ESP_LOGI(TAG, "Calibration success");
         }
     } else if (ret == ESP_ERR_NOT_SUPPORTED || !calibrated) {
         ESP_LOGW(TAG, "eFuse not burnt, skip software calibration");
@@ -104,7 +101,9 @@ uint32_t adc_read_channel(const adc_channel_t chan)
             return 0;
         }
         adc_sum += adc_raw;
-        vTaskDelay(1);
+        if (i % 8 == 0) {
+            vTaskDelay(1);
+        }
     }
     adc_raw = adc_sum / ADC_MULTISAMPLE;
 
@@ -112,16 +111,16 @@ uint32_t adc_read_channel(const adc_channel_t chan)
         const esp_err_t ret = adc_cali_raw_to_voltage(adc1_cali_bat_handle, adc_raw, &voltage);
         if (ret != ESP_OK) {
             ESP_LOGE(TAG, "ADC1 BAT calibration failed: %s", esp_err_to_name(ret));
-            return (adc_raw * 3300) / 4095;
+            return (adc_raw * 3100) / 4095;
         }
-    } else if (do_calibration_bat && chan == ADC_CHAN_VIN) {
+    } else if (do_calibration_vin && chan == ADC_CHAN_VIN) {
         const esp_err_t ret = adc_cali_raw_to_voltage(adc1_cali_vin_handle, adc_raw, &voltage);
         if (ret != ESP_OK) {
             ESP_LOGE(TAG, "ADC1 VIN calibration failed: %s", esp_err_to_name(ret));
             return (adc_raw * 3300) / 4095;
         }
     } else {
-        voltage = (adc_raw * 3300) / 4095;
+        voltage = (adc_raw * 3100) / 4095;
     }
 
     return (uint32_t) voltage;

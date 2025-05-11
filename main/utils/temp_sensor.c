@@ -13,7 +13,7 @@ esp_err_t temp_sensor_init(void)
         return ESP_OK;
     }
 
-    const temperature_sensor_config_t temp_sensor_config = TEMPERATURE_SENSOR_CONFIG_DEFAULT(10, 50);
+    const temperature_sensor_config_t temp_sensor_config = TEMPERATURE_SENSOR_CONFIG_DEFAULT(0, 55);
     esp_err_t ret = temperature_sensor_install(&temp_sensor_config, &temp_sensor);
     if (ret != ESP_OK) {
         ESP_LOGW(TAG, "Failed to install temperature sensor: %s", esp_err_to_name(ret));

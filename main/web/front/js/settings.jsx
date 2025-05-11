@@ -155,7 +155,7 @@ const App = () => {
             sensitivity: 100,
         },
         buttons: {
-            longPressMs: 1500,
+            longPressMs: 750,
             keys: [
                 {
                     "acType": "keyboard_key",
@@ -353,7 +353,9 @@ const App = () => {
     }, [minp, scale, min]);
 
     const onConfigChange = (config) => {
-        updateSetting('buttons', '', config);
+        updateSetting('buttons', 'keys', config.keys);
+        updateSetting('buttons', 'longPress', config.longPress);
+        updateSetting('buttons', 'encoder', config.encoder);
     }
 
     const handleOtaConfirm = () => {
@@ -730,7 +732,7 @@ const App = () => {
                             type="number"
                             min="100"
                             max="5000"
-                            value={settings.buttons.longPressMs}
+                            value={settings.buttons?.longPressMs || 750}
                             onChange={(e) => updateSetting('buttons', 'longPressMs', parseInt(e.target.value))}
                         />
                     </div>
