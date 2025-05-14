@@ -65,17 +65,7 @@ void app_main(void) {
     init_global_settings();
     init_pm();
     init_gpio();
-
     adc_init();
-    xTaskCreatePinnedToCore(vmon_task, "vmon", 2048, NULL, 5, NULL, 1);
-
-    rotary_enc_init();
-    buttons_init();
-    led_control_init(NUM_LEDS, GPIO_WS2812B_PIN);
-    descriptor_parser_init();
-    run_hid_bridge();
-
-    rotary_enc_subscribe_long_press(rot_long_press_cb);
 
     const uint8_t btn2 = gpio_get_level(GPIO_BUTTON_SW2);
     if (!btn2) {
@@ -100,6 +90,14 @@ void app_main(void) {
 
         init_web_stack();
     }
+
+    xTaskCreatePinnedToCore(vmon_task, "vmon", 2048, NULL, 5, NULL, 1);
+    rotary_enc_init();
+    buttons_init();
+    led_control_init(NUM_LEDS, GPIO_WS2812B_PIN);
+    descriptor_parser_init();
+    run_hid_bridge();
+    rotary_enc_subscribe_long_press(rot_long_press_cb);
 
     static uint32_t sleep_counter = 0;
     const uint32_t sleep_threshold = (3 * 60 * 1000) / MAIN_LOOP_DELAY_MS; // 3 minutes
@@ -210,10 +208,11 @@ static void init_gpio(void) {
     rtc_gpio_hold_dis(GPIO_BUTTON_SW4);
 
     gpio_deep_sleep_hold_dis();
-    esp_deep_sleep_disable_rom_logging();
     // esp_sleep_enable_ulp_wakeup();
+    esp_deep_sleep_disable_rom_logging();
     esp_sleep_enable_ext0_wakeup(GPIO_ADC_VIN, 1);
     esp_sleep_enable_ext1_wakeup_io(
+        (1ULL<<GPIO_ROT_B)      |
         (1ULL<<GPIO_BUTTON_SW1) |
         (1ULL<<GPIO_BUTTON_SW2) |
         (1ULL<<GPIO_BUTTON_SW3) |

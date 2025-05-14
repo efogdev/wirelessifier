@@ -122,54 +122,16 @@ static void update_tx_power(void) {
 
 static void battery_timer_callback(TimerHandle_t timer) {
     const float voltage = get_battery_level();
-    uint8_t level = 0;
-
-    // LiPo battery discharge curve using piecewise linear interpolation
-    // Based on the provided voltage-percentage table
-    if (voltage >= 4.20f) {
-        level = 100;
-    } else if (voltage <= 3.27f) {
-        level = 0;
+    if (voltage >= 4.15f) {
+        battery_lev = 100;
+    } else if (voltage <= 3.3f) {
+        battery_lev = 0;
     } else {
-        const float voltage_levels[] = {
-            4.20f, 4.15f, 4.11f, 4.08f, 4.02f, 3.98f, 3.95f, 3.91f, 3.87f, 3.85f,
-            3.84f, 3.82f, 3.80f, 3.79f, 3.77f, 3.75f, 3.73f, 3.71f, 3.69f, 3.61f, 3.27f
-        };
-
-        const uint8_t percentage_levels[] = {
-            100, 95, 90, 85, 80, 75, 70, 65, 60, 55,
-            50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 0
-        };
-
-        const int num_levels = sizeof(voltage_levels) / sizeof(voltage_levels[0]);
-
-        int i;
-        for (i = 0; i < num_levels - 1; i++) {
-            if (voltage <= voltage_levels[i] && voltage >= voltage_levels[i+1]) {
-                // Linear interpolation formula
-                level = percentage_levels[i] +
-                    (uint8_t)((voltage - voltage_levels[i]) *
-                    (float)(percentage_levels[i+1] - percentage_levels[i]) /
-                    (voltage_levels[i+1] - voltage_levels[i]));
-                break;
-            }
-        }
-
-        if (i == num_levels - 1) {
-            if (voltage > 4.20f) {
-                level = 100;
-            } else if (voltage < 3.27f) {
-                level = 0;
-            } else {
-                level = 50;
-            }
-        }
+        battery_lev = (uint8_t)((voltage - 3.3f) * (100.0f / (4.15f - 3.3f)));
     }
 
-    battery_lev = level;
-
     if (VERBOSE) {
-        ESP_LOGI(TAG, "Battery level = %d%%", level);
+        ESP_LOGI(TAG, "Battery level = %d%%", battery_lev);
     }
 
     esp_ble_gatts_set_attr_value(

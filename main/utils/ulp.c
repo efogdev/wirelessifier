@@ -33,5 +33,9 @@ void IRAM_ATTR deep_sleep(void) {
     // ulp_adc_init(&cfg);
     // ulp_run(&ulp_entry - RTC_SLOW_MEM);
     // ulp_timer_resume();
+
+    rotary_enc_deinit();
+    rtc_gpio_pullup_en(GPIO_ROT_B);
+    rtc_gpio_pulldown_en(GPIO_ROT_A);
     esp_deep_sleep_start();
 }

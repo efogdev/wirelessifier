@@ -69,7 +69,7 @@ esp_err_t adc_init(void)
         .atten = ADC_ATTEN_DB_12,
         .bitwidth = ADC_BITWIDTH_12,
     };
-    
+
     ret = adc_oneshot_config_channel(adc1_handle, ADC_CHAN_BAT, &config);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "ADC1 channel BAT config failed: %s", esp_err_to_name(ret));

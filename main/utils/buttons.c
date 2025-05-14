@@ -36,7 +36,7 @@ static void buttons_task(void* arg) {
     bool is_pressed[4] = {false};
     bool long_press_detected[4] = {false};
     bool last_state[4] = {true};  
-
+    
     while (1) {
         const uint32_t current_time = pdTICKS_TO_MS(xTaskGetTickCount());
         for (uint8_t i = 0; i < 4; i++) {
