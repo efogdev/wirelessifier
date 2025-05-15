@@ -268,7 +268,11 @@ const HIDControlsConfigurator = ({ onClose, defaultValues, onConfigChange }) => 
       .flat()
       .find(option => option.key === event.target.value);
 
-    const newConfig = { ...encoderConfig, [action]: selectedOption.key };
+    if (!selectedOption) {
+      return;
+    }
+
+    const newConfig = { ...encoderConfig, [action]: event.target.value };
     setEncoderConfig(newConfig);
     onConfigChange?.({ keys: keyConfigs, encoder: newConfig });
   };

@@ -117,15 +117,15 @@ const useWebSocket = (onMessage) => {
     return { connected, loading, error, send };
 };
 
-const ConfirmModal = ({ isOpen, onClose, title, message, onYes, onNo, showCancel = false }) => {
+const ConfirmModal = ({ isOpen, onClose, title, message, onYes, onNo, showCancel = false, yesClassName, noClassName }) => {
     return (
         <Modal isOpen={isOpen} onClose={onClose} className="confirm-modal">
             <h3>{title}</h3>
             <p>{message}</p>
             <div className="confirm-buttons">
-                <button onClick={() => { onYes(); onClose(); }}>Yes</button>
-                <button onClick={() => { onNo(); onClose(); }}>No</button>
-                {showCancel && <button onClick={onClose}>Cancel</button>}
+                <button className={yesClassName} onClick={() => { onYes(); onClose(); }}>Yes</button>
+                <button className={noClassName} onClick={() => { onNo(); onClose(); }}>No</button>
+                {showCancel && <button className="neutral" onClick={onClose}>Cancel</button>}
             </div>
         </Modal>
     );
@@ -331,6 +331,8 @@ const App = () => {
                 title: 'Save Settings',
                 message: 'Do you want to keep WiFi and web stack on after reboot?',
                 showCancel: true,
+                yesClassName: 'neutral',
+                noClassName: 'success',
                 onYes: () => {
                     if (send({
                         type: 'command',
@@ -405,8 +407,10 @@ const App = () => {
         setConfirmModal({
             isOpen: true,
             config: {
-                title: 'Clear Data',
+                title: 'Clear data',
                 message: 'Are you sure you want to restore default configuration?',
+                yesClassName: 'error',
+                noClassName: 'neutral',
                 onYes: () => {
                     send({ type: 'clear', content: { keepWifi: true } });
                     showStatus('Done! The device is rebooting.', 'success');
@@ -495,7 +499,7 @@ const App = () => {
                         <button className="save-button" onClick={saveSettings} disabled={!connected || otaInProgress || (initialSettingsRef.current && JSON.stringify(settings) === initialSettingsRef.current)}>
                             Save and restart
                         </button>
-                        <button className="return-button" onClick={() => window.location.href = '/'} disabled={otaInProgress}>
+                        <button className="return-button neutral" onClick={() => window.location.href = '/'} disabled={otaInProgress}>
                             Return
                         </button>
                     </div>
