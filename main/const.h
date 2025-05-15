@@ -10,7 +10,7 @@
 #define TASK_MON 0
 #define ADC_MULTISAMPLE 32
 #define DEVICE_NAME "Wirelessifier"
-#define FIRMWARE_VERSION "0.2.128"
+#define FIRMWARE_VERSION "0.2.130"
 
 #ifdef HW01
 #define HARDWARE_VERSION "rev. 01"
@@ -29,8 +29,8 @@
 
 #ifdef HW02
 #define HARDWARE_VERSION "rev. 02"
-#define GPIO_MUX_OE 34
-#define GPIO_MUX_SEL 33
+#define GPIO_MUX_OE GPIO_NUM_34
+#define GPIO_MUX_SEL GPIO_NUM_33
 #define GPIO_MUX_SEL_PC 0
 #define GPIO_MUX_SEL_MC 1
 #define GPIO_WS2812B_PIN GPIO_NUM_38

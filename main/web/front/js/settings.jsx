@@ -1,8 +1,8 @@
-const Modal = ({ isOpen, onClose, children }) => {
+const Modal = ({ isOpen, onClose, children, className = '' }) => {
     if (!isOpen) return null;
     return (
-        <div className="modal-overlay">
-            <div className="modal-content">
+        <div className="modal-overlay" onClick={onClose}>
+            <div className={`modal-content ${className}`} onClick={e => e.stopPropagation()}>
                 <button className="modal-close" onClick={onClose}>×</button>
                 {children}
             </div>
@@ -117,8 +117,23 @@ const useWebSocket = (onMessage) => {
     return { connected, loading, error, send };
 };
 
+const ConfirmModal = ({ isOpen, onClose, title, message, onYes, onNo, showCancel = false }) => {
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} className="confirm-modal">
+            <h3>{title}</h3>
+            <p>{message}</p>
+            <div className="confirm-buttons">
+                <button onClick={() => { onYes(); onClose(); }}>Yes</button>
+                <button onClick={() => { onNo(); onClose(); }}>No</button>
+                {showCancel && <button onClick={onClose}>Cancel</button>}
+            </div>
+        </Modal>
+    );
+};
+
 const App = () => {
     const [isModalOpen, setIsModalOpen] = React.useState(false);
+    const [confirmModal, setConfirmModal] = React.useState({ isOpen: false, config: {} });
     const [systemInfo, setSystemInfo] = React.useState({
         heap: 0,
         temp: 0,
@@ -310,15 +325,32 @@ const App = () => {
     }, [connected, requestSettings]);
 
     const saveSettings = () => {
-        const keepWifi = confirm('Do you want to keep WiFi and web stack on after reboot? Press "Ok" to keep it enabled.');
-
-        if (send({
-            type: 'command',
-            command: 'update_settings',
-            content: { ...settings, keepWifi }
-        })) {
-            showStatus('Saving settings…', 'info');
-        }
+        setConfirmModal({
+            isOpen: true,
+            config: {
+                title: 'Save Settings',
+                message: 'Do you want to keep WiFi and web stack on after reboot?',
+                showCancel: true,
+                onYes: () => {
+                    if (send({
+                        type: 'command',
+                        command: 'update_settings',
+                        content: { ...settings, keepWifi: true }
+                    })) {
+                        showStatus('Settings saved. WiFi kept on.', 'success');
+                    }
+                },
+                onNo: () => {
+                    if (send({
+                        type: 'command',
+                        command: 'update_settings',
+                        content: { ...settings, keepWifi: false }
+                    })) {
+                        showStatus('Settings saved. You can close this page.', 'info');
+                    }
+                }
+            }
+        });
     };
 
     const updateSetting = (category, key, value) => {
@@ -370,16 +402,24 @@ const App = () => {
     }
 
     const clearData = () => {
-        if (confirm('Are you sure you want to restore default configuration?')) {
-            send({ type: 'clear', content: { keepWifi: true } });
-            showStatus('Done! The device is rebooting.', 'success');
-        }
+        setConfirmModal({
+            isOpen: true,
+            config: {
+                title: 'Clear Data',
+                message: 'Are you sure you want to restore default configuration?',
+                onYes: () => {
+                    send({ type: 'clear', content: { keepWifi: true } });
+                    showStatus('Done! The device is rebooting.', 'success');
+                },
+                onNo: () => {}
+            }
+        });
     }
 
     const handleFirmwareUpload = () => {
         const fileInput = fileInputRef.current;
         if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
-            showStatus('Please select a firmware file', 'error');
+            showStatus('Please select a firmware file.', 'error');
             return;
         }
 
@@ -404,12 +444,7 @@ const App = () => {
             req.onerror = () => reject(new Error('Network error'));
             req.send(file);
         })
-        .then(data => {
-            console.log('Upload successful:', data);
-        })
         .catch(error => {
-            console.error('Upload failed:', error);
-            setOtaInProgress(false);
             showStatus(`Upload failed: ${error.message}`, 'error');
         });
     };
@@ -434,13 +469,19 @@ const App = () => {
 
     return (
         <div>
-            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} className="config-modal">
                 {isModalOpen ? (
-                    <HIDControlsConfigurator defaultValues={settings.buttons} onConfigChange={onConfigChange} />
+                    <HIDControlsConfigurator onClose={() => setIsModalOpen(false)} defaultValues={settings.buttons} onConfigChange={onConfigChange} />
                 ) : null}
             </Modal>
 
             <h1>Device Settings</h1>
+
+            <ConfirmModal 
+                isOpen={confirmModal.isOpen}
+                onClose={() => setConfirmModal({ isOpen: false, config: {} })}
+                {...confirmModal.config}
+            />
 
             <div className="container">
                 {statusMessage && (
@@ -547,21 +588,6 @@ const App = () => {
                             <option value="p9">+9 dB</option>
                         </select>
                     </div>
-
-                    {/*<div className="setting-item">*/}
-                    {/*    <div className="setting-title">Reconnect delay</div>*/}
-                    {/*    <div className="setting-description">*/}
-                    {/*        Delay in seconds before attempting to reconnect after Bluetooth disconnect.*/}
-                    {/*        Doesn't affect waking up from sleep.*/}
-                    {/*    </div>*/}
-                    {/*    <input*/}
-                    {/*        type="number"*/}
-                    {/*        min="1"*/}
-                    {/*        max="60"*/}
-                    {/*        value={settings.connectivity.bleRecDelay}*/}
-                    {/*        onChange={(e) => updateSetting('connectivity', 'bleRecDelay', parseInt(e.target.value))}*/}
-                    {/*    />*/}
-                    {/*</div>*/}
                 </div>
 
                 <div className="setting-group">
@@ -573,6 +599,20 @@ const App = () => {
                             Configure on-device buttons and the rotary encoder.
                         </div>
                         <button onClick={() => setIsModalOpen(true)}>Configure</button>
+                    </div>
+
+                    <div className="setting-item">
+                        <div className="setting-title">Long press threshold</div>
+                        <div className="setting-description">
+                            Time in milliseconds to trigger long press action.
+                        </div>
+                        <input
+                            type="number"
+                            min="100"
+                            max="5000"
+                            value={settings.buttons?.longPressMs || 750}
+                            onChange={(e) => updateSetting('buttons', 'longPressMs', parseInt(e.target.value))}
+                        />
                     </div>
 
                     <div className="setting-item">
@@ -669,8 +709,8 @@ const App = () => {
                         <div className="setting-item">
                             <div className="setting-title">
                                 {settings.power.twoSleeps 
-                                    ? 'Light sleep timeout'
-                                    : 'Sleep timeout'}
+                                    ? 'Light sleep timeout (seconds)'
+                                    : 'Sleep timeout (seconds)'}
                             </div>
                             <div className="setting-description">
                                 Time without USB events in seconds before device enters light sleep mode. 
@@ -686,7 +726,7 @@ const App = () => {
                         </div>
 
                         <div className={`setting-item ${settings.power.twoSleeps && settings.power.deepSleep ? 'animate-visible' : 'animate-hidden'}`}>
-                            <div className="setting-title">Deep sleep timeout</div>
+                            <div className="setting-title">Deep sleep timeout (seconds)</div>
                             <div className="setting-description">
                                 Time without USB events in seconds before device enters deep sleep mode.
                                 In deep sleep, the device will do nothing and only wake up when you press any button on the bridge device itself.
@@ -721,20 +761,6 @@ const App = () => {
                             />
                             <span className="range-value">{settings.mouse.sensitivity}%</span>
                         </div>
-                    </div>
-
-                    <div className="setting-item">
-                        <div className="setting-title">Long press threshold</div>
-                        <div className="setting-description">
-                            Time in milliseconds to trigger long press action.
-                        </div>
-                        <input
-                            type="number"
-                            min="100"
-                            max="5000"
-                            value={settings.buttons?.longPressMs || 750}
-                            onChange={(e) => updateSetting('buttons', 'longPressMs', parseInt(e.target.value))}
-                        />
                     </div>
 
                     <div className="setting-item">

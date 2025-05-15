@@ -15,8 +15,8 @@
 
 #define VIN_THRESHOLD          4.20f
 #define BAT_SLOW_PHASE_THRESH  4.16f
-#define BAT_NORMAL_THRESH      3.56f
-#define BAT_WARNING_THRESH     3.45f
+#define BAT_NORMAL_THRESH      3.52f
+#define BAT_WARNING_THRESH     3.43f
 #define BAT_DEAD_THRESH        3.25f
 #define ADC_CORRECTION_COEF    1.025f
 

@@ -1,4 +1,4 @@
-const HIDControlsConfigurator = ({ numKeys = 4, defaultValues, onConfigChange }) => {
+const HIDControlsConfigurator = ({ onClose, defaultValues, onConfigChange }) => {
   const acTypes = [
     { key: 'keyboard_key', value: 'Keyboard Key' },
     { key: 'keyboard_combo', value: 'Keyboard Combo' },
@@ -223,19 +223,6 @@ const HIDControlsConfigurator = ({ numKeys = 4, defaultValues, onConfigChange })
     }
   };
 
-  const handleComboKeyChange = (index, key, isLongPress = false) => {
-    const newConfigs = isLongPress ? [ ...longPressConfigs ] : [ ...keyConfigs ];
-    newConfigs[index].action = key;
-    
-    if (isLongPress) {
-      setLongPressConfigs(newConfigs);
-      onConfigChange?.({ keys: keyConfigs, longPress: newConfigs, encoder: encoderConfig });
-    } else {
-      setKeyConfigs(newConfigs);
-      onConfigChange?.({ keys: newConfigs, longPress: longPressConfigs, encoder: encoderConfig });
-    }
-  };
-
   const handleEncoderModeChange = (mode) => {
     let left, right, click;
 
@@ -271,12 +258,7 @@ const HIDControlsConfigurator = ({ numKeys = 4, defaultValues, onConfigChange })
         click = "KC_AUDIO_MUTE";
     }
 
-    const newConfig = {
-      mode,
-      left,
-      right,
-      click
-    };
+    const newConfig = { mode, left, right, click };
     setEncoderConfig(newConfig);
     onConfigChange?.({ keys: keyConfigs, encoder: newConfig });
   };
@@ -286,10 +268,7 @@ const HIDControlsConfigurator = ({ numKeys = 4, defaultValues, onConfigChange })
       .flat()
       .find(option => option.key === event.target.value);
 
-    const newConfig = {
-      ...encoderConfig,
-      [action]: selectedOption.key
-    };
+    const newConfig = { ...encoderConfig, [action]: selectedOption.key };
     setEncoderConfig(newConfig);
     onConfigChange?.({ keys: keyConfigs, encoder: newConfig });
   };
@@ -524,6 +503,10 @@ const HIDControlsConfigurator = ({ numKeys = 4, defaultValues, onConfigChange })
 
           {renderEncoderConfig()}
         </div>
+      </div>
+
+      <div className="setting-group align-right">
+        <button onClick={onClose || undefined}>Close</button>
       </div>
     </div>
   );
