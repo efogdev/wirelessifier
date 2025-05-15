@@ -260,7 +260,7 @@ const HIDControlsConfigurator = ({ onClose, defaultValues, onConfigChange }) => 
 
     const newConfig = { mode, left, right, click };
     setEncoderConfig(newConfig);
-    onConfigChange?.({ keys: keyConfigs, encoder: newConfig });
+    onConfigChange?.({ keys: keyConfigs, encoder: newConfig, longPress: longPressConfigs });
   };
 
   const handleEncoderActionChange = (event, action) => {
@@ -272,9 +272,9 @@ const HIDControlsConfigurator = ({ onClose, defaultValues, onConfigChange }) => 
       return;
     }
 
-    const newConfig = { ...encoderConfig, [action]: event.target.value };
+    const newConfig = Object.assign({}, encoderConfig, { [action]: selectedOption.key });
     setEncoderConfig(newConfig);
-    onConfigChange?.({ keys: keyConfigs, encoder: newConfig });
+    onConfigChange?.({ keys: keyConfigs, encoder: newConfig, longPress: longPressConfigs });
   };
 
   const getDisplayValue = (keyCode) => {
