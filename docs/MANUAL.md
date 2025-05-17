@@ -59,3 +59,4 @@ Any non-verified firmware will be rolled back on next boot.
 
 ## Miscellaneous
 - To force bootloader mode: hold all buttons and the rotary encoder at the same time. But don't.
+- You will need to re-bond the device with the host after renaming it in the web configurator.
