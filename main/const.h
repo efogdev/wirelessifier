@@ -10,7 +10,7 @@
 #define TASK_MON 0
 #define ADC_MULTISAMPLE 32
 #define DEVICE_NAME "Wirelessifier"
-#define FIRMWARE_VERSION "0.2.141"
+#define FIRMWARE_VERSION "0.2.145"
 
 #ifdef HW01
 #define HARDWARE_VERSION "rev. 01"

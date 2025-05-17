@@ -30,7 +30,6 @@ const useWebSocket = (onMessage) => {
         const socket = new WebSocket(wsUrl);
         
         socket.onopen = () => {
-            console.log('WebSocket connected');
             setConnected(true);
             setLoading(false);
             setLastMessageTime(Date.now());
@@ -38,7 +37,6 @@ const useWebSocket = (onMessage) => {
         };
 
         socket.onclose = () => {
-            console.log('WebSocket disconnected');
             setConnected(false);
             setLoading(true);
 
@@ -49,7 +47,6 @@ const useWebSocket = (onMessage) => {
         };
 
         socket.onerror = (err) => {
-            console.error('WebSocket error:', err);
             setConnected(false);
             setLoading(true);
 
@@ -76,9 +73,7 @@ const useWebSocket = (onMessage) => {
             if (socketRef.current && socketRef.current.readyState !== WebSocket.CLOSED) {
                 try {
                     socketRef.current.close();
-                } catch (e) {
-                    console.error('Error closing socket:', e);
-                }
+                } catch (e) {}
             }
             
             if (reconnectTimeoutRef.current) {
@@ -294,13 +289,11 @@ const App = () => {
                                 temp: pingData.temp || 0,
                                 bat: pingData.bat || 0,
                             });
-                        } catch (e) {
-                            console.error('Error parsing ping data:', e);
-                        }
+                        } catch (e) {}
                     }
                     break;
                 default:
-                    console.log('Unknown message type:', message.type);
+                    break;
             }
         } catch (error) {
             console.error('Error parsing WebSocket message:', error);

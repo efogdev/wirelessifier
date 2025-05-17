@@ -7,8 +7,7 @@
 #include "hid_bridge.h"
 
 #define HID_NVS_NAMESPACE "hid_desc"
-
-static const char *TAG = "HID_DSC_PARSE";
+static const char *TAG = "HID_DSC_PRS";
 
 void descriptor_parser_init(void) {
     // ToDo
