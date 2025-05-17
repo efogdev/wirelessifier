@@ -58,5 +58,4 @@ This device acts as a USB-to-Bluetooth Low Energy (BLE) adapter for HID devices 
 Any non-verified firmware will be rolled back on next boot.
 
 ## Miscellaneous
-- To force bootloader mode: hold all buttons and the rotary encoder at the same time.
-- To reset, rename the device: available in the web configurator.
+- To force bootloader mode: hold all buttons and the rotary encoder at the same time. But don't.
