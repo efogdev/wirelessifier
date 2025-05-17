@@ -15,6 +15,10 @@ This project implements a Human Interface Device (HID) bridge using the ESP32-S3
 - Web configuration interface via WiFi
 - OTA updates
 
+## Disclaimer
+
+This project hardly has any real-world use. The reason is really simple: esp32-s3 sucks in terms of power consumption, for example, with a 0.2W Ploopy Adept connected as the slave device, we get only ~11 hours of active work with a 1500 mAh battery. Consider this a PoC or something. I personally see this as a compilation of the esp-idf examples into something usable (the "architecture" sucks hard though).
+
 ## Requirements
 
 - ESP-IDF v5.5 (Espressif IoT Development Framework)
