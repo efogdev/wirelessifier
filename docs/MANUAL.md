@@ -38,7 +38,7 @@ This device acts as a USB-to-Bluetooth Low Energy (BLE) adapter for HID devices 
 ## Web Interface
 1. Hold Button #4 during [re]boot to enable WiFi.
 2. Connect to the open WiFi network (unless you have already configured the device to use your access point).
-3. Open web browser and navigate to 192.168.4.1.
+3. Open web browser and navigate to 192.168.4.1 (or the IP given by your router).
 4. You can either setup the WiFi connection so the device operates withing your regular network, or go straight to settings skipping this step. Either way, the device is fully local and never uses internet.
 
 ## LED indicators
