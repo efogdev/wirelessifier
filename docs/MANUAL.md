@@ -6,7 +6,7 @@ This device acts as a USB-to-Bluetooth Low Energy (BLE) adapter for HID devices 
 ## Basic Operation
 
 ### Power
-> **Important**: long press of the rotary encoder will always restart the device, unless it sleeps. 
+> **Important**: long press of the rotary encoder will always restart the device, unless it sleeps. This is the only non-configurable action, however it is affected by the long press threshold preference. 
 
 - Charging at ~5.5W with fast charge enabled, otherwise ~2.5W.
 - Light sleep: Bluetooth disabled, but the slave device is still powered and serves as a wakeup source.  
