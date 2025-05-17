@@ -213,6 +213,7 @@ static void init_gpio(void) {
     esp_sleep_enable_ext0_wakeup(GPIO_ADC_VIN, 1);
     esp_sleep_enable_ext1_wakeup_io(
         (1ULL<<GPIO_ROT_B)      |
+        (1ULL<<GPIO_ROT_E)      |
         (1ULL<<GPIO_BUTTON_SW1) |
         (1ULL<<GPIO_BUTTON_SW2) |
         (1ULL<<GPIO_BUTTON_SW3) |

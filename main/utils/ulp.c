@@ -37,5 +37,10 @@ void IRAM_ATTR deep_sleep(void) {
     rotary_enc_deinit();
     rtc_gpio_pullup_en(GPIO_ROT_B);
     rtc_gpio_pulldown_en(GPIO_ROT_A);
+    rtc_gpio_init(GPIO_ROT_D);
+    rtc_gpio_set_level(GPIO_ROT_D, 0);
+    rtc_gpio_pulldown_en(GPIO_ROT_D);
+    rtc_gpio_hold_en(GPIO_ROT_D);
+    rtc_gpio_pullup_en(GPIO_ROT_E);
     esp_deep_sleep_start();
 }

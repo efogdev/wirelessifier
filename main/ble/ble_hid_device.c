@@ -254,13 +254,16 @@ static void gap_event_handler(const esp_gap_ble_cb_event_t event, esp_ble_gap_cb
 
             if (!param->ble_security.auth_cmpl.success) {
                 ESP_LOGE(TAG, "fail reason = 0x%x", param->ble_security.auth_cmpl.fail_reason);
-                if (param->ble_security.auth_cmpl.fail_reason == 0x66) {
-                    if (VERBOSE) {
-                        ESP_LOGI(TAG, "Unbonding device due to error 0x66");
-                    }
 
-                    esp_ble_remove_bond_device(bd_addr);
-                }
+                // ToDo
+                //
+                // if (param->ble_security.auth_cmpl.fail_reason == 0x66) {
+                //     if (VERBOSE) {
+                //         ESP_LOGI(TAG, "Unbonding device due to error 0x66");
+                //     }
+                //
+                //     esp_ble_remove_bond_device(bd_addr);
+                // }
             } else {
                 save_connected_device(bd_addr, s_connected_device_addr_type);
             }
