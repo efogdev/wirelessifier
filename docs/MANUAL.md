@@ -5,6 +5,13 @@ This device acts as a USB-to-Bluetooth Low Energy (BLE) adapter for HID devices 
 
 ## Basic Operation
 
+### tl;dr
+
+- Hold encoder + Button #4 to enable WiFi.
+- Hold encoder + Button #3 to enable BLE-only mode until next reboot (useful when charging from wall).
+- Hold encoder + Button #2 to disable any sleep until next reboot.
+- Hold encoder to reboot the device. 
+
 ### Power
 > **Important**: long press of the rotary encoder will always restart the device, unless it sleeps. This is the only non-configurable action, however it is affected by the long press threshold preference. 
 
