@@ -151,6 +151,7 @@ const App = () => {
             twoSleeps: true,
             fastCharge: true,
             disableSlowPhase: false,
+            disableWarn: false,
             warpSpeed: 'slow',
             output: 5,
         },
@@ -772,6 +773,21 @@ const App = () => {
                             value={toLinear(settings.led.brightness)}
                             onChange={(e) => updateSetting('led', 'brightness', toLog(parseInt(e.target.value)))}
                         />
+                    </div>
+
+                    <div className="setting-item">
+                        <div className="setting-title">Enable battery warning</div>
+                        <div className="setting-description">
+                            Blink yellow when the battery is under ±30%.
+                        </div>
+                        <label className="toggle-switch">
+                            <input
+                                type="checkbox"
+                                checked={!settings.power.disableWarn}
+                                onChange={(e) => updateSetting('power', 'disableWarn', !e.target.checked)}
+                            />
+                            <span className="slider"></span>
+                        </label>
                     </div>
                 </div>
 

@@ -29,6 +29,7 @@ static bool s_never_wired = false;
 static float bat_volts = 0;
 static bool s_slow_phase = false;
 static bool s_charging_finished = false;
+static bool s_disable_warn = false;
 
 // ToDo remove this and impement proper termination
 static void slow_phase_timer_cb(TimerHandle_t xTimer) {
@@ -100,13 +101,13 @@ static void start_charging() {
 }
 
 void vmon_task(void *pvParameters) {
-    vTaskDelay(pdMS_TO_TICKS(50));
-
     bool disable_slow_phase;
-    storage_get_bool_setting("power.disableSlowPhase", &disable_slow_phase);
-
     bool fast_charge;
+
+    storage_get_bool_setting("power.disableSlowPhase", &disable_slow_phase);
     storage_get_bool_setting("power.fastCharge", &fast_charge);
+    storage_get_bool_setting("power.disableWarn", &s_disable_warn);
+    vTaskDelay(pdMS_TO_TICKS(50));
 
     uint16_t i = 0;
     while (1) {
@@ -227,9 +228,9 @@ IRAM_ATTR battery_state_t get_battery_state(void) {
 
     if (is_charging()) {
         new_state = BATTERY_CHARGING;
-    } else if (level > BAT_NORMAL_THRESH || is_psu_connected()) {
+    } else if (level > (s_disable_warn ? BAT_WARNING_THRESH : BAT_NORMAL_THRESH) || is_psu_connected()) {
         new_state = BATTERY_NORMAL;
-    } else if (level > BAT_WARNING_THRESH) {
+    } else if (level > BAT_WARNING_THRESH && !s_disable_warn) {
         new_state = BATTERY_WARNING;
     } else {
         new_state = BATTERY_LOW;
