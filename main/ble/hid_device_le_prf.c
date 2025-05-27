@@ -82,10 +82,10 @@ static void IRAM_ATTR esp_hidd_prf_cb_hdl(esp_gatts_cb_event_t event, esp_gatt_i
             esp_ble_conn_update_params_t conn_params;
             memcpy(conn_params.bda, param->connect.remote_bda, sizeof(esp_bd_addr_t));
 
-            conn_params.latency = 0x00;
-            conn_params.min_int = 0x06; // x 1.25ms
-            conn_params.max_int = 0x06; // x 1.25ms
-            conn_params.timeout = 0xA0; // x 6.25ms
+            conn_params.latency = 0x10;
+            conn_params.min_int = 0x06;  // x 1.25ms
+            conn_params.max_int = 0x06;  // x 1.25ms
+            conn_params.timeout = 0xC80; // x 6.25ms
 
             esp_ble_gap_update_conn_params(&conn_params);
             break;

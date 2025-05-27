@@ -62,10 +62,10 @@ static uint8_t hidd_service_uuid128[] = {
 static esp_ble_adv_data_t hidd_adv_data = {
     .set_scan_rsp = false,
     .include_name = true,
-    .include_txpower = true,
+    .include_txpower = false,
     .min_interval = 0x6,
-    .max_interval = 0x20,
-    .appearance = ESP_BLE_APPEARANCE_HID_GAMEPAD,
+    .max_interval = 0x6,
+    .appearance = ESP_BLE_APPEARANCE_GENERIC_HID,
     .manufacturer_len = 0,
     .p_manufacturer_data = NULL,
     .service_data_len = 0,
@@ -77,7 +77,7 @@ static esp_ble_adv_data_t hidd_adv_data = {
 
 static esp_ble_adv_params_t hidd_adv_params = {
     .adv_int_min = 0x20,
-    .adv_int_max = 0x60,
+    .adv_int_max = 0x80,
     .adv_type = ADV_TYPE_IND,
     .own_addr_type = BLE_ADDR_TYPE_PUBLIC,
     .channel_map = ADV_CHNL_ALL,
@@ -254,16 +254,6 @@ static void gap_event_handler(const esp_gap_ble_cb_event_t event, esp_ble_gap_cb
 
             if (!param->ble_security.auth_cmpl.success) {
                 ESP_LOGE(TAG, "fail reason = 0x%x", param->ble_security.auth_cmpl.fail_reason);
-
-                // ToDo
-                //
-                // if (param->ble_security.auth_cmpl.fail_reason == 0x66) {
-                //     if (VERBOSE) {
-                //         ESP_LOGI(TAG, "Unbonding device due to error 0x66");
-                //     }
-                //
-                //     esp_ble_remove_bond_device(bd_addr);
-                // }
             } else {
                 save_connected_device(bd_addr, s_connected_device_addr_type);
             }
