@@ -12,6 +12,7 @@
 #include "const.h"
 #include "esp_gap_ble_api.h"
 #include "esp_ota_ops.h"
+#include "esp_random.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
@@ -30,6 +31,7 @@ static const char *WIFI_TAG = "WIFI_MGR";
 #define NVS_NAMESPACE "wifi_config"
 #define NVS_KEY_SSID "ssid"
 #define NVS_KEY_PASS "password"
+#define NVS_KEY_MAC "mac_address"
 
 int s_retry_num = 0;
 static bool connecting = false;
@@ -478,6 +480,23 @@ void process_wifi_ws_message(const char* message) {
             const esp_partition_t* phy_partition = esp_partition_get(it);
             esp_partition_erase_range(phy_partition, 0, phy_partition->size);
             esp_partition_iterator_release(it);
+        }
+        reboot_device(false);
+    }
+    else if (strcmp(type->valuestring, "macgen") == 0) {
+        uint8_t mac[6];
+        esp_fill_random(mac, sizeof(mac));
+        mac[0] &= 0xFE; // Ensure it's a unicast MAC
+        mac[0] |= 0x02; // Set locally administered bit
+        
+        nvs_handle_t nvs_handle;
+        esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
+        if (err == ESP_OK) {
+            err = nvs_set_blob(nvs_handle, NVS_KEY_MAC, mac, sizeof(mac));
+            if (err == ESP_OK) {
+                nvs_commit(nvs_handle);
+            }
+            nvs_close(nvs_handle);
         }
         reboot_device(false);
     }

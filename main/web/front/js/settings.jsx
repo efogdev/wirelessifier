@@ -414,6 +414,23 @@ const App = () => {
         });
     }
 
+     const assignRandomMAC = () => {
+        setConfirmModal({
+            isOpen: true,
+            config: {
+                title: 'Reset MAC address',
+                message: 'Are you sure you want to assign a new random MAC address to the device? You will need to re-pair.',
+                yesClassName: 'error',
+                noClassName: 'neutral',
+                onYes: () => {
+                    send({ type: 'macgen', content: { keepWifi: true } });
+                    showStatus('Done! The device is rebooting.', 'success');
+                },
+                onNo: () => {}
+            }
+        });
+    }
+
     const handleFirmwareUpload = () => {
         const fileInput = fileInputRef.current;
         if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
@@ -618,7 +635,8 @@ const App = () => {
                         <div className="setting-description">
                             Restore factory default configuration, remove saved devices.
                         </div>
-                        <button className="error" onClick={() => clearData()}>Clear</button>
+                        <button className="error pr" onClick={() => clearData()}>Clear data</button>
+                        <button className="error" onClick={() => assignRandomMAC()}>New MAC</button>
                     </div>
                 </div>
 

@@ -138,8 +138,22 @@ static char *current_settings = NULL;
 
 static void get_mac_address_str(char *mac_str, const size_t size) {
     uint8_t mac[6];
+    nvs_handle_t nvs_handle;
+    size_t mac_len = sizeof(mac);
+    
+    if (nvs_open("wifi_config", NVS_READONLY, &nvs_handle) == ESP_OK) {
+        if (nvs_get_blob(nvs_handle, "mac_address", mac, &mac_len) == ESP_OK && mac_len == sizeof(mac)) {
+            esp_iface_mac_addr_set(mac, ESP_MAC_BASE);
+            nvs_close(nvs_handle);
+            snprintf(mac_str, size, "%02X:%02X:%02X:%02X:%02X:%02X",
+                     mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+            return;
+        }
+        nvs_close(nvs_handle);
+    }
+    
     esp_read_mac(mac, ESP_MAC_BT);
-    snprintf(mac_str, size, "%02X:%02X:%02X:%02X:%02X:%02X", 
+    snprintf(mac_str, size, "%02X:%02X:%02X:%02X:%02X:%02X",
              mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 }
 
