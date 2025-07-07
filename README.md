@@ -1,7 +1,5 @@
 # Wirelessifier: USB-to-BLE bridge
 
-**⚠️ This project is currently in active development. Functionality is limited.**
-
 ## Overview
 
 This project implements a Human Interface Device (HID) bridge using the ESP32-S3 microcontroller. It allows connecting USB HID devices (like keyboards and mice) and forwarding their inputs to other devices via Bluetooth Low Energy (BLE 4.2).
